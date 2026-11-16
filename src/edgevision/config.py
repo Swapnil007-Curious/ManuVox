@@ -6,6 +6,7 @@ from typing import Literal, Self
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from edgevision import spec
 from edgevision.data.landmarks import DEFAULT_POSE_INDICES, validate_pose_indices
 
 
@@ -16,13 +17,28 @@ class _StrictModel(BaseModel):
 class PreprocessConfig(_StrictModel):
     data_root: Path
     output_dir: Path
-    num_frames: int = Field(default=32, ge=1)
-    use_z: bool = False  # z from this source is unreliable; kept optional.
+    num_frames: int = Field(default=spec.NUM_FRAMES, ge=1)
+    use_z: bool = spec.USE_Z  # z from this source is unreliable; kept optional.
     pose_indices: list[int] = Field(default_factory=lambda: list(DEFAULT_POSE_INDICES))
-    min_hand_frames: int = Field(default=3, ge=1)
+    min_hand_frames: int = Field(default=spec.MIN_HAND_FRAMES, ge=1)
     limit: int | None = Field(default=None, ge=1)
     num_workers: int = Field(default=4, ge=1)
     seed: int = Field(default=42, ge=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_pose_set(cls, raw: object) -> object:
+        """``pose_set: v1|v2`` names a features_spec.json selection instead of listing it."""
+        if not isinstance(raw, dict) or "pose_set" not in raw:
+            return raw
+        values = dict(raw)
+        name = values.pop("pose_set")
+        if name not in spec.POSE_SETS:
+            raise ValueError(f"pose_set {name!r} is not one of {sorted(spec.POSE_SETS)}")
+        if "pose_indices" in values and list(values["pose_indices"]) != list(spec.POSE_SETS[name]):
+            raise ValueError(f"pose_indices contradict pose_set {name!r}")
+        values["pose_indices"] = list(spec.POSE_SETS[name])
+        return values
 
     @field_validator("pose_indices")
     @classmethod

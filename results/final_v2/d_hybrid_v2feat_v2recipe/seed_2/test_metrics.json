@@ -1,0 +1,28 @@
+{
+  "model": "hybrid",
+  "split_mode": "signer_independent",
+  "seed": 2,
+  "evaluator": "torch_fp32",
+  "n_sequences": 16242,
+  "test_top1": 0.6840906292328531,
+  "test_top5": 0.8734761728851127,
+  "test_macro_f1": 0.6740101549436686,
+  "per_participant": {
+    "30680": {
+      "n_sequences": 2700,
+      "top1": 0.5192592592592593
+    },
+    "37779": {
+      "n_sequences": 4322,
+      "top1": 0.7734844979176307
+    },
+    "49445": {
+      "n_sequences": 4787,
+      "top1": 0.6089408815542093
+    },
+    "62590": {
+      "n_sequences": 4433,
+      "top1": 0.7784795849311978
+    }
+  }
+}

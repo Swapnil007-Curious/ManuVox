@@ -46,6 +46,8 @@ TEST_SUMMARY_COLUMNS = (
     "n_seeds",
     "test_top1_mean",
     "test_top1_std",
+    "test_top3_mean",
+    "test_top3_std",
     "test_top5_mean",
     "test_top5_std",
     "test_macro_f1_mean",
@@ -86,6 +88,7 @@ ENSEMBLE_KEYS = ("experiment", "model", "split_mode", "feature_set", "recipe", "
 VAL_ENSEMBLE_COLUMNS = (
     *ENSEMBLE_KEYS,
     "val_top1",
+    "val_top3",
     "val_top5",
     "val_macro_f1",
     "val_top1_seed_mean",
@@ -93,6 +96,7 @@ VAL_ENSEMBLE_COLUMNS = (
 TEST_ENSEMBLE_COLUMNS = (
     *ENSEMBLE_KEYS,
     "test_top1",
+    "test_top3",
     "test_top5",
     "test_macro_f1",
     "test_top1_seed_mean",
@@ -168,13 +172,14 @@ def select_best_experiment(val_summary: pd.DataFrame) -> str:
 def ensemble_scores(
     member_logits: Sequence[npt.NDArray[np.float32]], labels: npt.NDArray[np.int64]
 ) -> dict[str, float]:
-    """Top-1, top-5 and macro-F1 of the mean of the members' logits, plus the members' mean
-    single-model top-1."""
+    """Top-1, top-3, top-5 and macro-F1 of the mean of the members' logits, plus the members'
+    mean single-model top-1."""
     if len(member_logits) < 2:
         raise ValueError("an ensemble needs at least two members")
     averaged = np.mean(np.stack(member_logits), axis=0)
     return {
         "top1": top_k_accuracy(averaged, labels, 1),
+        "top3": top_k_accuracy(averaged, labels, 3),
         "top5": top_k_accuracy(averaged, labels, 5),
         "macro_f1": macro_f1(labels, averaged.argmax(axis=1)),
         "top1_seed_mean": float(
@@ -213,12 +218,14 @@ def score_test_split(
     labels: npt.NDArray[np.int64],
     participants: npt.NDArray[np.int64],
 ) -> dict[str, Any]:
-    """Top-1, top-5, macro-F1 and per-participant top-1 (not named test_* so pytest skips it)."""
+    """Top-1, top-3, top-5, macro-F1 and per-participant top-1 (not named test_* so pytest
+    skips it)."""
     predictions = logits.argmax(axis=1)
     per_participant = per_group_accuracy(labels, predictions, participants)
     return {
         "n_sequences": int(labels.size),
         "test_top1": top_k_accuracy(logits, labels, 1),
+        "test_top3": top_k_accuracy(logits, labels, 3),
         "test_top5": top_k_accuracy(logits, labels, 5),
         "test_macro_f1": macro_f1(labels, predictions),
         "per_participant": {
@@ -232,7 +239,11 @@ def summarize_test(records: Sequence[dict[str, Any]]) -> pd.DataFrame:
     """``records`` hold model, split_mode, seed, the score_test_split() keys and, optionally,
     experiment."""
     frame = pd.DataFrame(records)
-    table = _mean_std(frame, ("test_top1", "test_top5", "test_macro_f1"))
+    if "test_top3" not in frame.columns:
+        # Records written before top-3 was scored keep the table they were published with.
+        table = _mean_std(frame, ("test_top1", "test_top5", "test_macro_f1"))
+        return table.loc[:, [c for c in TEST_SUMMARY_COLUMNS if not c.startswith("test_top3")]]
+    table = _mean_std(frame, ("test_top1", "test_top3", "test_top5", "test_macro_f1"))
     return table.loc[:, list(TEST_SUMMARY_COLUMNS)]
 
 

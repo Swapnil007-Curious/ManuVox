@@ -1,0 +1,29 @@
+{
+  "model": "cnn",
+  "split_mode": "signer_independent",
+  "seed": 2,
+  "evaluator": "torch_fp32",
+  "n_sequences": 16242,
+  "test_top1": 0.6304642285432829,
+  "test_top3": 0.8051964043836966,
+  "test_top5": 0.8521118088905307,
+  "test_macro_f1": 0.6188600674346116,
+  "per_participant": {
+    "30680": {
+      "n_sequences": 2700,
+      "top1": 0.4603703703703704
+    },
+    "37779": {
+      "n_sequences": 4322,
+      "top1": 0.7184173993521518
+    },
+    "49445": {
+      "n_sequences": 4787,
+      "top1": 0.5686233549195738
+    },
+    "62590": {
+      "n_sequences": 4433,
+      "top1": 0.7150913602526505
+    }
+  }
+}

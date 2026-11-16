@@ -1,0 +1,139 @@
+{
+  "spec_version": 1,
+  "description": "The single source of truth for the landmark features: read by src/edgevision/spec.py (training, export, the offline live pipeline) and web/src/spec.ts (the browser demo). Change a value here, not in code. Values marked as derived are written by scripts/calibrate_live.py from the train or val split only.",
+  "dataset": {
+    "name": "asl-signs",
+    "tracker": "MediaPipe Holistic",
+    "raw_format": "long rows (frame, type, landmark_index, x, y, z), x and y normalised by the frame width and height"
+  },
+  "landmark_types": {
+    "order": ["face", "left_hand", "pose", "right_hand"],
+    "counts": {
+      "face": 468,
+      "left_hand": 21,
+      "pose": 33,
+      "right_hand": 21
+    }
+  },
+  "selection": {
+    "order": ["left_hand", "right_hand", "pose"],
+    "hand_points": 21,
+    "face": "dropped: no face or lip points are selected",
+    "pose_sets": {
+      "v1": [0, 11, 12, 13, 14, 15, 16],
+      "v2": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    },
+    "default_pose_set": "v1"
+  },
+  "pose_points": {
+    "nose": 0,
+    "mouth_left": 9,
+    "mouth_right": 10,
+    "left_shoulder": 11,
+    "right_shoulder": 12,
+    "left_wrist": 15,
+    "right_wrist": 16
+  },
+  "pose_swap_pairs": [[1, 4], [2, 5], [3, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 16]],
+  "hand_points": {
+    "wrist": 0,
+    "middle_mcp": 9,
+    "fingertips": [4, 8, 12, 16, 20]
+  },
+  "coordinates": {
+    "axes": ["x", "y"],
+    "use_z": false,
+    "z": "dropped: training never used z, so the different z scales of Holistic and the Tasks landmarkers do not reach the model",
+    "x_snap_grid": 4294967296
+  },
+  "missing": {
+    "raw": "NaN for every point of an undetected block",
+    "hand_presence": "a hand is present in a frame when all 21 of its x and y are finite",
+    "frame_filter": "frames with no present hand are dropped before every other step",
+    "after_resampling": 0.0,
+    "model_rule": "a point is missing when x == 0.0 and y == 0.0; derived features of missing points are 0.0"
+  },
+  "min_hand_frames": 3,
+  "dominance": {
+    "rule": "mirror when the left hand is present in strictly more kept frames than the right; ties keep the right",
+    "mirror": "x -> 1 - x, swap the hand blocks, swap every selected pose_swap_pair, swap the presence columns"
+  },
+  "normalization": {
+    "method": "shoulders",
+    "center": "nanmedian over kept frames of the shoulder midpoint",
+    "scale": "nanmedian over kept frames of the shoulder distance",
+    "fallback": "hand_fallback when no kept frame has both shoulders: center = nanmean of all hand points, scale = the larger side of their bounding box",
+    "min_scale": 1e-06
+  },
+  "resampling": {
+    "num_frames": 32,
+    "coordinates": "linear between finite values of each coordinate; positions before the first or after the last finite value stay missing",
+    "presence": "nearest neighbour, index floor(position + 0.5)",
+    "training_axis": "kept-frame index",
+    "live_axis": "kept-frame clock: every kept frame advances the clock by its own capture interval (the time since the previous captured frame, capped at max_gap_ms), so a constant frame rate gives exactly the training positions"
+  },
+  "storage": {
+    "dtype": "float16",
+    "presence": "stored unrounded"
+  },
+  "model_input": {
+    "layout": "per frame: the selected landmarks landmark-major [x0, y0, x1, y1, ...], then presence_left and presence_right",
+    "input_name": "landmarks",
+    "output_name": "logits"
+  },
+  "aspect": {
+    "train_width_over_height": 0.723,
+    "train_width_over_height_iqr": [0.689, 0.761],
+    "face_ratio_reference": 1.106,
+    "derived": "scripts/calibrate_live.py: train_width_over_height = f_train / face_ratio_reference, with f the eye-to-mouth height over the eye distance in normalised image coordinates (pose eyes 2 and 5, mouth corners 9 and 10; f = physical ratio x width / height), f_train its median over the train split's frames (iqr: its quartiles), and face_ratio_reference the physical ratio of MediaPipe's canonical face mesh (canonical_face_model.obj: eye centres from corners 33/133 and 362/263, mouth corners 61/291: 6.97 cm over 6.30 cm). The same estimator gives 1.318 on 640 x 480 Holistic landmarks (true 1.333).",
+    "correction": "y' = y_mid + (y - y_mid) * k on every landmark of a frame, about that frame's shoulder midpoint y (default_y_mid without both shoulders); x unchanged",
+    "frame_k": "k = train_width_over_height / (width / height) of the frame given to the landmarkers",
+    "default_y_mid": 0.5,
+    "k_min": 0.25,
+    "k_max": 4.0,
+    "calibration": {
+      "description": "the body-ratio alternative: k = r_train / median r_live over 2 s, r = |y_nose - y_shoulder_mid| / |x_left_shoulder - x_right_shoulder|",
+      "seconds": 2.0,
+      "min_visibility": 0.5
+    }
+  },
+  "live": {
+    "trackers": {
+      "hands": "MediaPipe Tasks HandLandmarker, 2 hands, VIDEO mode",
+      "pose": "MediaPipe Tasks PoseLandmarker, 1 pose, VIDEO mode",
+      "face": "not used: the model has no face or lip points"
+    },
+    "hand_assignment": {
+      "rule": "nearest_pose_wrist",
+      "description": "Holistic crops each hand from the pose: left_hand is the hand at pose landmark 15 (the signer's left wrist). A detected hand goes to the block of the nearer pose wrist; two hands take the pairing with the smaller total distance. Without a pose the handedness label decides; Tasks HandLandmarker reports the true handedness on an unmirrored frame.",
+      "label_on_unmirrored_frame": {
+        "Left": "left_hand",
+        "Right": "right_hand"
+      }
+    },
+    "mirroring": "landmarks come from the unmirrored camera frame; only the preview is mirrored",
+    "motion": {
+      "points": "wrist and the five fingertips of every present hand",
+      "units": "shoulder widths per second, on aspect-corrected coordinates",
+      "scale": "shoulder distance of the frame, else the last known one, else hand_scale_factor x the wrist-middle MCP distance",
+      "hand_scale_factor": 4.0,
+      "window_ms": 100,
+      "speed": "mean displacement of the points between the frame and the latest earlier frame at least window_ms older (the oldest kept frame while the hand is newer), over the scale and the time between the two frames",
+      "energy": "the largest speed among the present hands; 0 for a hand seen in one frame only; none without a hand"
+    },
+    "segmenter": {
+      "start_energy": 1.08,
+      "still_energy": 0.41,
+      "still_ms": 400,
+      "hand_lost_ms": 200,
+      "max_ms": 3000,
+      "min_ms": 250,
+      "preroll_ms": 22.0,
+      "tail_ms": 0.0,
+      "max_gap_ms": 200,
+      "early_guess_ms": 600,
+      "early_guess_every_ms": 500,
+      "derived": "scripts/calibrate_live.py on the val split (12573 sequences, frames 30 fps apart before resampling): start_energy = P10 of the per-sequence peak energy; still_energy = the largest value with at most 5% of sequences still for still_ms inside the sign; preroll_ms and tail_ms = median lead-in before start_energy and median tail after the last frame above still_energy"
+    }
+  }
+}

@@ -43,7 +43,7 @@ export interface Segment<T> {
 
 export type SegmenterEvent<T> =
   | { type: "segment"; segment: Segment<T> }
-  | { type: "discarded"; handFrames: number; reason: EndReason; startTime: number; endTime: number };
+  | { type: "discarded"; handFrames: number; reason: EndReason; startTime: number; endTime: number; frames: TimedFrame<T>[] };
 
 export type SegmenterState = "idle" | "arming" | "recording";
 
@@ -155,7 +155,7 @@ export class Segmenter<T> {
     const startTime = this.startTime;
     this.reset();
     if (handFrames < this.settings.minHandFrames) {
-      return { type: "discarded", handFrames, reason, startTime, endTime };
+      return { type: "discarded", handFrames, reason, startTime, endTime, frames };
     }
     return { type: "segment", segment: { frames, startTime, endTime, handFrames, reason } };
   }

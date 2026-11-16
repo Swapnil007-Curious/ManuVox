@@ -4,12 +4,27 @@
 // navigations get the cached index.html. Matching ignores Vary (servers may send Vary: Origin,
 // and module scripts carry an Origin header the precache requests lack). Cross-origin requests
 // are never made by the app.
+//
+// Cross-origin isolation (SharedArrayBuffer, so onnxruntime-web's wasm threads) needs COOP and
+// COEP headers, which GitHub Pages cannot send: like coi-serviceworker, this worker adds them
+// (the values of config/plugins.ts CROSS_ORIGIN_ISOLATION_HEADERS) to every response it serves,
+// so a page it controls is isolated. The first visit is not controlled yet; src/main.ts reloads
+// it once when the worker takes over, unless the camera is already running.
 
 const VERSION = "__CACHE_VERSION__";
 const CACHE = `edge-vision-${VERSION}`;
 const PRECACHE = __PRECACHE_URLS__;
+const ISOLATION_HEADERS = __ISOLATION_HEADERS__;
 const SCOPE = new URL(self.registration.scope);
 const INDEX = new URL("index.html", SCOPE).href;
+
+/** The response with the isolation headers added; opaque responses cannot be changed. */
+function isolated(response) {
+  if (!response || response.status === 0 || response.type === "opaque" || response.type === "opaqueredirect") return response;
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(ISOLATION_HEADERS)) headers.set(name, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -41,7 +56,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       (async () => {
         const cache = await caches.open(CACHE);
-        return (await cache.match(INDEX, { ignoreVary: true })) ?? fetch(request);
+        return isolated((await cache.match(INDEX, { ignoreVary: true })) ?? (await fetch(request)));
       })(),
     );
     return;
@@ -49,7 +64,7 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
-      return (await cache.match(request, { ignoreSearch: true, ignoreVary: true })) ?? fetch(request);
+      return isolated((await cache.match(request, { ignoreSearch: true, ignoreVary: true })) ?? (await fetch(request)));
     })(),
   );
 });

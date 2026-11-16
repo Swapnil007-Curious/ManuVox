@@ -1,0 +1,32 @@
+{
+  "browser": "157.0.8103.52",
+  "measured_at": "2026-11-16T01:16:36.435Z",
+  "results": [
+    {
+      "ep": "wasm",
+      "threads": 1,
+      "backend": "wasm",
+      "crossOriginIsolated": true,
+      "webgpu": true,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+      "hardwareConcurrency": 4,
+      "model": {
+        "file": "model.onnx",
+        "sha256": "470f255749edd18297ab160b8f7e52f8eb83f0087549c576a64f37f7914cbf80",
+        "variant": "fp32",
+        "bytes": 41068119
+      },
+      "sessionMs": 1132.744999999879,
+      "runs": 200,
+      "p50": 38.59499999997206,
+      "p95": 45.294999999925494,
+      "mean": 38.773525000006195,
+      "maxAbsDiffVsWasm1": null,
+      "top1AgreesWithWasm1": null,
+      "error": null,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ]
+    }
+  ]
+}

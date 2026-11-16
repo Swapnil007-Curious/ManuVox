@@ -1,9 +1,10 @@
-"""Export one trained model for the browser demo in web/.
+"""Export one trained model, or the seed ensemble of its experiment, for the browser demo in web/.
 
-Writes ``<out>/model.onnx`` (a copy of one quantisation variant), ``<out>/meta.json`` (labels,
-input layout, preprocessing settings, hashes and the confidence threshold) and the golden vectors
-that the web test suite compares the browser against. Only the val split is read; asking for any
-other split raises.
+Writes ``<out>/model.onnx`` (one ONNX variant, chosen on val by VARIANT_RULE), ``<out>/meta.json``
+(labels, feature set, input layout, preprocessing settings including the pose swap pairs, the
+training aspect statistics, hashes, the variant candidates and the confidence threshold) and the
+golden vectors that the web test suite compares the browser against. Only the val split is read;
+asking for any other split raises.
 """
 
 import hashlib
@@ -20,17 +21,24 @@ import onnx
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from edgevision import spec
 from edgevision.config import PreprocessConfig
 from edgevision.data.io import to_storage
-from edgevision.data.landmarks import N_HAND
+from edgevision.data.landmarks import N_HAND, NOSE, SHOULDERS, pose_swap_pairs
 from edgevision.data.preprocess import MIN_SCALE, X_GRID, preprocess_sequence, snap_x
-from edgevision.layout import (
-    FRAME_DIM,
-    NUM_COORDS,
-    NUM_FRAMES,
-    POSE_INDICES,
-    layout_dict,
-    to_model_input,
+from edgevision.evaluation.metrics import top_k_accuracy
+from edgevision.export.ensemble import export_ensemble_onnx
+from edgevision.export.onnx_export import export_onnx
+from edgevision.layout import NUM_FRAMES, POSE_INDICES, InputLayout, to_model_input
+from edgevision.live.aspect import K_MAX, K_MIN, MIN_VISIBILITY
+from edgevision.live.golden import build_aspect_golden, example_recordings
+from edgevision.models.registry import checkpoint_layout, load_checkpoint
+from edgevision.quant.variants import (
+    VARIANT_SCHEMA_VERSIONS,
+    convert_fp16,
+    quantize_int8_dynamic,
+    read_metadata,
+    save_with_metadata,
 )
 from edgevision.runs import (
     CHECKPOINT_FILE,
@@ -39,6 +47,9 @@ from edgevision.runs import (
     variant_file,
 )
 from edgevision.runtime import (
+    META_INPUT_LAYOUT,
+    META_LABEL_MAP,
+    META_SCHEMA_VERSION,
     META_SOURCE_SHA256,
     META_VARIANT,
     OrtModel,
@@ -56,28 +67,37 @@ DataSource = Literal["asl-signs", "synthetic"]
 DATA_SOURCES: tuple[DataSource, ...] = ("asl-signs", "synthetic")
 ASL_SIGNS_CLASSES = 250
 
+FeatureSetName = Literal["v1", "v2"]
+
 EVAL_SPLIT = "val"
-DEFAULT_TARGET_PRECISION = 0.90
+DEFAULT_TARGET_PRECISION = 0.80
 FALLBACK_MIN_COVERAGE = 0.2
-VARIANT_RULE_MAX_DROP_PP = 1.0
+VARIANT_RULE_MAX_DROP_PP = 0.5
 # Absorbs float noise in (fp32 - int8) * 100, e.g. 0.85 - 0.84 = 0.0100000000000000089.
 _PP_EPSILON = 1e-9
 MODEL_CASES = 16
-META_SCHEMA_VERSION: Literal[1] = 1
-GOLDEN_SCHEMA_VERSION: Literal[1] = 1
+WEB_META_SCHEMA_VERSION: Literal[2] = 2
+GOLDEN_SCHEMA_VERSION: Literal[2] = 2
 INPUT_DECIMALS = 6
 GOLDEN_SEED = 2026
+V2_GOLDEN_POSE_INDICES: tuple[int, ...] = tuple(range(17))
+CALIBRATION_SECONDS = 2.0
+META_ENSEMBLE_MEMBERS = "edgevision.ensemble_members"
 
 MODEL_FILE = "model.onnx"
 META_FILE = "meta.json"
 PREPROCESS_CASES_FILE = "preprocess_cases.json"
+PREPROCESS_CASES_V2_FILE = "preprocess_cases_v2.json"
+ASPECT_CASES_FILE = "aspect_cases.json"
+RECORDING_EXAMPLE_FILE = "recording_example.json"
 MODEL_CASES_FILE = "model_cases.json"
 PREPROCESS_REPORT_FILE = "preprocess_report.json"
 SHA256_PATTERN = r"^[0-9a-f]{64}$"
 
 VARIANT_RULE = (
-    f"use int8_static if its val top-1 is within {VARIANT_RULE_MAX_DROP_PP:.1f} percentage point "
-    "of fp32 val top-1 (from quant_report.json), otherwise fp32"
+    "among fp32, fp16, int8_dynamic and int8_static, the smallest file whose val top-1 is "
+    f"within {VARIANT_RULE_MAX_DROP_PP:.1f} percentage points of fp32 val top-1; a variant that "
+    "onnxruntime-web (wasm) cannot run falls back to the next smallest such file"
 )
 FLOAT_ENCODING = (
     "float32 arrays are written as the shortest decimal that rounds to the same float32; "
@@ -105,45 +125,116 @@ def load_eval_split(processed_dir: Path, splits_path: Path, split: str = EVAL_SP
 # Variant rule
 
 
+class WasmCheck(_StrictModel):
+    """Whether onnxruntime-web ran the exported file (the browser model-parity test)."""
+
+    status: Literal["passed", "failed", "not_run"]
+    detail: str | None = None
+
+
+class VariantCandidate(_StrictModel):
+    variant: WebVariant
+    available: bool
+    file_bytes: int | None
+    val_top1: float | None
+    drop_pp: float | None
+    eligible: bool
+    note: str | None
+    wasm: WasmCheck
+
+
+class Fallback(_StrictModel):
+    variant: WebVariant
+    reason: str
+
+
 class VariantSelection(_StrictModel):
     rule: str
-    fp32_val_top1: float
-    int8_static_val_top1: float | None
-    drop_pp: float | None
     max_drop_pp: float
-    recommended: Literal["fp32", "int8_static"]
+    source: Literal["quant_report", "export_build"]
+    fp32_val_top1: float
+    candidates: list[VariantCandidate]
+    # Eligible variants, smallest file first: the order in which they are tried.
+    order: list[WebVariant]
+    recommended: WebVariant
     chosen: WebVariant
+    forced: bool
+    fallbacks: list[Fallback]
     follows_rule: bool
 
 
-def _val_top1(variants: Mapping[str, Any], variant: str) -> float | None:
-    entry = variants.get(variant) or {}
-    if entry.get("error"):
-        return None
-    top1 = (entry.get("val") or {}).get("top1")
-    return None if top1 is None else float(top1)
+class CandidateInput(NamedTuple):
+    """What is known about one variant before the rule runs."""
+
+    path: Path | None
+    file_bytes: int | None
+    val_top1: float | None
+    note: str | None
 
 
-def select_variant(report: Mapping[str, Any], chosen: WebVariant) -> VariantSelection:
-    """Apply VARIANT_RULE to a quant_report.json; ``chosen`` is what the caller exports."""
-    variants = report.get("variants") or {}
-    fp32 = _val_top1(variants, "fp32")
-    if fp32 is None:
-        raise ValueError("quant_report.json has no fp32 val top-1; rerun scripts/quantize.py")
-    int8 = _val_top1(variants, "int8_static")
-    drop = None if int8 is None else (fp32 - int8) * 100.0
-    within = drop is not None and drop <= VARIANT_RULE_MAX_DROP_PP + _PP_EPSILON
-    recommended: Literal["fp32", "int8_static"] = "int8_static" if within else "fp32"
-    return VariantSelection(
-        rule=VARIANT_RULE,
-        fp32_val_top1=fp32,
-        int8_static_val_top1=int8,
-        drop_pp=drop,
-        max_drop_pp=VARIANT_RULE_MAX_DROP_PP,
-        recommended=recommended,
-        chosen=chosen,
-        follows_rule=chosen == recommended,
+def rank_candidates(
+    inputs: Mapping[WebVariant, CandidateInput],
+) -> tuple[list[VariantCandidate], list[WebVariant], float]:
+    """Apply VARIANT_RULE: the candidates in WEB_VARIANTS order, the eligible variants smallest
+    file first (ties in WEB_VARIANTS order), and fp32 val top-1."""
+    fp32 = inputs.get("fp32")
+    if fp32 is None or fp32.path is None or fp32.val_top1 is None:
+        raise ValueError("no fp32 variant with a val top-1; rerun scripts/quantize.py")
+    candidates = []
+    for variant in WEB_VARIANTS:
+        item = inputs.get(variant) or CandidateInput(None, None, None, "not built")
+        available = item.path is not None and item.val_top1 is not None
+        drop = None if item.val_top1 is None else (fp32.val_top1 - item.val_top1) * 100.0
+        within = drop is not None and drop <= VARIANT_RULE_MAX_DROP_PP + _PP_EPSILON
+        eligible = available and within
+        note = item.note
+        if available and not eligible and drop is not None:
+            note = f"val top-1 {drop:.2f} pp below fp32 (limit {VARIANT_RULE_MAX_DROP_PP:.1f} pp)"
+        candidates.append(
+            VariantCandidate(
+                variant=variant,
+                available=available,
+                file_bytes=item.file_bytes,
+                val_top1=item.val_top1,
+                drop_pp=drop,
+                eligible=eligible,
+                note=note,
+                wasm=WasmCheck(status="not_run"),
+            )
+        )
+    ranked = sorted(
+        (c for c in candidates if c.eligible),
+        key=lambda c: (c.file_bytes or 0, WEB_VARIANTS.index(c.variant)),
     )
+    return candidates, [c.variant for c in ranked], fp32.val_top1
+
+
+def candidates_from_report(
+    report: Mapping[str, Any], quant_dir: Path, checkpoint_sha256: str
+) -> dict[WebVariant, CandidateInput]:
+    """The quant_report.json variants whose files exist and were built from this checkpoint."""
+    variants = report.get("variants") or {}
+    inputs: dict[WebVariant, CandidateInput] = {}
+    for variant in WEB_VARIANTS:
+        entry = variants.get(variant)
+        path = quant_dir / variant_file(variant)
+        if entry is None:
+            inputs[variant] = CandidateInput(None, None, None, "not in quant_report.json")
+        elif entry.get("error"):
+            inputs[variant] = CandidateInput(None, None, None, f"build failed: {entry['error']}")
+        elif not path.is_file():
+            inputs[variant] = CandidateInput(None, None, None, f"{path} not found")
+        elif read_metadata(path).get(META_SOURCE_SHA256) != checkpoint_sha256:
+            inputs[variant] = CandidateInput(None, None, None, f"{path} was not built from best.pt")
+        else:
+            top1 = (entry.get("val") or {}).get("top1")
+            inputs[variant] = CandidateInput(
+                path,
+                path.stat().st_size,
+                None if top1 is None else float(top1),
+                None if top1 is not None else "no val top-1 in quant_report.json",
+            )
+    return inputs
 
 
 # ---------------------------------------------------------------------------------------------
@@ -240,11 +331,143 @@ def threshold_from_logits(
 
 
 # ---------------------------------------------------------------------------------------------
+# Calibration: temperature scaling and the "not sure" threshold
+
+TEMPERATURE_BOUNDS = (0.05, 20.0)
+ECE_BINS = 15
+CALIBRATION_CRITERION = (
+    "maximise coverage x (2 x selective accuracy - 1) on val: an accepted right sign gains 1, an "
+    "accepted wrong sign costs 1, 'not sure' scores 0 (the smallest such threshold on ties)"
+)
+
+
+class CalibrationBlock(_StrictModel):
+    """softmax(logits / temperature); a prediction whose top probability is >= ``threshold`` is
+    shown, otherwise the app says "not sure". Both are fitted on val only."""
+
+    computed_on: Literal["val"]
+    method: Literal["temperature_scaling"]
+    temperature: float = Field(gt=0.0)
+    nll_before: float
+    nll_after: float
+    ece_before: float = Field(ge=0.0, le=1.0)
+    ece_after: float = Field(ge=0.0, le=1.0)
+    criterion: str
+    threshold: float = Field(ge=0.0, le=1.0)
+    coverage: float = Field(ge=0.0, le=1.0)
+    selective_accuracy: float = Field(ge=0.0, le=1.0)
+    net_score: float = Field(ge=-1.0, le=1.0)
+    val_top1: float = Field(ge=0.0, le=1.0)
+    val_top3: float = Field(ge=0.0, le=1.0)
+    val_sequences: int = Field(ge=1)
+
+
+def _log_softmax(logits: npt.NDArray[np.floating[Any]], temperature: float) -> FloatArray:
+    values = np.asarray(logits, dtype=np.float64) / temperature
+    values = values - values.max(axis=1, keepdims=True)
+    result: FloatArray = values - np.log(np.exp(values).sum(axis=1, keepdims=True))
+    return result
+
+
+def nll(
+    logits: npt.NDArray[np.floating[Any]], labels: npt.NDArray[np.int64], temperature: float
+) -> float:
+    """Mean negative log-likelihood of ``labels`` under softmax(logits / temperature)."""
+    log_p = _log_softmax(logits, temperature)
+    return float(-log_p[np.arange(labels.size), labels].mean())
+
+
+def expected_calibration_error(
+    max_prob: npt.NDArray[np.floating[Any]], correct: npt.NDArray[np.bool_], bins: int = ECE_BINS
+) -> float:
+    """Equal-width ECE of the top-1 confidence."""
+    edges = np.linspace(0.0, 1.0, bins + 1)
+    which = np.clip(np.digitize(max_prob, edges[1:-1], right=True), 0, bins - 1)
+    total = 0.0
+    for b in range(bins):
+        mask = which == b
+        if mask.any():
+            total += mask.mean() * abs(float(correct[mask].mean()) - float(max_prob[mask].mean()))
+    return float(total)
+
+
+def fit_temperature(logits: npt.NDArray[np.floating[Any]], labels: npt.NDArray[np.int64]) -> float:
+    """The temperature minimising val NLL: golden-section search on log T (NLL is convex in
+    1 / T, so unimodal in log T)."""
+    low, high = float(np.log(TEMPERATURE_BOUNDS[0])), float(np.log(TEMPERATURE_BOUNDS[1]))
+    ratio = (np.sqrt(5.0) - 1.0) / 2.0
+    a, b = high - ratio * (high - low), low + ratio * (high - low)
+    fa, fb = nll(logits, labels, float(np.exp(a))), nll(logits, labels, float(np.exp(b)))
+    for _ in range(80):
+        if fa < fb:
+            high, b, fb = b, a, fa
+            a = high - ratio * (high - low)
+            fa = nll(logits, labels, float(np.exp(a)))
+        else:
+            low, a, fa = a, b, fb
+            b = low + ratio * (high - low)
+            fb = nll(logits, labels, float(np.exp(b)))
+    return float(np.exp(0.5 * (low + high)))
+
+
+def select_net_threshold(
+    max_prob: npt.NDArray[np.floating[Any]], correct: npt.NDArray[np.bool_]
+) -> tuple[float, float, float, float]:
+    """(threshold, coverage, selective accuracy, net score) maximising coverage x (2 x
+    selective accuracy - 1) over the distinct probabilities; the smallest threshold on ties."""
+    p = np.asarray(max_prob, dtype=np.float64)
+    ok = np.asarray(correct, dtype=bool)
+    if p.ndim != 1 or p.shape != ok.shape or p.size == 0:
+        raise ValueError(f"expected two equal non-empty 1-D arrays, got {p.shape} and {ok.shape}")
+    order = np.argsort(p, kind="stable")
+    p_sorted, ok_sorted = p[order], ok[order]
+    candidates, first = np.unique(p_sorted, return_index=True)
+    n = p.size
+    accepted = n - first
+    right = np.cumsum(ok_sorted[::-1])[::-1][first]
+    net = (2 * right - accepted) / n
+    index = int(np.argmax(net))
+    return (
+        float(candidates[index]),
+        float(accepted[index] / n),
+        float(right[index] / accepted[index]),
+        float(net[index]),
+    )
+
+
+def calibration_from_logits(
+    logits: npt.NDArray[np.floating[Any]], labels: npt.NDArray[np.int64]
+) -> CalibrationBlock:
+    temperature = fit_temperature(logits, labels)
+    raw = softmax(np.asarray(logits, dtype=np.float64))
+    scaled = np.exp(_log_softmax(logits, temperature))
+    correct = scaled.argmax(axis=1) == labels
+    threshold, coverage, selective, net = select_net_threshold(scaled.max(axis=1), correct)
+    return CalibrationBlock(
+        computed_on="val",
+        method="temperature_scaling",
+        temperature=temperature,
+        nll_before=nll(logits, labels, 1.0),
+        nll_after=nll(logits, labels, temperature),
+        ece_before=expected_calibration_error(raw.max(axis=1), raw.argmax(axis=1) == labels),
+        ece_after=expected_calibration_error(scaled.max(axis=1), correct),
+        criterion=CALIBRATION_CRITERION,
+        threshold=threshold,
+        coverage=coverage,
+        selective_accuracy=selective,
+        net_score=net,
+        val_top1=top_k_accuracy(np.asarray(logits), labels, 1),
+        val_top3=top_k_accuracy(np.asarray(logits), labels, 3),
+        val_sequences=int(labels.size),
+    )
+
+
+# ---------------------------------------------------------------------------------------------
 # meta.json
 
 
-class InputLayout(_StrictModel):
-    """Mirrors edgevision.layout.layout_dict(); extra or missing keys fail validation."""
+class InputLayoutBlock(_StrictModel):
+    """Mirrors edgevision.layout.InputLayout.to_dict(); extra or missing keys fail validation."""
 
     num_frames: int
     num_landmarks: int
@@ -264,6 +487,8 @@ class PreprocessingSettings(_StrictModel):
     num_frames: int = Field(ge=1)
     use_z: Literal[False]
     pose_indices: list[int]
+    # The left/right pose pairs mirroring swaps, restricted to pose_indices.
+    pose_swap_pairs: list[tuple[int, int]]
     min_hand_frames: int = Field(ge=1)
     min_scale: float
     x_grid: float
@@ -271,26 +496,51 @@ class PreprocessingSettings(_StrictModel):
     source: str
 
 
+class AspectBlock(_StrictModel):
+    """Training aspect ratio r (preprocess_report.json aspect_stats) and the calibration
+    settings the app applies: k = r_train / r_live, clamped to [k_min, k_max]."""
+
+    r_train: float = Field(gt=0.0)
+    stats: dict[str, Any]
+    source: str
+    k_min: float
+    k_max: float
+    calibration_seconds: float
+    min_visibility: float
+
+
+class SourceCheckpoint(_StrictModel):
+    run: str
+    sha256: str = Field(pattern=SHA256_PATTERN)
+
+
 class WebMeta(_StrictModel):
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     model_name: str
     variant: WebVariant
     data_source: DataSource
     run: str
-    seed: int
+    seed: int | None
+    seeds: list[int] = Field(min_length=1)
+    ensemble: bool
+    feature_set: FeatureSetName
     num_classes: int = Field(ge=2)
     labels: list[str]
     num_frames: int
     landmark_order: list[str]
     pose_indices: list[int]
-    input_layout: InputLayout
+    input_layout: InputLayoutBlock
     preprocessing: PreprocessingSettings
+    aspect: AspectBlock | None
     opset: int
     model_file: str
     model_bytes: int = Field(ge=1)
     model_sha256: str = Field(pattern=SHA256_PATTERN)
-    source_checkpoint_sha256: str = Field(pattern=SHA256_PATTERN)
+    source_checkpoints: list[SourceCheckpoint] = Field(min_length=1)
     threshold: ThresholdBlock
+    calibration: CalibrationBlock
+    features_spec_version: int
+    features_spec_sha256: str = Field(pattern=SHA256_PATTERN)
     variant_selection: VariantSelection
     tool_versions: dict[str, str]
 
@@ -309,8 +559,14 @@ class WebMeta(_StrictModel):
         pose = (self.pose_indices, self.input_layout.pose_indices, self.preprocessing.pose_indices)
         if pose[0] != pose[1] or pose[0] != pose[2]:
             problems.append("pose_indices differ between fields")
+        if [list(pair) for pair in self.preprocessing.pose_swap_pairs] != [
+            list(pair) for pair in pose_swap_pairs(self.pose_indices)
+        ]:
+            problems.append("pose_swap_pairs do not match pose_indices")
         if self.variant != self.variant_selection.chosen:
             problems.append("variant differs from variant_selection.chosen")
+        if self.ensemble != (len(self.source_checkpoints) > 1):
+            problems.append("an ensemble has several source checkpoints, a single run one")
         if problems:
             raise ValueError("; ".join(problems))
         return self
@@ -322,15 +578,19 @@ def landmark_names(pose_indices: Sequence[int] = POSE_INDICES) -> list[str]:
     return hands + [f"pose_{index}" for index in pose_indices]
 
 
-def preprocessing_settings(processed_dir: Path) -> PreprocessingSettings:
-    """Settings from the processed dir's preprocess_report.json, else PreprocessConfig defaults.
+def read_preprocess_report(processed_dir: Path) -> dict[str, Any] | None:
+    path = processed_dir / PREPROCESS_REPORT_FILE
+    return read_json(path) if path.is_file() else None
 
-    Refuses settings the exported input layout cannot represent.
+
+def preprocessing_settings(processed_dir: Path, layout: InputLayout) -> PreprocessingSettings:
+    """Settings from the processed dir's preprocess_report.json, else PreprocessConfig defaults
+    with the layout's pose selection.
+
+    Refuses settings the model's input layout cannot represent.
     """
-    report_path = processed_dir / PREPROCESS_REPORT_FILE
-    if report_path.is_file():
-        with report_path.open(encoding="utf-8") as handle:
-            report = json.load(handle)
+    report = read_preprocess_report(processed_dir)
+    if report is not None:
         values = dict(report["config"]["preprocess"])
         if "landmarks" in report:  # The effective selection, recorded since v2.
             values["pose_indices"] = report["landmarks"]["pose_indices"]
@@ -340,28 +600,106 @@ def preprocessing_settings(processed_dir: Path) -> PreprocessingSettings:
         values = {
             "num_frames": fields["num_frames"].default,
             "use_z": fields["use_z"].default,
-            "pose_indices": list(POSE_INDICES),
+            "pose_indices": list(layout.pose_indices),
             "min_hand_frames": fields["min_hand_frames"].default,
         }
         source = f"PreprocessConfig defaults (no {PREPROCESS_REPORT_FILE} in the processed dir)"
     if (
-        values["num_frames"] != NUM_FRAMES
-        or list(values["pose_indices"]) != list(POSE_INDICES)
+        values["num_frames"] != layout.num_frames
+        or list(values["pose_indices"]) != list(layout.pose_indices)
         or values["use_z"]
     ):
         raise ValueError(
             f"preprocessing settings {values} do not match the model input layout "
-            f"(num_frames {NUM_FRAMES}, pose_indices {list(POSE_INDICES)}, use_z False)"
+            f"(num_frames {layout.num_frames}, pose_indices {list(layout.pose_indices)}, "
+            "use_z False)"
         )
+    pose_indices = [int(index) for index in values["pose_indices"]]
     return PreprocessingSettings(
         num_frames=int(values["num_frames"]),
         use_z=False,
-        pose_indices=[int(index) for index in values["pose_indices"]],
+        pose_indices=pose_indices,
+        pose_swap_pairs=list(pose_swap_pairs(pose_indices)),
         min_hand_frames=int(values["min_hand_frames"]),
         min_scale=MIN_SCALE,
         x_grid=X_GRID,
         storage_dtype="float16",
         source=source,
+    )
+
+
+# Report fields that must agree for another preprocessing run's aspect_stats to stand in: the
+# measurement depends only on the raw data, the kept-frame rule (a frame with a full hand) and
+# which sequences are kept, and it reads only the nose and the shoulders.
+ASPECT_PREPROCESS_KEYS = ("data_root", "num_frames", "use_z", "min_hand_frames", "limit", "seed")
+ASPECT_POINTS = (NOSE, *SHOULDERS)
+
+
+def _aspect_block(stats: Mapping[str, Any], source: str) -> AspectBlock:
+    return AspectBlock(
+        r_train=float(stats["median"]),
+        stats=dict(stats),
+        source=source,
+        k_min=K_MIN,
+        k_max=K_MAX,
+        calibration_seconds=CALIBRATION_SECONDS,
+        min_visibility=MIN_VISIBILITY,
+    )
+
+
+def aspect_compatibility(own: Mapping[str, Any], other: Mapping[str, Any]) -> list[str]:
+    """Why ``other``'s aspect_stats cannot stand in for a run preprocessed as ``own``."""
+    problems = []
+    for key in ("counts", "per_sign_kept", "mirrored_fraction", "norm_method_fractions"):
+        if own.get(key) != other.get(key):
+            problems.append(f"{key} differs")
+    own_pre, other_pre = own["config"]["preprocess"], other["config"]["preprocess"]
+    for key in ASPECT_PREPROCESS_KEYS:
+        if own_pre.get(key) != other_pre.get(key):
+            problems.append(f"config.preprocess.{key} differs")
+    if own["config"].get("split") != other["config"].get("split"):
+        problems.append("config.split differs")
+    for name, pre in (("this run", own_pre), ("the other run", other_pre)):
+        missing = [index for index in ASPECT_POINTS if index not in pre["pose_indices"]]
+        if missing:
+            problems.append(f"{name} does not select pose {missing}")
+    if not other.get("aspect_stats") or other["aspect_stats"].get("median") is None:
+        problems.append("the other report has no aspect_stats")
+    return problems
+
+
+def aspect_settings(
+    processed_dir: Path, aspect_report: Path | None, data_source: DataSource
+) -> AspectBlock | None:
+    """The processed dir's aspect_stats; else those of ``aspect_report``, a preprocessing run of
+    the same raw data, after aspect_compatibility checks; else None for synthetic data."""
+    report = read_preprocess_report(processed_dir)
+    if report is not None and (report.get("aspect_stats") or {}).get("median") is not None:
+        return _aspect_block(
+            report["aspect_stats"], (processed_dir / PREPROCESS_REPORT_FILE).as_posix()
+        )
+    if aspect_report is not None:
+        if report is None:
+            raise ValueError(f"no {PREPROCESS_REPORT_FILE} in {processed_dir} to compare with")
+        other = read_json(aspect_report)
+        problems = aspect_compatibility(report, other)
+        if problems:
+            raise ValueError(
+                f"{aspect_report} cannot stand in for {processed_dir}: " + "; ".join(problems)
+            )
+        return _aspect_block(
+            other["aspect_stats"],
+            f"{aspect_report.as_posix()} (another preprocessing run of the same raw data: "
+            "identical counts, "
+            "kept sequences, split settings and kept-frame rule; the measurement reads only pose "
+            f"{list(ASPECT_POINTS)}, which both selections hold)",
+        )
+    if data_source == "synthetic":
+        return None
+    raise ValueError(
+        f"{processed_dir / PREPROCESS_REPORT_FILE} has no aspect_stats (written by preprocessing "
+        "since the v2 change); rerun scripts/preprocess.py, or pass --aspect-report with the "
+        "report of another preprocessing run of the same raw data"
     )
 
 
@@ -428,6 +766,10 @@ def _check_matrix(name: str, value: list[list[float]] | None, columns: int) -> N
         raise ValueError(f"{name} must be {NUM_FRAMES} x {columns}")
 
 
+def frame_dim(pose_indices: Sequence[int]) -> int:
+    return InputLayout.for_pose_indices(pose_indices).frame_dim
+
+
 class PreprocessCase(_StrictModel):
     """One sequence: features (num_frames x FRAME_DIM, float32) are the preprocessed coordinates
     then presence; model_input is the same after the float16 storage step training data took."""
@@ -447,16 +789,19 @@ class PreprocessCase(_StrictModel):
             raise ValueError("excluded cases have no arrays; kept cases have all three")
         if self.info.excluded != (self.info.reason is not None):
             raise ValueError("reason must be set exactly when the case is excluded")
-        _check_matrix("features", self.features, FRAME_DIM)
         _check_matrix("presence", self.presence, 2)
-        _check_matrix("model_input", self.model_input, FRAME_DIM)
         return self
+
+    def check_width(self, width: int) -> None:
+        _check_matrix(f"{self.name} features", self.features, width)
+        _check_matrix(f"{self.name} model_input", self.model_input, width)
 
 
 class GoldenPreprocessConfig(_StrictModel):
     num_frames: int
     use_z: Literal[False]
     pose_indices: list[int]
+    pose_swap_pairs: list[tuple[int, int]]
     min_hand_frames: int
 
 
@@ -466,12 +811,19 @@ class SnapCase(_StrictModel):
 
 
 class PreprocessGolden(_StrictModel):
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     description: str
     float_encoding: str
     config: GoldenPreprocessConfig
     snap_x_cases: list[SnapCase]
     cases: list[PreprocessCase] = Field(min_length=12)
+
+    @model_validator(mode="after")
+    def _widths(self) -> Self:
+        width = frame_dim(self.config.pose_indices)
+        for case in self.cases:
+            case.check_width(width)
+        return self
 
 
 class ModelCase(_StrictModel):
@@ -480,14 +832,9 @@ class ModelCase(_StrictModel):
     input: list[list[float]]
     logits: list[float]
 
-    @model_validator(mode="after")
-    def _shapes(self) -> Self:
-        _check_matrix("input", self.input, FRAME_DIM)
-        return self
-
 
 class ModelGolden(_StrictModel):
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     description: str
     float_encoding: str
     source: DataSource
@@ -495,12 +842,15 @@ class ModelGolden(_StrictModel):
     variant: WebVariant
     model_sha256: str = Field(pattern=SHA256_PATTERN)
     num_classes: int
+    frame_dim: int
     cases: list[ModelCase] = Field(min_length=MODEL_CASES, max_length=MODEL_CASES)
 
     @model_validator(mode="after")
-    def _logit_widths(self) -> Self:
+    def _widths(self) -> Self:
         if any(len(case.logits) != self.num_classes for case in self.cases):
             raise ValueError(f"every case needs {self.num_classes} logits")
+        for case in self.cases:
+            _check_matrix(f"sequence {case.sequence_id} input", case.input, self.frame_dim)
         return self
 
 
@@ -778,10 +1128,11 @@ def synthetic_cases(
 
 
 def pack_features(features: Float32Array, presence: Float32Array) -> Float32Array:
-    """(T, L, 2) coordinates and (T, 2) presence -> (T, FRAME_DIM) in the model layout."""
-    packed = np.empty((features.shape[0], FRAME_DIM), dtype=np.float32)
-    packed[:, :NUM_COORDS] = features.reshape(features.shape[0], NUM_COORDS)
-    packed[:, NUM_COORDS:] = presence
+    """(T, L, 2) coordinates and (T, 2) presence -> (T, 2L + 2) in the model layout."""
+    coords = features.shape[1] * features.shape[2]
+    packed = np.empty((features.shape[0], coords + 2), dtype=np.float32)
+    packed[:, :coords] = features.reshape(features.shape[0], coords)
+    packed[:, coords:] = presence
     return packed
 
 
@@ -807,7 +1158,9 @@ def golden_case(case: RawCase, settings: GoldenPreprocessConfig) -> PreprocessCa
     stored = to_storage(0, result)
     if stored.features is None or stored.presence is None:
         raise ValueError(f"{case.name}: excluded by the float16 storage step")
-    model_input = to_model_input(stored.features[None], stored.presence[None])[0]
+    model_input = to_model_input(
+        stored.features[None], stored.presence[None], num_landmarks=stored.features.shape[1]
+    )[0]
     return PreprocessCase(
         name=case.name,
         description=case.description,
@@ -833,12 +1186,16 @@ SNAP_X_INPUTS: tuple[float, ...] = (
 
 
 def build_preprocess_golden(
-    landmark_blocks: BlockBuilder, long_frame: FrameBuilder, min_hand_frames: int
+    landmark_blocks: BlockBuilder,
+    long_frame: FrameBuilder,
+    min_hand_frames: int,
+    pose_indices: Sequence[int] = POSE_INDICES,
 ) -> PreprocessGolden:
     settings = GoldenPreprocessConfig(
         num_frames=NUM_FRAMES,
         use_z=False,
-        pose_indices=list(POSE_INDICES),
+        pose_indices=list(pose_indices),
+        pose_swap_pairs=list(pose_swap_pairs(pose_indices)),
         min_hand_frames=min_hand_frames,
     )
     raw = synthetic_cases(landmark_blocks, long_frame)
@@ -891,6 +1248,7 @@ def build_model_golden(
         variant=variant,
         model_sha256=model_sha256,
         num_classes=int(logits.shape[1]),
+        frame_dim=int(val.X.shape[2]),
         cases=[
             ModelCase(
                 sequence_id=int(val.sequence_id[row]),
@@ -924,12 +1282,17 @@ def _write_text(path: Path, text: str) -> None:
 # Export
 
 
+DEFAULT_WORK_DIR = Path("results/web_export")
+
+
 class ExportResult(NamedTuple):
     meta: WebMeta
     model_path: Path
     meta_path: Path
-    preprocess_golden_path: Path
-    model_golden_path: Path
+    golden_paths: dict[str, Path]
+
+
+WasmVerifier = Callable[["ExportResult"], WasmCheck]
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -938,9 +1301,221 @@ def read_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+class RunInfo(NamedTuple):
+    directory: Path
+    summary: dict[str, Any]
+    seed: int
+    checkpoint: Path
+    sha256: str
+
+    @property
+    def key(self) -> str:
+        """<experiment>/seed_<seed>, as quant and results directories name runs."""
+        return f"{self.directory.parent.name}/{self.directory.name}"
+
+
+def run_info(directory: Path) -> RunInfo:
+    summary = read_json(directory / SUMMARY_FILE)
+    checkpoint = directory / CHECKPOINT_FILE
+    return RunInfo(directory, summary, int(summary["seed"]), checkpoint, sha256_file(checkpoint))
+
+
+def ensemble_members(run_directory: Path) -> list[RunInfo]:
+    """Every seed of the run's experiment that has a summary and a checkpoint, by seed; they
+    must share one split file, so val is the same data for every member."""
+    members = [
+        run_info(directory)
+        for directory in sorted(run_directory.parent.glob("seed_*"))
+        if (directory / SUMMARY_FILE).is_file() and (directory / CHECKPOINT_FILE).is_file()
+    ]
+    members.sort(key=lambda member: member.seed)
+    if len(members) < 2:
+        raise ValueError(
+            f"{run_directory.parent} has {len(members)} seed(s) with {CHECKPOINT_FILE}; an "
+            "ensemble needs at least two"
+        )
+    splits = {sha256_file(m.directory / m.summary["splits_file"]) for m in members}
+    if len(splits) != 1:
+        raise ValueError(f"the seeds of {run_directory.parent} use different split files")
+    return members
+
+
+def ensemble_sha256(shas: Sequence[str]) -> str:
+    """One digest for an ensemble's member checkpoints, in member order."""
+    return hashlib.sha256("\n".join(shas).encode("ascii")).hexdigest()
+
+
+def source_sha256(members: Sequence[RunInfo]) -> str:
+    if len(members) == 1:
+        return members[0].sha256
+    return ensemble_sha256([member.sha256 for member in members])
+
+
+def model_metadata(
+    variant: str, members: Sequence[RunInfo], layout: InputLayout, label_map: Mapping[int, str]
+) -> dict[str, str]:
+    metadata = {
+        META_VARIANT: variant,
+        META_SCHEMA_VERSION: str(VARIANT_SCHEMA_VERSIONS[variant]),
+        META_SOURCE_SHA256: source_sha256(members),
+        META_LABEL_MAP: json.dumps({str(index): sign for index, sign in label_map.items()}),
+        META_INPUT_LAYOUT: json.dumps(layout.to_dict()),
+    }
+    if len(members) > 1:
+        metadata[META_ENSEMBLE_MEMBERS] = json.dumps(
+            [{"run": member.key, "sha256": member.sha256} for member in members]
+        )
+    return metadata
+
+
+def build_fp32(
+    members: Sequence[RunInfo], path: Path, layout: InputLayout, label_map: Mapping[int, str]
+) -> None:
+    """fp32 ONNX (opset 17) of one checkpoint, or of the seed ensemble, with metadata."""
+    scratch = path.with_name(f".{path.stem}.export.onnx")
+    try:
+        if len(members) == 1:
+            export_onnx(load_checkpoint(members[0].checkpoint).model, scratch, layout=layout)
+        else:
+            export_ensemble_onnx([member.checkpoint for member in members], scratch)
+        save_with_metadata(
+            onnx.load(str(scratch)), path, model_metadata("fp32", members, layout, label_map)
+        )
+    finally:
+        scratch.unlink(missing_ok=True)
+
+
+def _scored(path: Path, val: SplitArrays) -> CandidateInput:
+    logits = OrtModel(path, intra_op_threads=1).run(val.X)
+    if not np.isfinite(logits).all():
+        return CandidateInput(None, None, None, "non-finite val outputs")
+    return CandidateInput(path, path.stat().st_size, top_k_accuracy(logits, val.y, 1), None)
+
+
+SINGLE_RUN_NOTE = (
+    "not built: no quant_report.json for this run (scripts/quantize.py builds int8_static for "
+    "v1 runs and skips feature set v2)"
+)
+ENSEMBLE_INT8_STATIC_NOTE = (
+    "not built: int8_static keeps the FeatureBlock in float32 by its '/features/' node scope, "
+    "which ensemble members do not have ('/members.<n>/features/')"
+)
+
+
+def build_candidates(
+    members: Sequence[RunInfo],
+    work_dir: Path,
+    layout: InputLayout,
+    label_map: Mapping[int, str],
+    val: SplitArrays,
+) -> dict[WebVariant, CandidateInput]:
+    """fp32, fp16 and int8_dynamic of a single run without a quant report (feature set v2) or
+    of an ensemble, built with the scripts/quantize.py builders into ``work_dir`` and scored on
+    val. int8_static needs calibration data and the quant report's checks, so only
+    scripts/quantize.py builds it."""
+    work_dir.mkdir(parents=True, exist_ok=True)
+    fp32 = work_dir / variant_file("fp32")
+    build_fp32(members, fp32, layout, label_map)
+    inputs: dict[WebVariant, CandidateInput] = {"fp32": _scored(fp32, val)}
+    builders: dict[WebVariant, Callable[[Path], onnx.ModelProto]] = {
+        "fp16": lambda _: convert_fp16(fp32, keep_feature_block_fp32=False),
+        "int8_dynamic": lambda path: quantize_int8_dynamic(fp32, path),
+    }
+    for variant, build in builders.items():
+        path = work_dir / variant_file(variant)
+        try:
+            save_with_metadata(
+                build(path), path, model_metadata(variant, members, layout, label_map)
+            )
+            inputs[variant] = _scored(path, val)
+        except Exception as error:  # Recorded as the candidate's note, never raised.
+            inputs[variant] = CandidateInput(
+                None, None, None, f"build failed: {type(error).__name__}: {error}"
+            )
+    inputs["int8_static"] = CandidateInput(
+        None, None, None, ENSEMBLE_INT8_STATIC_NOTE if len(members) > 1 else SINGLE_RUN_NOTE
+    )
+    return inputs
+
+
+def make_selection(
+    candidates: Sequence[VariantCandidate],
+    order: Sequence[WebVariant],
+    fp32_val_top1: float,
+    source: Literal["quant_report", "export_build"],
+    *,
+    chosen: WebVariant,
+    forced: bool,
+    fallbacks: Sequence[Fallback],
+    checks: Mapping[str, WasmCheck],
+) -> VariantSelection:
+    failed = {fallback.variant for fallback in fallbacks}
+    expected = next((variant for variant in order if variant not in failed), order[0])
+    return VariantSelection(
+        rule=VARIANT_RULE,
+        max_drop_pp=VARIANT_RULE_MAX_DROP_PP,
+        source=source,
+        fp32_val_top1=fp32_val_top1,
+        candidates=[
+            c.model_copy(update={"wasm": checks.get(c.variant, c.wasm)}) for c in candidates
+        ],
+        order=list(order),
+        recommended=order[0],
+        chosen=chosen,
+        forced=forced,
+        fallbacks=list(fallbacks),
+        follows_rule=chosen == (order[0] if forced else expected),
+    )
+
+
+def write_static_goldens(
+    golden_dir: Path,
+    landmark_blocks: BlockBuilder,
+    long_frame: FrameBuilder,
+    min_hand_frames: int,
+) -> dict[str, Path]:
+    """The golden files that do not depend on the exported model: preprocessing for the v1 and
+    v2 selections, and the aspect cases."""
+    paths = {}
+    for name, pose_indices in (
+        (PREPROCESS_CASES_FILE, POSE_INDICES),
+        (PREPROCESS_CASES_V2_FILE, V2_GOLDEN_POSE_INDICES),
+    ):
+        golden = build_preprocess_golden(landmark_blocks, long_frame, min_hand_frames, pose_indices)
+        write_golden(golden_dir / name, golden)
+        paths[name] = golden_dir / name
+    aspect = build_aspect_golden(landmark_blocks)
+    _write_text(
+        golden_dir / ASPECT_CASES_FILE,
+        json.dumps(aspect.model_dump(mode="json"), separators=(",", ":")) + "\n",
+    )
+    paths[ASPECT_CASES_FILE] = golden_dir / ASPECT_CASES_FILE
+    return paths
+
+
+def recordings_app_block(meta: WebMeta) -> dict[str, Any]:
+    return {
+        "model_name": meta.model_name,
+        "variant": meta.variant,
+        "run": meta.run,
+        "model_sha256": meta.model_sha256,
+        "feature_set": meta.feature_set,
+        "pose_indices": meta.pose_indices,
+        "pose_swap_pairs": meta.preprocessing.pose_swap_pairs,
+        "num_frames": meta.num_frames,
+        "min_hand_frames": meta.preprocessing.min_hand_frames,
+        "threshold": meta.threshold.threshold,
+        "num_classes": meta.num_classes,
+        "r_train": None if meta.aspect is None else meta.aspect.r_train,
+    }
+
+
+def _write_meta(path: Path, meta: WebMeta) -> None:
+    _write_text(path, json.dumps(meta.model_dump(mode="json"), indent=2) + "\n")
+
+
 def export_web(
     run_directory: Path,
-    variant: WebVariant,
     quant_root: Path,
     processed_dir: Path,
     *,
@@ -948,37 +1523,146 @@ def export_web(
     golden_dir: Path,
     landmark_blocks: BlockBuilder,
     long_frame: FrameBuilder,
+    variant: WebVariant | None = None,
     target_precision: float = DEFAULT_TARGET_PRECISION,
     data_source: DataSource = "asl-signs",
+    ensemble: bool = False,
+    work_dir: Path = DEFAULT_WORK_DIR,
+    aspect_report: Path | None = None,
+    wasm_verifier: WasmVerifier | None = None,
 ) -> ExportResult:
-    """Copy one variant to ``out_dir``, write meta.json there and the golden vectors to
-    ``golden_dir``. The variant file must have been built from the run's current best.pt."""
-    if variant not in WEB_VARIANTS:
-        raise ValueError(f"variant must be one of {WEB_VARIANTS}, got {variant!r}")
-    summary = read_json(run_directory / SUMMARY_FILE)
-    model_name, seed = summary["model"], int(summary["seed"])
-    if summary.get("feature_set", "v1") != "v1":
-        raise ValueError(
-            f"{run_directory} uses feature set {summary['feature_set']}; the web demo implements "
-            "v1 preprocessing only"
-        )
-    run_key = f"{run_directory.parent.name}/{run_directory.name}"
-    quant_dir = quant_root / run_key  # <quant root>/<experiment>/seed_<seed>.
-    selection = select_variant(read_json(quant_dir / QUANT_REPORT_FILE), variant)
+    """Export the variant VARIANT_RULE picks (or ``variant``) of one run, or of the seed
+    ensemble of its experiment, to ``out_dir``, and the golden vectors to ``golden_dir``.
 
-    source = quant_dir / variant_file(variant)
-    checkpoint_sha256 = sha256_file(run_directory / CHECKPOINT_FILE)
-    probe = OrtModel(source, intra_op_threads=1)
-    metadata = probe.metadata
-    if metadata.get(META_SOURCE_SHA256) != checkpoint_sha256:
-        raise ValueError(f"{source} was not built from {run_directory / CHECKPOINT_FILE}")
+    Variants come from the run's quant_report.json when there is one (they must have been built
+    from the run's current best.pt); otherwise they are built into ``work_dir``. With
+    ``wasm_verifier`` each exported variant is checked in onnxruntime-web; a failure is
+    recorded and the next eligible variant is exported instead.
+    """
+    if variant is not None and variant not in WEB_VARIANTS:
+        raise ValueError(f"variant must be one of {WEB_VARIANTS}, got {variant!r}")
+    primary = run_info(run_directory)
+    feature_set: FeatureSetName = primary.summary.get("feature_set", "v1")
+    layout = checkpoint_layout(primary.checkpoint)
+    members = ensemble_members(run_directory) if ensemble else [primary]
+    experiment = run_directory.parent.name
+    run_key = f"{experiment}/ensemble" if ensemble else primary.key
+    label_map = {int(k): v for k, v in read_json(run_directory / "label_map.json").items()}
+    labels = [label_map[index] for index in range(len(label_map))]
+    settings = preprocessing_settings(processed_dir, layout)
+    aspect = aspect_settings(processed_dir, aspect_report, data_source)
+    val = load_eval_split(processed_dir, run_directory / primary.summary["splits_file"])
+
+    quant_dir = quant_root / primary.key  # <quant root>/<experiment>/seed_<seed>.
+    source: Literal["quant_report", "export_build"]
+    if not ensemble and (quant_dir / QUANT_REPORT_FILE).is_file():
+        report = read_json(quant_dir / QUANT_REPORT_FILE)
+        inputs = candidates_from_report(report, quant_dir, primary.sha256)
+        source = "quant_report"
+    else:
+        inputs = build_candidates(members, work_dir / run_key, layout, label_map, val)
+        source = "export_build"
+    candidates, order, fp32_top1 = rank_candidates(inputs)
+    if variant is not None and inputs[variant].path is None:
+        raise ValueError(f"variant {variant} is not available: {inputs[variant].note}")
+    attempts: list[WebVariant] = [variant] if variant is not None else list(order)
+
+    golden_paths = write_static_goldens(
+        golden_dir, landmark_blocks, long_frame, settings.min_hand_frames
+    )
+    fallbacks: list[Fallback] = []
+    checks: dict[str, WasmCheck] = {}
+    for attempt in attempts:
+        selection = make_selection(
+            candidates,
+            order,
+            fp32_top1,
+            source,
+            chosen=attempt,
+            forced=variant is not None,
+            fallbacks=fallbacks,
+            checks=checks,
+        )
+        path = inputs[attempt].path
+        assert path is not None  # attempts hold available variants only.
+        result = _export_file(
+            path,
+            out_dir=out_dir,
+            golden_dir=golden_dir,
+            golden_paths=golden_paths,
+            members=members,
+            layout=layout,
+            label_map=label_map,
+            val=val,
+            target_precision=target_precision,
+            landmark_blocks=landmark_blocks,
+            fields={
+                "model_name": primary.summary["model"],
+                "variant": attempt,
+                "data_source": data_source,
+                "run": run_key,
+                "seed": None if ensemble else primary.seed,
+                "seeds": [member.seed for member in members],
+                "ensemble": ensemble,
+                "feature_set": feature_set,
+                "labels": labels,
+                "preprocessing": settings,
+                "aspect": aspect,
+                "variant_selection": selection,
+            },
+        )
+        if wasm_verifier is None:
+            return result
+        check = wasm_verifier(result)
+        checks[attempt] = check
+        if check.status != "failed":
+            meta = result.meta.model_copy(
+                update={
+                    "variant_selection": make_selection(
+                        candidates,
+                        order,
+                        fp32_top1,
+                        source,
+                        chosen=attempt,
+                        forced=variant is not None,
+                        fallbacks=fallbacks,
+                        checks=checks,
+                    )
+                }
+            )
+            _write_meta(result.meta_path, meta)
+            return result._replace(meta=meta)
+        fallbacks.append(Fallback(variant=attempt, reason=check.detail or "failed"))
+    raise RuntimeError(
+        "onnxruntime-web could not run any eligible variant: "
+        + "; ".join(f"{f.variant}: {f.reason}" for f in fallbacks)
+    )
+
+
+def _export_file(
+    source: Path,
+    *,
+    out_dir: Path,
+    golden_dir: Path,
+    golden_paths: dict[str, Path],
+    members: Sequence[RunInfo],
+    layout: InputLayout,
+    label_map: Mapping[int, str],
+    val: SplitArrays,
+    target_precision: float,
+    landmark_blocks: BlockBuilder,
+    fields: dict[str, Any],
+) -> ExportResult:
+    """Copy one variant file to ``out_dir`` and write meta.json, the model golden and the
+    recording example for it."""
+    variant = fields["variant"]
+    metadata = OrtModel(source, intra_op_threads=1).metadata
+    if metadata.get(META_SOURCE_SHA256) != source_sha256(members):
+        raise ValueError(f"{source} was not built from {members[0].checkpoint}")
     if metadata.get(META_VARIANT) != variant:
         raise ValueError(f"{source} records variant {metadata.get(META_VARIANT)!r}")
-    label_map = label_map_from_metadata(metadata, source)
-    run_labels = {int(k): v for k, v in read_json(run_directory / "label_map.json").items()}
-    if label_map != run_labels:
+    if label_map_from_metadata(metadata, source, layout.to_dict()) != dict(label_map):
         raise ValueError(f"{source} label map differs from the run's label_map.json")
-    labels = [label_map[index] for index in range(len(label_map))]
 
     out_dir.mkdir(parents=True, exist_ok=True)
     model_path = out_dir / MODEL_FILE
@@ -986,46 +1670,45 @@ def export_web(
     shutil.copyfile(source, temporary)
     temporary.replace(model_path)
     model_sha256 = sha256_file(model_path)
-
-    val = load_eval_split(processed_dir, run_directory / summary["splits_file"])
-    logits = OrtModel(model_path, intra_op_threads=1).run(val.X)
-    threshold = threshold_from_logits(logits, val.y, target_precision)
-    settings = preprocessing_settings(processed_dir)
+    model = OrtModel(model_path, intra_op_threads=1)
+    logits = model.run(val.X)
 
     meta = WebMeta(
-        schema_version=META_SCHEMA_VERSION,
-        model_name=model_name,
-        variant=variant,
-        data_source=data_source,
-        run=run_key,
-        seed=seed,
-        num_classes=len(labels),
-        labels=labels,
-        num_frames=NUM_FRAMES,
-        landmark_order=landmark_names(),
-        pose_indices=list(POSE_INDICES),
-        input_layout=InputLayout.model_validate(layout_dict()),
-        preprocessing=settings,
+        schema_version=WEB_META_SCHEMA_VERSION,
+        num_classes=len(fields["labels"]),
+        num_frames=layout.num_frames,
+        landmark_order=landmark_names(layout.pose_indices),
+        pose_indices=list(layout.pose_indices),
+        input_layout=InputLayoutBlock.model_validate(layout.to_dict()),
         opset=onnx_opset(model_path),
         model_file=MODEL_FILE,
         model_bytes=model_path.stat().st_size,
         model_sha256=model_sha256,
-        source_checkpoint_sha256=checkpoint_sha256,
-        threshold=threshold,
-        variant_selection=selection,
+        source_checkpoints=[
+            SourceCheckpoint(run=member.key, sha256=member.sha256) for member in members
+        ],
+        threshold=threshold_from_logits(logits, val.y, target_precision),
+        calibration=calibration_from_logits(logits, val.y),
+        features_spec_version=spec.SUPPORTED_VERSION,
+        features_spec_sha256=sha256_file(spec.spec_path()),
         tool_versions=tool_versions(),
+        **fields,
     )
     meta_path = out_dir / META_FILE
-    _write_text(meta_path, json.dumps(meta.model_dump(mode="json"), indent=2) + "\n")
+    _write_meta(meta_path, meta)
 
-    preprocess_golden = build_preprocess_golden(
-        landmark_blocks, long_frame, settings.min_hand_frames
-    )
-    preprocess_path = golden_dir / PREPROCESS_CASES_FILE
-    write_golden(preprocess_path, preprocess_golden)
+    paths = dict(golden_paths)
     model_golden = build_model_golden(
-        val, logits, source=data_source, variant=variant, model_sha256=model_sha256
+        val, logits, source=meta.data_source, variant=variant, model_sha256=model_sha256
     )
-    model_golden_path = golden_dir / MODEL_CASES_FILE
-    write_golden(model_golden_path, model_golden)
-    return ExportResult(meta, model_path, meta_path, preprocess_path, model_golden_path)
+    write_golden(golden_dir / MODEL_CASES_FILE, model_golden)
+    paths[MODEL_CASES_FILE] = golden_dir / MODEL_CASES_FILE
+    example = example_recordings(
+        landmark_blocks, recordings_app_block(meta), meta.labels, model.run
+    )
+    _write_text(
+        golden_dir / RECORDING_EXAMPLE_FILE,
+        json.dumps(example.model_dump(mode="json"), separators=(",", ":")) + "\n",
+    )
+    paths[RECORDING_EXAMPLE_FILE] = golden_dir / RECORDING_EXAMPLE_FILE
+    return ExportResult(meta, model_path, meta_path, paths)

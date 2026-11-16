@@ -11,6 +11,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
+from edgevision import spec
 from edgevision.data.landmarks import (
     DEFAULT_POSE_INDICES,
     FIRST_POSE_SLOT,
@@ -32,13 +33,13 @@ FloatArray = npt.NDArray[np.float64]
 Float32Array = npt.NDArray[np.float32]
 BoolArray = npt.NDArray[np.bool_]
 
-MIN_SCALE = 1e-6
+MIN_SCALE = spec.MIN_SCALE
 
 # x -> 1 - x cannot be an exact involution on arbitrary floats: there are far more floats in
 # (0, 0.5) than in (0.5, 1), so some must collide. On this dyadic grid every value and its
 # mirror are exactly representable for |x| < 2**20, so x is snapped here before any mirroring.
 # The grid step (2.3e-10) is well below the float32 resolution of the outputs.
-X_GRID = 2.0**32
+X_GRID = spec.X_SNAP_GRID  # 2**32.
 
 
 class SequenceInfo(TypedDict):

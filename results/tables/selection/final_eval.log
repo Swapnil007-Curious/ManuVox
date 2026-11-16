@@ -1,0 +1,40 @@
+b_cnn_v2feat_v1recipe/seed_0: test top-1 0.6260 top-5 0.8511 macro-F1 0.6149 (n=16242)
+b_cnn_v2feat_v1recipe/seed_1: test top-1 0.6236 top-5 0.8475 macro-F1 0.6119 (n=16242)
+b_cnn_v2feat_v1recipe/seed_2: test top-1 0.6305 top-5 0.8521 macro-F1 0.6189 (n=16242)
+c_cnn_v2feat_v2recipe/seed_0: test top-1 0.6362 top-5 0.8565 macro-F1 0.6260 (n=16242)
+c_cnn_v2feat_v2recipe/seed_1: test top-1 0.6371 top-5 0.8556 macro-F1 0.6259 (n=16242)
+c_cnn_v2feat_v2recipe/seed_2: test top-1 0.6368 top-5 0.8578 macro-F1 0.6240 (n=16242)
+cnn_signer_dependent/seed_0: test top-1 0.8067 top-5 0.9376 macro-F1 0.8018 (n=8755)
+cnn_signer_independent/seed_0: test top-1 0.6232 top-5 0.8495 macro-F1 0.6101 (n=16242)
+cnn_signer_independent/seed_1: test top-1 0.6271 top-5 0.8465 macro-F1 0.6153 (n=16242)
+cnn_signer_independent/seed_2: test top-1 0.6237 top-5 0.8435 macro-F1 0.6099 (n=16242)
+d_hybrid_v2feat_v2recipe/seed_0: test top-1 0.6843 top-5 0.8634 macro-F1 0.6729 (n=16242)
+d_hybrid_v2feat_v2recipe/seed_1: test top-1 0.6875 top-5 0.8647 macro-F1 0.6759 (n=16242)
+d_hybrid_v2feat_v2recipe/seed_2: test top-1 0.6841 top-5 0.8735 macro-F1 0.6740 (n=16242)
+gru_signer_dependent/seed_0: test top-1 0.8021 top-5 0.9323 macro-F1 0.7983 (n=8755)
+gru_signer_independent/seed_0: test top-1 0.6076 top-5 0.8373 macro-F1 0.5968 (n=16242)
+gru_signer_independent/seed_1: test top-1 0.6132 top-5 0.8399 macro-F1 0.6029 (n=16242)
+gru_signer_independent/seed_2: test top-1 0.6097 top-5 0.8327 macro-F1 0.5978 (n=16242)
+transformer_signer_dependent/seed_0: test top-1 0.8107 top-5 0.9270 macro-F1 0.8061 (n=8755)
+transformer_signer_independent/seed_0: test top-1 0.6235 top-5 0.8224 macro-F1 0.6088 (n=16242)
+transformer_signer_independent/seed_1: test top-1 0.6273 top-5 0.8240 macro-F1 0.6145 (n=16242)
+transformer_signer_independent/seed_2: test top-1 0.6255 top-5 0.8290 macro-F1 0.6142 (n=16242)
+                    experiment       model         split_mode  n_seeds  test_top1_mean  test_top1_std  test_top3_mean  test_top3_std  test_top5_mean  test_top5_std  test_macro_f1_mean  test_macro_f1_std
+          cnn_signer_dependent         cnn   signer_dependent        1        0.806739            NaN        0.916276            NaN        0.937636            NaN            0.801788                NaN
+         b_cnn_v2feat_v1recipe         cnn signer_independent        3        0.626688       0.003494        0.804560       0.000559        0.850244       0.002432            0.615207           0.003502
+         c_cnn_v2feat_v2recipe         cnn signer_independent        3        0.636683       0.000444        0.809670       0.001746        0.856627       0.001085            0.625311           0.001116
+        cnn_signer_independent         cnn signer_independent        3        0.624656       0.002112        0.795243       0.004661        0.846509       0.003017            0.611780           0.003087
+          gru_signer_dependent         gru   signer_dependent        1        0.802056            NaN        0.906910            NaN        0.932267            NaN            0.798264                NaN
+        gru_signer_independent         gru signer_independent        3        0.610126       0.002831        0.784817       0.003043        0.836638       0.003622            0.599133           0.003294
+      d_hybrid_v2feat_v2recipe      hybrid signer_independent        3        0.685322       0.001923        0.829331       0.006545        0.867196       0.005473            0.674272           0.001506
+  transformer_signer_dependent transformer   signer_dependent        1        0.810737            NaN        0.906568            NaN        0.927013            NaN            0.806106                NaN
+transformer_signer_independent transformer signer_independent        3        0.625436       0.001880        0.780261       0.003052        0.825145       0.003446            0.612486           0.003197
+top confusions from d_hybrid_v2feat_v2recipe (hybrid, signer_independent), chosen by mean val top-1
+                    experiment       model         split_mode feature_set recipe  n_seeds seeds  test_top1  test_top3  test_top5  test_macro_f1  test_top1_seed_mean
+         b_cnn_v2feat_v1recipe         cnn signer_independent          v2     v1        3 0 1 2   0.666420   0.836165   0.879510       0.655862             0.626688
+         c_cnn_v2feat_v2recipe         cnn signer_independent          v2     v2        3 0 1 2   0.666051   0.836289   0.882588       0.655631             0.636683
+        cnn_signer_independent         cnn signer_independent          v1     v1        3 0 1 2   0.657247   0.823421   0.872799       0.644861             0.624656
+        gru_signer_independent         gru signer_independent          v1     v1        3 0 1 2   0.642840   0.812708   0.862271       0.631724             0.610126
+      d_hybrid_v2feat_v2recipe      hybrid signer_independent          v2     v2        3 0 1 2   0.709580   0.851311   0.889176       0.699875             0.685322
+transformer_signer_independent transformer signer_independent          v1     v1        3 0 1 2   0.665189   0.818742   0.861963       0.653299             0.625436
+EXIT 0

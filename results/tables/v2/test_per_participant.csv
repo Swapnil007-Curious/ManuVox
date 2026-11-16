@@ -1,0 +1,13 @@
+experiment,model,split_mode,participant_id,n_sequences,n_seeds,test_top1_mean
+b_cnn_v2feat_v1recipe,cnn,signer_independent,30680,2700,3,0.45296296296296296
+b_cnn_v2feat_v1recipe,cnn,signer_independent,37779,4322,3,0.7101650470461207
+b_cnn_v2feat_v1recipe,cnn,signer_independent,49445,4787,3,0.5732887681916301
+b_cnn_v2feat_v1recipe,cnn,signer_independent,62590,4433,3,0.70877509587187
+c_cnn_v2feat_v2recipe,cnn,signer_independent,30680,2700,3,0.45456790123456786
+c_cnn_v2feat_v2recipe,cnn,signer_independent,37779,4322,3,0.7222736387474935
+c_cnn_v2feat_v2recipe,cnn,signer_independent,49445,4787,3,0.5890954668894923
+c_cnn_v2feat_v2recipe,cnn,signer_independent,62590,4433,3,0.7155425219941348
+d_hybrid_v2feat_v2recipe,hybrid,signer_independent,30680,2700,3,0.5191358024691358
+d_hybrid_v2feat_v2recipe,hybrid,signer_independent,37779,4322,3,0.7769551133734383
+d_hybrid_v2feat_v2recipe,hybrid,signer_independent,49445,4787,3,0.6120743680802172
+d_hybrid_v2feat_v2recipe,hybrid,signer_independent,62590,4433,3,0.7762989698473569

@@ -41,6 +41,7 @@
         <div class="controls">
           <button id="start" type="button" disabled>Start camera</button>
           <button id="stop" type="button" disabled>Stop camera</button>
+          <button id="recalibrate" type="button" disabled>Recalibrate</button>
           <fieldset class="mode">
             <legend>Capture mode</legend>
             <label><input type="radio" name="mode" value="auto" /> Automatic</label>
@@ -51,6 +52,7 @@
           Hold to record a sign
         </button>
         <p id="record-help" class="help" hidden>Hold Space, or press and hold the button, while you sign. Release to recognise.</p>
+        <p id="calibration-status" class="help" role="status">Aspect calibration runs for 2 seconds when the camera starts.</p>
         <p id="segment-state" class="segment-state">Not capturing.</p>
       </section>
 
@@ -58,7 +60,11 @@
         <h2 id="result-heading">Result</h2>
         <p id="result-sign" class="result-sign">–</p>
         <p id="result-detail" class="result-detail"></p>
-        <ol id="candidates" class="candidates" aria-label="Top candidates" hidden></ol>
+        <ol id="candidates" class="candidates" aria-label="Top 3 candidates" hidden></ol>
+        <details id="segment-debug" class="segment-debug">
+          <summary>Segment details</summary>
+          <p id="segment-debug-text">No segment yet.</p>
+        </details>
         <div id="announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
         <h3>History</h3>
         <ol id="history" class="history" aria-label="Last 10 results"></ol>
@@ -95,9 +101,32 @@
               <label class="check"><input id="swapHands" name="swapHands" type="checkbox" /> Swap hands</label>
               <label for="delegate">Landmark backend</label>
               <select id="delegate" name="delegate">
+                <option value="GPU">GPU (WebGL), CPU if it fails</option>
                 <option value="CPU">CPU</option>
-                <option value="GPU">GPU (WebGL)</option>
               </select>
+              <label for="classifierBackend">Classifier backend</label>
+              <select id="classifierBackend" name="classifierBackend">
+                <option value="auto">Automatic (WebGPU if it is faster here, else WebAssembly)</option>
+                <option value="wasm">WebAssembly</option>
+                <option value="webgpu">WebGPU, WebAssembly if it fails</option>
+              </select>
+              <label for="classifierThreads">Classifier threads (0 = automatic)</label>
+              <input id="classifierThreads" name="classifierThreads" type="number" min="0" max="8" step="1" required />
+              <label for="poseEvery">Pose landmarker runs every</label>
+              <select id="poseEvery" name="poseEvery">
+                <option value="1">frame</option>
+                <option value="2">2nd frame (poses in between interpolated)</option>
+                <option value="3">3rd frame (poses in between interpolated)</option>
+              </select>
+              <fieldset class="aspect">
+                <legend>Aspect correction</legend>
+                <label><input type="radio" name="aspectMode" value="frame" /> From the camera's frame size</label>
+                <label><input type="radio" name="aspectMode" value="auto" /> Calibrated at camera start (head and shoulders)</label>
+                <label><input type="radio" name="aspectMode" value="manual" /> Manual</label>
+                <label><input type="radio" name="aspectMode" value="off" /> Off</label>
+                <label for="aspectK">Manual factor k: <output id="aspectK-value" for="aspectK">1.00</output></label>
+                <input id="aspectK" name="aspectK" type="range" min="0.25" max="4" step="0.01" />
+              </fieldset>
               <label for="lowLightThreshold">Low-light warning below brightness (0 to 255)</label>
               <input id="lowLightThreshold" name="lowLightThreshold" type="number" min="0" max="255" step="1" required />
               <label for="minShoulderDistance">"Too far" below shoulder distance</label>
@@ -129,9 +158,34 @@
             <dt>Shoulder distance</dt><dd id="diag-shoulders">–</dd>
             <dt>Brightness</dt><dd id="diag-light">–</dd>
             <dt>Hands match pose wrists</dt><dd id="diag-wrists">–</dd>
+            <dt>Aspect correction</dt><dd id="diag-aspect">–</dd>
+            <dt>Landmarks</dt><dd id="diag-mediapipe">–</dd>
           </dl>
           <button id="benchmark" type="button" disabled>Run 60-second benchmark</button>
           <p id="benchmark-status" class="help" role="status">Start the camera first. Sign a few times during the run so whole segments are timed.</p>
+        </details>
+      </section>
+
+      <section class="panel" aria-labelledby="recorder-heading">
+        <details id="recorder-details">
+          <summary><h2 id="recorder-heading">Record test signs</h2></summary>
+          <p class="help">
+            Saves the landmarks of each completed segment, with the settings and the app's result, for offline
+            diagnosis with scripts/live_diagnose.py. No video or images are stored. Recordings stay in this tab until
+            you download them and are lost when it closes.
+          </p>
+          <label class="check"><input id="recorder-on" type="checkbox" /> Record each completed segment</label>
+          <label for="label-search">Find the sign you will perform</label>
+          <input id="label-search" type="search" autocomplete="off" aria-controls="label-select" aria-describedby="label-help" />
+          <p id="label-help" class="help">Type to filter, then press Down Arrow to move to the list.</p>
+          <label for="label-select">Intended sign</label>
+          <select id="label-select" size="6"></select>
+          <p id="recorder-status" class="help" role="status">No recordings.</p>
+          <div class="controls">
+            <button id="recorder-download" type="button" disabled>Download recordings</button>
+            <button id="recorder-clear" type="button" disabled>Clear recordings</button>
+          </div>
+          <ol id="recorder-list" class="history" aria-label="Last 10 recordings"></ol>
         </details>
       </section>
     </main>

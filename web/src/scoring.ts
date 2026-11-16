@@ -16,16 +16,17 @@ export interface Decision {
   top: Candidate[];
 }
 
-/** Numerically stable softmax in float64. */
-export function softmax(logits: ArrayLike<number>): Float64Array {
+/** Numerically stable softmax(logits / temperature) in float64. */
+export function softmax(logits: ArrayLike<number>, temperature = 1): Float64Array {
   const n = logits.length;
   if (n === 0) throw new Error("softmax of an empty vector");
+  if (!(temperature > 0)) throw new Error(`temperature must be positive, got ${temperature}`);
   let max = Number.NEGATIVE_INFINITY;
-  for (let i = 0; i < n; i += 1) max = Math.max(max, logits[i] as number);
+  for (let i = 0; i < n; i += 1) max = Math.max(max, (logits[i] as number) / temperature);
   const out = new Float64Array(n);
   let sum = 0;
   for (let i = 0; i < n; i += 1) {
-    const value = Math.exp((logits[i] as number) - max);
+    const value = Math.exp((logits[i] as number) / temperature - max);
     out[i] = value;
     sum += value;
   }
@@ -45,11 +46,12 @@ export function decide(
   labels: readonly string[],
   threshold: number,
   k = 3,
+  temperature = 1,
 ): Decision {
   if (logits.length !== labels.length) {
     throw new Error(`${logits.length} logits for ${labels.length} labels`);
   }
-  const probabilities = softmax(logits);
+  const probabilities = softmax(logits, temperature);
   const top = topK(probabilities, k).map((index) => ({
     index,
     label: labels[index] as string,

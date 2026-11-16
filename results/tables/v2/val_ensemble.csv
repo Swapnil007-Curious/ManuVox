@@ -1,0 +1,4 @@
+experiment,model,split_mode,feature_set,recipe,n_seeds,seeds,val_top1,val_top5,val_macro_f1,val_top1_seed_mean
+b_cnn_v2feat_v1recipe,cnn,signer_independent,v2,v1,3,0 1 2,0.6435218324982105,0.8573928258967629,0.6316439677178224,0.6100904053659959
+c_cnn_v2feat_v2recipe,cnn,signer_independent,v2,v2,3,0 1 2,0.6531456295235822,0.8631193828044221,0.6407310719413799,0.6242212147723959
+d_hybrid_v2feat_v2recipe,hybrid,signer_independent,v2,v2,3,0 1 2,0.6929929213393781,0.8736976059810706,0.6805207211992156,0.6747792889525174

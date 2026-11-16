@@ -62,7 +62,7 @@ export function assignHands(hands: readonly DetectedHand[], swap: boolean): Assi
  * side (15 left, 16 right) than the other one. A consistent assignment matches Holistic.
  */
 export function wristConsistency(
-  assigned: AssignedHands,
+  assigned: Pick<AssignedHands, "left" | "right">,
   pose: readonly Point2[] | null,
 ): { checked: number; consistent: number } {
   if (!pose || pose.length < 17) return { checked: 0, consistent: 0 };

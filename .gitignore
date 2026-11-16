@@ -6,13 +6,18 @@ build/
 dist/
 .pytest_cache/
 
-# Virtual environments
+# Virtual environments (.venv-live: MediaPipe Holistic and OpenCV for the live-gap tools)
 .venv/
+.venv-live/
 venv/
 
 # Data and generated outputs
 # Anchored to the repo root: a bare "data/" would also ignore src/edgevision/data/.
 /data/
+# Kaggle training outputs and the recorded webcam clips (personal video): local inputs only.
+/artifacts/
+/test_clips/
+results/live_gap/*.log
 results/**/artifacts
 # Quantised models; their quant_report.json files and the result CSVs stay tracked.
 results/quant/**/*.onnx

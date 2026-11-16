@@ -14,6 +14,7 @@ import torch
 
 from conftest import landmark_blocks, long_frame
 from edgevision.config import SplitConfig
+from edgevision.data.landmarks import POSE_SWAP_PAIRS
 from edgevision.evaluation.evaluators import TorchCheckpointEvaluator
 from edgevision.evaluation.tables import (
     TEST_ENSEMBLE_COLUMNS,
@@ -33,7 +34,7 @@ from edgevision.train.data import load_split_arrays
 from edgevision.train.loop import run_training
 from edgevision.web_export import export_web
 from training_support import EXPERIMENTS, build_processed_dir, load_script
-from v2_support import V2_LAYOUT, build_v2_processed_dir
+from v2_support import V2_LAYOUT, V2_POSE_INDICES, build_v2_processed_dir
 
 V2_NAMES = [experiment.name for experiment in V2_EXPERIMENTS]
 V1_RUN = "cnn_signer_independent/seed_0"
@@ -326,18 +327,87 @@ def test_quantize_lists_v2_runs_and_skips_them(grid, tmp_path, capsys):
     assert not (tmp_path / "quant").exists()
 
 
-def test_web_export_refuses_v2_features(grid, tmp_path):
+def web_export_v2(grid, tmp_path, *, ensemble):
     _, processed, runs_root, _ = grid
-    with pytest.raises(ValueError, match="v1 preprocessing only"):
+    return export_web(
+        runs_root / "b_cnn_v2feat_v1recipe" / "seed_0",
+        tmp_path / "quant",
+        processed.root,
+        out_dir=tmp_path / "out",
+        golden_dir=tmp_path / "golden",
+        landmark_blocks=landmark_blocks,
+        long_frame=long_frame,
+        data_source="synthetic",
+        ensemble=ensemble,
+        work_dir=tmp_path / "work",
+    )
+
+
+def test_web_export_writes_the_v2_selection_to_meta(grid, tmp_path):
+    """A v2 run has no quant report, so the export builds fp32, fp16 and int8_dynamic itself
+    (int8_static is left to scripts/quantize.py) and applies the variant rule to them; meta.json
+    carries pose 0-16 and all eight swap pairs for the web preprocessing."""
+    meta = web_export_v2(grid, tmp_path, ensemble=False).meta
+    assert (meta.feature_set, meta.run) == ("v2", "b_cnn_v2feat_v1recipe/seed_0")
+    assert meta.pose_indices == list(V2_POSE_INDICES) and meta.input_layout.frame_dim == 120
+    assert meta.preprocessing.pose_swap_pairs == list(POSE_SWAP_PAIRS)
+    selection = meta.variant_selection
+    assert selection.source == "export_build"
+    by_name = {c.variant: c for c in selection.candidates}
+    assert all(by_name[name].available for name in ("fp32", "fp16", "int8_dynamic"))
+    assert not by_name["int8_static"].available
+    assert "no quant_report.json" in (by_name["int8_static"].note or "")
+    assert meta.variant == selection.order[0]
+    assert set(selection.order) <= {"fp32", "fp16", "int8_dynamic"}
+
+
+def test_web_export_of_the_seed_ensemble_applies_the_variant_rule(grid, tmp_path):
+    result = web_export_v2(grid, tmp_path, ensemble=True)
+    meta = result.meta
+    assert (meta.run, meta.seed, meta.seeds, meta.ensemble) == (
+        "b_cnn_v2feat_v1recipe/ensemble",
+        None,
+        [0, 1],
+        True,
+    )
+    assert [item.run for item in meta.source_checkpoints] == [
+        "b_cnn_v2feat_v1recipe/seed_0",
+        "b_cnn_v2feat_v1recipe/seed_1",
+    ]
+    by_name = {c.variant: c for c in meta.variant_selection.candidates}
+    assert all(by_name[name].available for name in ("fp32", "fp16", "int8_dynamic"))
+    assert "'/features/' node scope" in (by_name["int8_static"].note or "")
+    assert meta.variant == meta.variant_selection.order[0]
+    _, processed, runs_root, _ = grid
+    checkpoints = [runs_root / "b_cnn_v2feat_v1recipe" / f"seed_{s}" / "best.pt" for s in SEEDS]
+    torch_ensemble, _ = load_ensemble(checkpoints)
+    run = runs_root / "b_cnn_v2feat_v1recipe" / "seed_0"
+    splits = run / json.loads((run / "summary.json").read_text(encoding="utf-8"))["splits_file"]
+    val = load_split_arrays(processed.root, splits, ["val"])["val"]
+    x = torch.from_numpy(val.X[:4])
+    with torch.no_grad():
+        expected = torch_ensemble(x).numpy()
+    fp32 = ort.InferenceSession(str(tmp_path / "work" / meta.run / "fp32.onnx"))
+    (logits,) = fp32.run([OUTPUT_NAME], {INPUT_NAME: x.numpy()})
+    assert float(np.abs(logits - expected).max()) < 1e-4
+
+
+def test_web_export_ensemble_needs_two_seeds(grid, tmp_path):
+    _, processed, runs_root, _ = grid
+    lone = tmp_path / "runs" / "b_cnn_v2feat_v1recipe"
+    shutil.copytree(runs_root / "b_cnn_v2feat_v1recipe" / "seed_0", lone / "seed_0")
+    with pytest.raises(ValueError, match="an ensemble needs at least two"):
         export_web(
-            runs_root / "b_cnn_v2feat_v1recipe" / "seed_0",
-            "fp32",
-            tmp_path,
+            lone / "seed_0",
+            tmp_path / "quant",
             processed.root,
             out_dir=tmp_path / "out",
             golden_dir=tmp_path / "golden",
             landmark_blocks=landmark_blocks,
             long_frame=long_frame,
+            data_source="synthetic",
+            ensemble=True,
+            work_dir=tmp_path / "work",
         )
 
 

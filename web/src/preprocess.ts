@@ -3,36 +3,48 @@
 //
 // Internal coordinates are a Float64Array of shape (T, L, 2) holding x, y; z is never used by the
 // exported model (use_z is false) and is only checked for infinities, as pivot_sequence does.
+//
+// The pose selection and the left/right pose pairs that mirroring swaps come from meta.json
+// (preprocessing.pose_indices and preprocessing.pose_swap_pairs), so one build serves the v1
+// selection (7 pose points) and v2 (pose 0-16); the defaults are features_spec.json's.
+//
+// Every constant comes from features_spec.json (./spec), the file Python reads too.
 
-export const LANDMARK_COUNTS = { face: 468, left_hand: 21, pose: 33, right_hand: 21 } as const;
+import * as spec from "./spec";
+
+export const LANDMARK_COUNTS = spec.LANDMARK_COUNTS;
 export type LandmarkType = keyof typeof LANDMARK_COUNTS;
-export const N_HAND = 21;
-export const N_POSE = 33;
+export const N_HAND = spec.N_HAND;
+export const N_POSE = spec.N_POSE;
 export const FIRST_POSE_SLOT = 2 * N_HAND;
-export const DEFAULT_POSE_INDICES: readonly number[] = [0, 11, 12, 13, 14, 15, 16];
-export const SHOULDERS = [11, 12] as const;
-export const POSE_SWAP_PAIRS: readonly (readonly [number, number])[] = [
-  [11, 12],
-  [13, 14],
-  [15, 16],
-];
-export const MIN_SCALE = 1e-6;
-export const X_GRID = 2 ** 32;
+export const DEFAULT_POSE_INDICES: readonly number[] = spec.DEFAULT_POSE_INDICES;
+export const SHOULDERS = [spec.POSE.left_shoulder, spec.POSE.right_shoulder] as const;
+export type PosePair = readonly [number, number];
+/** The spec's swap pairs that a pose selection holds, in spec order. */
+export function swapPairsFor(poseIndices: readonly number[]): PosePair[] {
+  return spec.POSE_SWAP_PAIRS.filter(([a, b]) => poseIndices.includes(a) && poseIndices.includes(b)).map(([a, b]) => [a, b] as const);
+}
+/** The pairs of DEFAULT_POSE_INDICES; the app uses meta.json's pose_swap_pairs. */
+export const V1_POSE_SWAP_PAIRS: readonly PosePair[] = swapPairsFor(DEFAULT_POSE_INDICES);
+export const MIN_SCALE = spec.MIN_SCALE;
+export const X_GRID = spec.X_SNAP_GRID;
 export const FLOAT16_MAX = 65504;
 const COORDS = 2;
 
 export interface PreprocessConfig {
   numFrames: number;
   poseIndices: readonly number[];
+  poseSwapPairs: readonly PosePair[];
   minHandFrames: number;
   minScale: number;
   xGrid: number;
 }
 
 export const DEFAULT_CONFIG: PreprocessConfig = {
-  numFrames: 32,
+  numFrames: spec.NUM_FRAMES,
   poseIndices: DEFAULT_POSE_INDICES,
-  minHandFrames: 3,
+  poseSwapPairs: V1_POSE_SWAP_PAIRS,
+  minHandFrames: spec.MIN_HAND_FRAMES,
   minScale: MIN_SCALE,
   xGrid: X_GRID,
 };
@@ -82,16 +94,23 @@ export function frameDim(poseIndices: readonly number[]): number {
   return numSelected(poseIndices) * COORDS + 2;
 }
 
-/** Same checks as landmarks.validate_pose_indices. */
-export function validatePoseIndices(poseIndices: readonly number[]): void {
+/**
+ * landmarks.validate_pose_indices, with the swap pairs given (meta.json lists the pairs the
+ * selection holds): unique indices in range, and every pair fully selected and disjoint.
+ */
+export function validatePoseIndices(poseIndices: readonly number[], swapPairs: readonly PosePair[]): void {
   if (new Set(poseIndices).size !== poseIndices.length) {
     throw new Error(`pose_indices must be unique, got [${poseIndices.join(", ")}]`);
   }
   const outside = poseIndices.filter((index) => !(index >= 0 && index < N_POSE));
   if (outside.length > 0) throw new Error(`pose_indices outside 0-${N_POSE - 1}: ${outside}`);
-  for (const [first, second] of POSE_SWAP_PAIRS) {
-    if (poseIndices.includes(first) !== poseIndices.includes(second)) {
-      throw new Error(`pose_indices must contain both or neither of (${first}, ${second})`);
+  const paired = new Set<number>();
+  for (const pair of swapPairs) {
+    if (!Array.isArray(pair) || pair.length !== 2) throw new Error("pose_swap_pairs must hold pairs");
+    for (const index of pair) {
+      if (!poseIndices.includes(index)) throw new Error(`pose swap pair (${pair.join(", ")}) is not in pose_indices`);
+      if (paired.has(index)) throw new Error(`pose landmark ${index} is in more than one swap pair`);
+      paired.add(index);
     }
   }
 }
@@ -227,16 +246,15 @@ export function poseSlot(poseIndices: readonly number[], landmark: number): numb
 }
 
 /** mirror_permutation: swap the hand blocks and the selected pose pairs. */
-export function mirrorPermutation(poseIndices: readonly number[]): Int32Array {
-  validatePoseIndices(poseIndices);
+export function mirrorPermutation(poseIndices: readonly number[], swapPairs: readonly PosePair[]): Int32Array {
+  validatePoseIndices(poseIndices, swapPairs);
   const permutation = new Int32Array(numSelected(poseIndices));
   for (let i = 0; i < permutation.length; i += 1) permutation[i] = i;
   for (let i = 0; i < N_HAND; i += 1) {
     permutation[i] = N_HAND + i;
     permutation[N_HAND + i] = i;
   }
-  for (const [first, second] of POSE_SWAP_PAIRS) {
-    if (!poseIndices.includes(first)) continue;
+  for (const [first, second] of swapPairs) {
     const a = poseSlot(poseIndices, first);
     const b = poseSlot(poseIndices, second);
     const saved = permutation[a] as number;
@@ -247,8 +265,8 @@ export function mirrorPermutation(poseIndices: readonly number[]): Int32Array {
 }
 
 /** mirror_sequence: permute landmarks, then x -> 1 - x. */
-export function mirrorCoords(coords: Coords, poseIndices: readonly number[]): Coords {
-  const permutation = mirrorPermutation(poseIndices);
+export function mirrorCoords(coords: Coords, poseIndices: readonly number[], swapPairs: readonly PosePair[]): Coords {
+  const permutation = mirrorPermutation(poseIndices, swapPairs);
   const data = new Float64Array(coords.data.length);
   for (let t = 0; t < coords.frames; t += 1) {
     for (let l = 0; l < coords.landmarks; l += 1) {
@@ -478,8 +496,97 @@ function excluded(info: SequenceInfo, reason: ExclusionReason): PreprocessResult
   return { features: null, presence: null, info: { ...info, excluded: true, reason } };
 }
 
+/**
+ * edgevision.live.pipeline.kept_clock: 0 for the first kept frame, then each kept frame advances
+ * by the time since the frame captured just before it (kept or not), capped at maxGapMs.
+ */
+export function keptClock(times: readonly number[], keep: readonly boolean[], maxGapMs: number): Float64Array {
+  const clock: number[] = [];
+  for (let index = 0; index < keep.length; index += 1) {
+    if (!keep[index]) continue;
+    if (clock.length === 0) {
+      clock.push(0);
+      continue;
+    }
+    const interval = index > 0 ? (times[index] as number) - (times[index - 1] as number) : 0;
+    clock.push((clock[clock.length - 1] as number) + Math.min(Math.max(interval, 0), maxGapMs));
+  }
+  return Float64Array.from(clock);
+}
+
+/** resample_on_clock: resampleCoords with the kept-frame clock as the source axis. */
+export function resampleOnClock(coords: Coords, clock: Float64Array, numFrames: number): Coords {
+  const { frames, landmarks, data } = coords;
+  const last = clock.length > 0 ? (clock[clock.length - 1] as number) : 0;
+  if (frames === 1 || last <= 0) return resampleCoords(coords, numFrames);
+  const positions = linspace(0, last, numFrames);
+  const out = new Float64Array(numFrames * landmarks * COORDS).fill(Number.NaN);
+  const sourceTime: number[] = [];
+  const sourceValue: number[] = [];
+  for (let l = 0; l < landmarks; l += 1) {
+    for (let axis = 0; axis < COORDS; axis += 1) {
+      sourceTime.length = 0;
+      sourceValue.length = 0;
+      for (let t = 0; t < frames; t += 1) {
+        const value = data[(t * landmarks + l) * COORDS + axis] as number;
+        if (Number.isFinite(value)) {
+          sourceTime.push(clock[t] as number);
+          sourceValue.push(value);
+        }
+      }
+      if (sourceTime.length === 0) continue;
+      for (let i = 0; i < numFrames; i += 1) {
+        out[(i * landmarks + l) * COORDS + axis] = interp(positions[i] as number, sourceTime, sourceValue, Number.NaN, Number.NaN);
+      }
+    }
+  }
+  return { frames: numFrames, landmarks, data: out };
+}
+
+/** nearest_on_clock: presence at the nearest kept frame on the clock; ties go to the later one. */
+export function nearestOnClock(presence: Uint8Array, clock: Float64Array, numFrames: number): Uint8Array {
+  const frames = presence.length / 2;
+  const last = clock.length > 0 ? (clock[clock.length - 1] as number) : 0;
+  if (frames === 1 || last <= 0) return resamplePresence(presence, numFrames);
+  const positions = linspace(0, last, numFrames);
+  const out = new Uint8Array(numFrames * 2);
+  for (let i = 0; i < numFrames; i += 1) {
+    const position = positions[i] as number;
+    let later = 0;
+    while (later < frames && (clock[later] as number) < position) later += 1;
+    later = Math.min(later, frames - 1);
+    const earlier = Math.max(later - 1, 0);
+    const chosen = (clock[later] as number) - position <= position - (clock[earlier] as number) ? later : earlier;
+    out[i * 2] = presence[chosen * 2] as number;
+    out[i * 2 + 1] = presence[chosen * 2 + 1] as number;
+  }
+  return out;
+}
+
 /** preprocess_sequence from dense, already snapped coordinates (T_raw, L, 2). */
 export function preprocessCoords(raw: Coords, config: PreprocessConfig = DEFAULT_CONFIG): PreprocessResult {
+  return preprocessWithAxis(raw, config, null);
+}
+
+/**
+ * preprocess_on_clock: the same steps, with the 32 output frames placed on the kept-frame clock
+ * of `times` (one per raw frame, in ms) instead of the kept-frame index.
+ */
+export function preprocessCoordsOnClock(
+  raw: Coords,
+  times: readonly number[],
+  config: PreprocessConfig = DEFAULT_CONFIG,
+  maxGapMs: number = spec.SEGMENTER.max_gap_ms,
+): PreprocessResult {
+  if (times.length !== raw.frames) throw new Error(`${times.length} frame times for ${raw.frames} frames`);
+  return preprocessWithAxis(raw, config, { times, maxGapMs });
+}
+
+function preprocessWithAxis(
+  raw: Coords,
+  config: PreprocessConfig,
+  axis: { times: readonly number[]; maxGapMs: number } | null,
+): PreprocessResult {
   const rawPresence = handPresence(raw);
   const keep: boolean[] = [];
   for (let t = 0; t < raw.frames; t += 1) {
@@ -505,7 +612,7 @@ export function preprocessCoords(raw: Coords, config: PreprocessConfig = DEFAULT
   if (info.t_kept < config.minHandFrames) return excluded(info, "insufficient_hand_frames");
 
   if (leftIsDominant(presence)) {
-    coords = mirrorCoords(coords, config.poseIndices);
+    coords = mirrorCoords(coords, config.poseIndices, config.poseSwapPairs);
     const swapped = new Uint8Array(presence.length);
     for (let t = 0; t < coords.frames; t += 1) {
       swapped[t * 2] = presence[t * 2 + 1] as number;
@@ -520,8 +627,16 @@ export function preprocessCoords(raw: Coords, config: PreprocessConfig = DEFAULT
   if (!Number.isFinite(params.scale) || params.scale < config.minScale) {
     return excluded(info, "degenerate_scale");
   }
-  const resampled = resampleCoords(normalizeCoords(coords, params), config.numFrames);
-  const resampledPresence = resamplePresence(presence, config.numFrames);
+  let resampled: Coords;
+  let resampledPresence: Uint8Array;
+  if (axis === null) {
+    resampled = resampleCoords(normalizeCoords(coords, params), config.numFrames);
+    resampledPresence = resamplePresence(presence, config.numFrames);
+  } else {
+    const clock = keptClock(axis.times, keep, axis.maxGapMs);
+    resampled = resampleOnClock(normalizeCoords(coords, params), clock, config.numFrames);
+    resampledPresence = nearestOnClock(presence, clock, config.numFrames);
+  }
   return {
     features: packFeatures(resampled, resampledPresence),
     presence: Float32Array.from(resampledPresence),
@@ -531,7 +646,7 @@ export function preprocessCoords(raw: Coords, config: PreprocessConfig = DEFAULT
 
 /** preprocess_sequence from long-format rows. */
 export function preprocessRows(rows: LongRows, config: PreprocessConfig = DEFAULT_CONFIG): PreprocessResult {
-  validatePoseIndices(config.poseIndices);
+  validatePoseIndices(config.poseIndices, config.poseSwapPairs);
   return preprocessCoords(pivotRows(rows, config.poseIndices, config.xGrid), config);
 }
 
@@ -595,6 +710,28 @@ export function frameCoords(
   if (leftHand) for (let i = 0; i < N_HAND; i += 1) put(i, leftHand[i]);
   if (rightHand) for (let i = 0; i < N_HAND; i += 1) put(N_HAND + i, rightHand[i]);
   if (pose) poseIndices.forEach((landmark, position) => put(FIRST_POSE_SLOT + position, pose[landmark]));
+  return out;
+}
+
+/**
+ * One raw frame as dense selected coordinates (L, 2), x snapped: hand blocks are flat
+ * [x0, y0, z0, ...] arrays of 21 points and the pose of 33, null when not detected.
+ */
+export function rawFrameCoords(
+  leftHand: Float64Array | null,
+  rightHand: Float64Array | null,
+  pose: Float64Array | null,
+  poseIndices: readonly number[] = DEFAULT_POSE_INDICES,
+  xGrid = X_GRID,
+): Float64Array {
+  const out = new Float64Array(numSelected(poseIndices) * COORDS).fill(Number.NaN);
+  const put = (slot: number, block: Float64Array, point: number): void => {
+    out[slot * COORDS] = snapX(block[point * 3] as number, xGrid);
+    out[slot * COORDS + 1] = block[point * 3 + 1] as number;
+  };
+  if (leftHand) for (let i = 0; i < N_HAND; i += 1) put(i, leftHand, i);
+  if (rightHand) for (let i = 0; i < N_HAND; i += 1) put(N_HAND + i, rightHand, i);
+  if (pose) poseIndices.forEach((landmark, position) => put(FIRST_POSE_SLOT + position, pose, landmark));
   return out;
 }
 

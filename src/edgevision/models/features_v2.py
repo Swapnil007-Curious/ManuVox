@@ -11,13 +11,17 @@ import itertools
 
 import torch
 
+from edgevision import spec
 from edgevision.data.landmarks import N_HAND, RIGHT_HAND, pose_slot
 from edgevision.layout import InputLayout
 from edgevision.models.features import StandardisedFeatures
 
-WRIST = 0
-FINGERTIPS = (4, 8, 12, 16, 20)
-NOSE, MOUTH_LEFT, MOUTH_RIGHT, LEFT_SHOULDER, RIGHT_SHOULDER = 0, 9, 10, 11, 12
+WRIST = spec.WRIST
+FINGERTIPS = spec.FINGERTIPS
+NOSE, MOUTH_LEFT, MOUTH_RIGHT, LEFT_SHOULDER, RIGHT_SHOULDER = (
+    spec.POSE_POINTS[name]
+    for name in ("nose", "mouth_left", "mouth_right", "left_shoulder", "right_shoulder")
+)
 REQUIRED_POSE = (NOSE, MOUTH_LEFT, MOUTH_RIGHT, LEFT_SHOULDER, RIGHT_SHOULDER)
 HAND_PAIRS = tuple(itertools.combinations(range(N_HAND), 2))  # 210 pairs.
 BODY_POINTS = (WRIST, *FINGERTIPS)  # 6 dominant-hand points ...

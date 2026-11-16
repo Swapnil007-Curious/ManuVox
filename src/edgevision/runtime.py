@@ -75,10 +75,14 @@ class OrtModel:
         return np.asarray(logits, dtype=np.float32)
 
 
-def label_map_from_metadata(metadata: dict[str, str], path: Path) -> dict[int, str]:
-    """The label map an ONNX file carries; refuses files made for another input layout."""
+def label_map_from_metadata(
+    metadata: dict[str, str], path: Path, layout: dict[str, Any] | None = None
+) -> dict[int, str]:
+    """The label map an ONNX file carries; refuses files made for another input layout than
+    ``layout`` (default: the v1 layout_dict())."""
     if META_LABEL_MAP not in metadata or META_INPUT_LAYOUT not in metadata:
         raise ValueError(f"{path}: no edgevision metadata; build it with scripts/quantize.py")
-    if json.loads(metadata[META_INPUT_LAYOUT]) != layout_dict():
+    expected = layout_dict() if layout is None else layout
+    if json.loads(metadata[META_INPUT_LAYOUT]) != expected:
         raise ValueError(f"{path}: model input layout differs from edgevision.layout")
     return {int(index): str(sign) for index, sign in json.loads(metadata[META_LABEL_MAP]).items()}

@@ -39,7 +39,12 @@ interface PreprocessCase {
 const BROWSER_CASES = ["left_dominant_both_hands", "pose_nan_hand_fallback", "tie_with_edge_gaps"];
 
 test("preprocess parity through the browser bundle", async ({ page }) => {
-  const golden = readJson<{ cases: PreprocessCase[] }>("tests/golden/preprocess_cases.json");
+  // The app preprocesses with the shipped model's pose selection: the v1 goldens hold 7 pose
+  // points, the v2 goldens pose 0-16.
+  const meta = readJson<{ preprocessing: { pose_indices: number[] } }>("public/model/meta.json");
+  const file = meta.preprocessing.pose_indices.length === 7 ? "preprocess_cases.json" : "preprocess_cases_v2.json";
+  const golden = readJson<{ config: { pose_indices: number[] }; cases: PreprocessCase[] }>(`tests/golden/${file}`);
+  expect(golden.config.pose_indices).toEqual(meta.preprocessing.pose_indices);
   await openDebugPage(page);
   for (const name of BROWSER_CASES) {
     const item = golden.cases.find((candidate) => candidate.name === name);

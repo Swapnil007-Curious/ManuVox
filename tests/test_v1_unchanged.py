@@ -17,6 +17,7 @@ from edgevision.evaluation.tables import (
     summarize_quant_test,
     summarize_test,
 )
+from edgevision.experiments import V1_EXPERIMENTS
 from edgevision.quant.pipeline import find_quant_reports, quant_ops_summary
 from edgevision.runs import find_completed_runs
 from edgevision.train.config import dump_train_config, load_train_config
@@ -45,6 +46,7 @@ V1_AUGMENT_KEYS = {
     "jitter_std",
 }
 RESULTS = REPO_ROOT / "results"
+V1_NAMES = {experiment.name for experiment in V1_EXPERIMENTS}
 
 
 @pytest.fixture(scope="module")
@@ -120,8 +122,13 @@ def read_records(pattern):
     return [json.loads(path.read_text("utf-8")) for path in sorted(RESULTS.glob(pattern))]
 
 
+def v1_runs():
+    """The runs of v1 experiments; v2 runs brought home from Kaggle sit beside them."""
+    return [run for run in find_completed_runs(RESULTS / "runs") if run.experiment in V1_NAMES]
+
+
 def test_committed_val_summary_is_rebuilt_from_the_run_summaries():
-    table = aggregate_val(find_completed_runs(RESULTS / "runs"))
+    table = aggregate_val(v1_runs())
     names = (table["model"] + "_" + table["split_mode"]).tolist()
     assert without_experiment(table, names) == committed_csv("val_summary.csv")
 
@@ -149,8 +156,10 @@ def test_committed_quant_tables_are_rebuilt_from_the_reports_and_records():
 
 
 def test_legacy_summaries_are_v1_runs():
-    """Committed summary.json files predate the experiment, feature_set and recipe fields."""
-    for run in find_completed_runs(RESULTS / "runs"):
+    """Committed v1 summary.json files predate the experiment, feature_set and recipe fields."""
+    runs = v1_runs()
+    assert len(runs) == 12
+    for run in runs:
         assert not {"experiment", "feature_set", "recipe"} & set(run.summary)
         assert run.experiment == run.directory.parent.name
         assert (run.feature_set, run.recipe) == ("v1", "v1")

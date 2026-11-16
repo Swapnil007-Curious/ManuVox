@@ -24,6 +24,19 @@ export const CONTENT_SECURITY_POLICY = [
   "form-action 'none'",
 ].join("; ");
 
+/**
+ * Cross-origin isolation: SharedArrayBuffer, and so onnxruntime-web's wasm threads, needs
+ * COOP same-origin and COEP require-corp. The dev and preview servers send them; on GitHub
+ * Pages, which cannot set headers, the service worker adds them to every response it serves
+ * (config/service-worker.template.js). Every resource is same-origin, so require-corp blocks
+ * nothing the app loads.
+ */
+export const CROSS_ORIGIN_ISOLATION_HEADERS: Record<string, string> = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+  "Cross-Origin-Resource-Policy": "same-origin",
+};
+
 export function contentSecurityPolicy(): Plugin {
   return {
     name: "edge-vision-csp",
@@ -77,7 +90,8 @@ export function serviceWorker(templatePath: string): Plugin {
       const version = digest.digest("hex").slice(0, 16);
       const source = template
         .replace("__CACHE_VERSION__", version)
-        .replace("__PRECACHE_URLS__", JSON.stringify(files, null, 2));
+        .replace("__PRECACHE_URLS__", JSON.stringify(files, null, 2))
+        .replace("__ISOLATION_HEADERS__", JSON.stringify(CROSS_ORIGIN_ISOLATION_HEADERS, null, 2));
       await writeFile(join(outDir, "sw.js"), source);
       config.logger.info(`service worker: ${files.length} files precached, version ${version}`);
     },

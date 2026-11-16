@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Edge-Vision benchmark</title>
+  </head>
+  <body>
+    <main>
+      <h1>Edge-Vision classifier benchmark</h1>
+      <p>
+        One configuration per page load: <code>?ep=wasm&amp;threads=1</code>, <code>?ep=wasm&amp;threads=4</code> or
+        <code>?ep=webgpu</code>. Results stay on this device.
+      </p>
+      <p id="bench-status">Starting…</p>
+      <pre id="bench-result"></pre>
+    </main>
+    <script type="module" src="/src/bench.ts"></script>
+  </body>
+</html>

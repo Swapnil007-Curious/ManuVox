@@ -19,15 +19,8 @@ import {
   type Point2,
   type PreprocessConfig,
 } from "../../src/preprocess";
-import { preprocessGolden } from "./golden";
+import { PREPROCESS_GOLDEN_FILES, preprocessGolden } from "./golden";
 
-const golden = preprocessGolden();
-const config: PreprocessConfig = {
-  ...DEFAULT_CONFIG,
-  numFrames: golden.config.num_frames,
-  poseIndices: golden.config.pose_indices,
-  minHandFrames: golden.config.min_hand_frames,
-};
 const FEATURE_TOLERANCE = 1e-5;
 
 /** Spacing of float16 values around `value`. */
@@ -37,69 +30,82 @@ function float16Ulp(value: number): number {
   return 2 ** (exponent - 10);
 }
 
-describe("preprocess.ts against preprocess_cases.json", () => {
-  it("has at least 12 cases covering every branch", () => {
-    expect(golden.cases.length).toBeGreaterThanOrEqual(12);
-    const infos = golden.cases.map((item) => item.info);
-    expect(infos.some((info) => info.mirrored)).toBe(true);
-    expect(infos.some((info) => info.norm_method === "hand_fallback" && !info.excluded)).toBe(true);
-    expect(new Set(infos.map((info) => info.reason))).toEqual(
-      new Set([null, "insufficient_hand_frames", "degenerate_scale"]),
-    );
-  });
+// The v1 selection (7 pose points, 3 swap pairs) and v2 (pose 0-16, 8 pairs), both driven by the
+// golden file's config the way the app is driven by meta.json.
+for (const file of PREPROCESS_GOLDEN_FILES) {
+  const golden = preprocessGolden(file);
+  const config: PreprocessConfig = {
+    ...DEFAULT_CONFIG,
+    numFrames: golden.config.num_frames,
+    poseIndices: golden.config.pose_indices,
+    poseSwapPairs: golden.config.pose_swap_pairs,
+    minHandFrames: golden.config.min_hand_frames,
+  };
 
-  for (const testCase of golden.cases) {
-    it(`matches Python: ${testCase.name}`, () => {
-      const result = preprocessRows(testCase.rows, config);
-      expect(result.info).toEqual(testCase.info);
-      if (testCase.features === null) {
-        expect(result.features).toBeNull();
-        expect(result.presence).toBeNull();
-        return;
-      }
-      const expected = testCase.features.flat();
-      const actual = result.features as Float32Array;
-      expect(actual.length).toBe(expected.length);
-      let maxDiff = 0;
-      for (let i = 0; i < expected.length; i += 1) {
-        maxDiff = Math.max(maxDiff, Math.abs((actual[i] as number) - (expected[i] as number)));
-      }
-      expect(maxDiff).toBeLessThanOrEqual(FEATURE_TOLERANCE);
-      expect(Array.from(result.presence as Float32Array)).toEqual((testCase.presence as number[][]).flat());
-
-      const modelInput = toModelInput(actual, config.poseIndices) as Float32Array;
-      const expectedInput = (testCase.model_input as number[][]).flat();
-      for (let i = 0; i < expectedInput.length; i += 1) {
-        const want = expectedInput[i] as number;
-        expect(Math.abs((modelInput[i] as number) - want)).toBeLessThanOrEqual(float16Ulp(want));
-      }
+  describe(`preprocess.ts against ${file} (pose ${golden.config.pose_indices.length} points, ${golden.config.pose_swap_pairs.length} swap pairs)`, () => {
+    it("has at least 12 cases covering every branch", () => {
+      expect(golden.cases.length).toBeGreaterThanOrEqual(12);
+      const infos = golden.cases.map((item) => item.info);
+      expect(infos.some((info) => info.mirrored)).toBe(true);
+      expect(infos.some((info) => info.norm_method === "hand_fallback" && !info.excluded)).toBe(true);
+      expect(new Set(infos.map((info) => info.reason))).toEqual(
+        new Set([null, "insufficient_hand_frames", "degenerate_scale"]),
+      );
     });
-  }
 
-  it("reports the largest feature difference over all cases", () => {
-    let maxDiff = 0;
-    let exactModelInput = 0;
-    let modelInputValues = 0;
     for (const testCase of golden.cases) {
-      if (testCase.features === null) continue;
-      const features = preprocessRows(testCase.rows, config).features as Float32Array;
-      testCase.features.flat().forEach((want, i) => {
-        maxDiff = Math.max(maxDiff, Math.abs((features[i] as number) - want));
-      });
-      const input = toModelInput(features, config.poseIndices) as Float32Array;
-      (testCase.model_input as number[][]).flat().forEach((want, i) => {
-        modelInputValues += 1;
-        if (input[i] === Math.fround(want)) exactModelInput += 1;
+      it(`matches Python: ${testCase.name}`, () => {
+        const result = preprocessRows(testCase.rows, config);
+        expect(result.info).toEqual(testCase.info);
+        if (testCase.features === null) {
+          expect(result.features).toBeNull();
+          expect(result.presence).toBeNull();
+          return;
+        }
+        const expected = testCase.features.flat();
+        const actual = result.features as Float32Array;
+        expect(actual.length).toBe(expected.length);
+        let maxDiff = 0;
+        for (let i = 0; i < expected.length; i += 1) {
+          maxDiff = Math.max(maxDiff, Math.abs((actual[i] as number) - (expected[i] as number)));
+        }
+        expect(maxDiff).toBeLessThanOrEqual(FEATURE_TOLERANCE);
+        expect(Array.from(result.presence as Float32Array)).toEqual((testCase.presence as number[][]).flat());
+
+        const modelInput = toModelInput(actual, config.poseIndices) as Float32Array;
+        const expectedInput = (testCase.model_input as number[][]).flat();
+        for (let i = 0; i < expectedInput.length; i += 1) {
+          const want = expectedInput[i] as number;
+          expect(Math.abs((modelInput[i] as number) - want)).toBeLessThanOrEqual(float16Ulp(want));
+        }
       });
     }
-    console.log(`preprocess parity: max |features - python| = ${maxDiff}; model_input exact ${exactModelInput}/${modelInputValues}`);
-    expect(maxDiff).toBeLessThanOrEqual(FEATURE_TOLERANCE);
-  });
 
-  it("snaps x exactly like snap_x, including ties to even", () => {
-    for (const { x, snapped } of golden.snap_x_cases) expect(snapX(x)).toBe(snapped);
+    it("reports the largest feature difference over all cases", () => {
+      let maxDiff = 0;
+      let exactModelInput = 0;
+      let modelInputValues = 0;
+      for (const testCase of golden.cases) {
+        if (testCase.features === null) continue;
+        const features = preprocessRows(testCase.rows, config).features as Float32Array;
+        testCase.features.flat().forEach((want, i) => {
+          maxDiff = Math.max(maxDiff, Math.abs((features[i] as number) - want));
+        });
+        const input = toModelInput(features, config.poseIndices) as Float32Array;
+        (testCase.model_input as number[][]).flat().forEach((want, i) => {
+          modelInputValues += 1;
+          if (input[i] === Math.fround(want)) exactModelInput += 1;
+        });
+      }
+      console.log(`preprocess parity: max |features - python| = ${maxDiff}; model_input exact ${exactModelInput}/${modelInputValues}`);
+      expect(maxDiff).toBeLessThanOrEqual(FEATURE_TOLERANCE);
+    });
+
+    it("snaps x exactly like snap_x, including ties to even", () => {
+      for (const { x, snapped } of golden.snap_x_cases) expect(snapX(x)).toBe(snapped);
+    });
   });
-});
+}
 
 describe("numerical helpers", () => {
   it("rint rounds half to even", () => {
@@ -152,7 +158,7 @@ describe("numerical helpers", () => {
   });
 
   it("mirror permutation is its own inverse", () => {
-    const permutation = mirrorPermutation(DEFAULT_CONFIG.poseIndices);
+    const permutation = mirrorPermutation(DEFAULT_CONFIG.poseIndices, DEFAULT_CONFIG.poseSwapPairs);
     permutation.forEach((target, source) => expect(permutation[target]).toBe(source));
     expect(permutation[0]).toBe(21);
     expect(permutation[43]).toBe(44); // shoulders 11 <-> 12
@@ -201,7 +207,7 @@ describe("live frames", () => {
     const live = stackFrames(frames.map((frame) => frameCoords(frame.left, frame.right, frame.pose)));
     const pivoted = pivotRows(rowsFor(frames), DEFAULT_CONFIG.poseIndices);
     expect(Array.from(live.data)).toEqual(Array.from(pivoted.data));
-    expect(preprocessCoords(live, config)).toEqual(preprocessRows(rowsFor(frames), config));
+    expect(preprocessCoords(live, DEFAULT_CONFIG)).toEqual(preprocessRows(rowsFor(frames), DEFAULT_CONFIG));
   });
 
   it("frameHasHand needs a complete hand", () => {

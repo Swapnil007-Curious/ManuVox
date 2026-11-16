@@ -64,7 +64,10 @@ describe("auto mode", () => {
   it("discards segments with fewer hand frames than min_hand_frames", () => {
     const segmenter = new Segmenter<number>({ ...AUTO, minHandFrames: 5 });
     const events = feed(segmenter, "1111" + "0".repeat(8));
-    expect(events).toEqual([{ type: "discarded", handFrames: 4, reason: "hands_lowered", startTime: 0, endTime: 3 * FRAME_MS }]);
+    expect(events).toHaveLength(1);
+    // The discarded segment keeps its frames (without the trailing hand-less ones) for the recorder.
+    expect(events[0]).toMatchObject({ type: "discarded", handFrames: 4, reason: "hands_lowered", startTime: 0, endTime: 3 * FRAME_MS });
+    expect(events[0]?.type === "discarded" && events[0].frames.map((frame) => frame.hasHand)).toEqual([true, true, true, true]);
   });
 
   it("ignores manual recording calls", () => {

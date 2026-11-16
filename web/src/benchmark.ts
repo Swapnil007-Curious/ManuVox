@@ -6,7 +6,9 @@ import { summarize, type Summary } from "./stats";
 export interface FrameTiming {
   t_ms: number;
   hand_ms: number;
+  /** 0 on frames where the pose landmarker did not run (it runs every Nth frame). */
   pose_ms: number;
+  pose_ran: boolean;
   total_ms: number;
 }
 
@@ -24,13 +26,21 @@ export interface SegmentTiming {
 export interface BenchmarkContext {
   camera: { width: number; height: number; frame_rate: number | null; requested: object };
   settings: object;
-  model: { name: string; variant: string; sha256: string; data_source: string; threshold: number };
+  model: { name: string; variant: string; sha256: string; data_source: string; threshold: number; feature_set: string };
   ort_wasm: object;
-  mediapipe: object;
+  mediapipe: {
+    delegate_requested: string;
+    delegate: string;
+    fallback_reason: string | null;
+    pose_every_n: number;
+    hand: string;
+    pose: string;
+  };
+  aspect: { mode: string; k: number; r_live: number | null; r_train: number | null; status: string };
 }
 
 export interface BenchmarkReport {
-  schema_version: 1;
+  schema_version: 2;
   started_at: string;
   duration_s: number;
   environment: {
@@ -109,7 +119,7 @@ export class BenchmarkRecorder {
     const notes: string[] = [];
     if (this.segments.length === 0) notes.push("No segments completed; sign during the benchmark to time preprocessing and classification of real segments.");
     return {
-      schema_version: 1,
+      schema_version: 2,
       started_at: this.startedAt,
       duration_s: elapsed,
       environment: {
@@ -124,7 +134,7 @@ export class BenchmarkRecorder {
       classifier_fixed_input: { runs: fixedInputMs.length, raw_ms: fixedInputMs },
       summary: {
         hand_landmarker_ms: summarize(column(this.frames, "hand_ms")),
-        pose_landmarker_ms: summarize(column(this.frames, "pose_ms")),
+        pose_landmarker_ms: summarize(column(this.frames.filter((frame) => frame.pose_ran), "pose_ms")),
         frame_total_ms: summarize(column(this.frames, "total_ms")),
         preprocess_ms: summarize(column(this.segments, "preprocess_ms")),
         classifier_ms: summarize(column(this.segments, "classifier_ms")),

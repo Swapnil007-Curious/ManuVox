@@ -8,7 +8,8 @@ export type GuidanceCode =
   | "low_light"
   | "too_close"
   | "too_far"
-  | "shoulders_hidden";
+  | "shoulders_hidden"
+  | "calibration_no_shoulders";
 
 export interface GuidanceMessage {
   code: GuidanceCode;
@@ -48,6 +49,7 @@ export const MESSAGES: Record<GuidanceCode, string> = {
   too_close: "Too close: move back from the camera.",
   too_far: "Too far: move closer to the camera.",
   shoulders_hidden: "Shoulders not visible: keep your upper body in view.",
+  calibration_no_shoulders: "Move back so your shoulders are visible",
 };
 
 /** Mean BT.709 luma of RGBA pixels. */

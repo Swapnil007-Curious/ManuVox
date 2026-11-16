@@ -6,7 +6,7 @@ preprocess:
   output_dir: /kaggle/working/processed_v2
   num_frames: 32
   use_z: false
-  pose_indices: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  pose_set: v2  # features_spec.json selection.pose_sets
   min_hand_frames: 3
   limit: null
   num_workers: 4

@@ -1,0 +1,9 @@
+# Live-gap tools only (scripts/prepare_live_clips.py, scripts/extract_holistic.py), in their own
+# Python 3.11 venv: mediapipe 0.10.21 is the last release with the legacy Holistic solution that
+# asl-signs was built with, and it needs numpy < 2, unlike the main environment.
+#   python -m venv .venv-live
+#   .venv-live\Scripts\python -m pip install -r requirements-live.txt
+mediapipe==0.10.21
+numpy==1.26.4
+opencv-contrib-python==4.11.0.86
+imageio-ffmpeg==0.8.1

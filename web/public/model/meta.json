@@ -1,10 +1,15 @@
 {
-  "schema_version": 1,
-  "model_name": "cnn",
-  "variant": "fp32",
+  "schema_version": 2,
+  "model_name": "hybrid",
+  "variant": "fp16",
   "data_source": "asl-signs",
-  "run": "cnn_signer_independent/seed_0",
+  "run": "d_hybrid_v2feat_v2recipe/seed_0",
   "seed": 0,
+  "seeds": [
+    0
+  ],
+  "ensemble": false,
+  "feature_set": "v2",
   "num_classes": 250,
   "labels": [
     "TV",
@@ -303,6 +308,16 @@
     "right_hand_19",
     "right_hand_20",
     "pose_0",
+    "pose_1",
+    "pose_2",
+    "pose_3",
+    "pose_4",
+    "pose_5",
+    "pose_6",
+    "pose_7",
+    "pose_8",
+    "pose_9",
+    "pose_10",
     "pose_11",
     "pose_12",
     "pose_13",
@@ -312,6 +327,16 @@
   ],
   "pose_indices": [
     0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
     11,
     12,
     13,
@@ -321,9 +346,9 @@
   ],
   "input_layout": {
     "num_frames": 32,
-    "num_landmarks": 49,
+    "num_landmarks": 59,
     "coords_per_landmark": 2,
-    "frame_dim": 100,
+    "frame_dim": 120,
     "coordinate_order": "landmark_major_xy",
     "landmark_order": [
       "left_hand_0-20",
@@ -332,6 +357,16 @@
     ],
     "pose_indices": [
       0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
       11,
       12,
       13,
@@ -339,8 +374,8 @@
       15,
       16
     ],
-    "presence_left_index": 98,
-    "presence_right_index": 99,
+    "presence_left_index": 118,
+    "presence_right_index": 119,
     "missing_point": "x == 0.0 and y == 0.0",
     "input_name": "landmarks",
     "output_name": "logits"
@@ -350,6 +385,16 @@
     "use_z": false,
     "pose_indices": [
       0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
       11,
       12,
       13,
@@ -357,37 +402,171 @@
       15,
       16
     ],
+    "pose_swap_pairs": [
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        7,
+        8
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        11,
+        12
+      ],
+      [
+        13,
+        14
+      ],
+      [
+        15,
+        16
+      ]
+    ],
     "min_hand_frames": 3,
     "min_scale": 1e-06,
     "x_grid": 4294967296.0,
     "storage_dtype": "float16",
     "source": "preprocess_report.json"
   },
+  "aspect": {
+    "r_train": 0.3982752966276271,
+    "stats": {
+      "definition": "r = |y_nose - y_shoulder_mid| / |x_shoulder_left - x_shoulder_right| per kept frame where the nose and both shoulders are finite, in raw normalised image coordinates before normalisation",
+      "p10": 0.33790230313569064,
+      "median": 0.3982752966276271,
+      "p90": 0.456762518386763,
+      "frames_measured": 2173410,
+      "kept_frames": 2173410,
+      "shoulders_finite_fraction": 1.0
+    },
+    "source": "data/processed_v2/preprocess_report.json",
+    "k_min": 0.25,
+    "k_max": 4.0,
+    "calibration_seconds": 2.0,
+    "min_visibility": 0.5
+  },
   "opset": 17,
   "model_file": "model.onnx",
-  "model_bytes": 1294936,
-  "model_sha256": "74b452ec2754ecbd8972df30af2d1a8a7cb73307ea0cb12419a7a8ee82e94d54",
-  "source_checkpoint_sha256": "31c8b0647ab4f671dc14d511cca5e911890bcb69bcb3fbb467cd37a62ddcaddd",
+  "model_bytes": 6928969,
+  "model_sha256": "92e3aea130734f2f5456ab309dcabfaac4e06a86e57ab2d13fc3f2534871372a",
+  "source_checkpoints": [
+    {
+      "run": "d_hybrid_v2feat_v2recipe/seed_0",
+      "sha256": "b4cff4c7283a2e50fd2c2a95668fc0b8c352442cb411572503b747a48f898cbe"
+    }
+  ],
   "threshold": {
     "computed_on": "val",
-    "target_precision": 0.9,
-    "threshold": 0.681122819741426,
-    "coverage": 0.3491609003420027,
-    "accuracy_above_threshold": 0.9,
-    "overall_val_top1": 0.6222063151197009,
+    "target_precision": 0.8,
+    "threshold": 0.3392349595770651,
+    "coverage": 0.7470770699117156,
+    "accuracy_above_threshold": 0.8000638773554775,
+    "overall_val_top1": 0.6761313926668258,
     "val_sequences": 12573,
     "method": "target_precision",
     "fallback_min_coverage": 0.2,
     "warning": null
   },
+  "calibration": {
+    "computed_on": "val",
+    "method": "temperature_scaling",
+    "temperature": 0.8681554789606684,
+    "nll_before": 1.69445055598439,
+    "nll_after": 1.651794935406092,
+    "ece_before": 0.07576465984661547,
+    "ece_after": 0.044534640342405174,
+    "criterion": "maximise coverage x (2 x selective accuracy - 1) on val: an accepted right sign gains 1, an accepted wrong sign costs 1, 'not sure' scores 0 (the smallest such threshold on ties)",
+    "threshold": 0.4877964799342001,
+    "coverage": 0.7348286009703332,
+    "selective_accuracy": 0.808312587942418,
+    "net_score": 0.4531138153185397,
+    "val_top1": 0.6761313926668258,
+    "val_top3": 0.8150799331901694,
+    "val_sequences": 12573
+  },
+  "features_spec_version": 1,
+  "features_spec_sha256": "818e08707498882db76ef1afe088d6a45d847c15edc7e6dcec9836f4b444736e",
   "variant_selection": {
-    "rule": "use int8_static if its val top-1 is within 1.0 percentage point of fp32 val top-1 (from quant_report.json), otherwise fp32",
-    "fp32_val_top1": 0.6222063151197009,
-    "int8_static_val_top1": 0.5541239163286408,
-    "drop_pp": 6.808239879106015,
-    "max_drop_pp": 1.0,
-    "recommended": "fp32",
-    "chosen": "fp32",
+    "rule": "among fp32, fp16, int8_dynamic and int8_static, the smallest file whose val top-1 is within 0.5 percentage points of fp32 val top-1; a variant that onnxruntime-web (wasm) cannot run falls back to the next smallest such file",
+    "max_drop_pp": 0.5,
+    "source": "export_build",
+    "fp32_val_top1": 0.6761313926668258,
+    "candidates": [
+      {
+        "variant": "fp32",
+        "available": true,
+        "file_bytes": 13701704,
+        "val_top1": 0.6761313926668258,
+        "drop_pp": 0.0,
+        "eligible": true,
+        "note": null,
+        "wasm": {
+          "status": "not_run",
+          "detail": null
+        }
+      },
+      {
+        "variant": "fp16",
+        "available": true,
+        "file_bytes": 6928969,
+        "val_top1": 0.6761313926668258,
+        "drop_pp": 0.0,
+        "eligible": true,
+        "note": null,
+        "wasm": {
+          "status": "not_run",
+          "detail": null
+        }
+      },
+      {
+        "variant": "int8_dynamic",
+        "available": true,
+        "file_bytes": 3664909,
+        "val_top1": 0.41342559452795674,
+        "drop_pp": 26.2705798138869,
+        "eligible": false,
+        "note": "val top-1 26.27 pp below fp32 (limit 0.5 pp)",
+        "wasm": {
+          "status": "not_run",
+          "detail": null
+        }
+      },
+      {
+        "variant": "int8_static",
+        "available": false,
+        "file_bytes": null,
+        "val_top1": null,
+        "drop_pp": null,
+        "eligible": false,
+        "note": "not built: no quant_report.json for this run (scripts/quantize.py builds int8_static for v1 runs and skips feature set v2)",
+        "wasm": {
+          "status": "not_run",
+          "detail": null
+        }
+      }
+    ],
+    "order": [
+      "fp16",
+      "fp32"
+    ],
+    "recommended": "fp16",
+    "chosen": "fp16",
+    "forced": false,
+    "fallbacks": [],
     "follows_rule": true
   },
   "tool_versions": {

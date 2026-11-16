@@ -2,7 +2,8 @@
 
 The selected order is fixed: left_hand 0-20, right_hand 0-20, then pose landmarks in
 ``pose_indices`` order. With the default pose indices that gives L = 49; the v2 selection
-(pose 0-16) gives L = 59. Face landmarks are dropped.
+(pose 0-16) gives L = 59. Face landmarks are dropped. Every constant comes from
+features_spec.json (edgevision.spec).
 """
 
 from collections.abc import Sequence
@@ -10,30 +11,24 @@ from collections.abc import Sequence
 import numpy as np
 import numpy.typing as npt
 
+from edgevision import spec
+
 IntArray = npt.NDArray[np.intp]
 
-LANDMARK_COUNTS: dict[str, int] = {"face": 468, "left_hand": 21, "pose": 33, "right_hand": 21}
+# The landmark types in flat-id order (face, left_hand, pose, right_hand) and their sizes.
+LANDMARK_COUNTS: dict[str, int] = dict(spec.LANDMARK_COUNTS)
 N_HAND = LANDMARK_COUNTS["left_hand"]
 N_POSE = LANDMARK_COUNTS["pose"]
 N_ALL_LANDMARKS = sum(LANDMARK_COUNTS.values())
 
-# Nose, shoulders, elbows, wrists.
-DEFAULT_POSE_INDICES: tuple[int, ...] = (0, 11, 12, 13, 14, 15, 16)
-NOSE = 0
-SHOULDERS: tuple[int, int] = (11, 12)
+# The v1 selection: nose, shoulders, elbows, wrists.
+DEFAULT_POSE_INDICES: tuple[int, ...] = spec.POSE_SETS[spec.DEFAULT_POSE_SET]
+NOSE = spec.POSE_POINTS["nose"]
+SHOULDERS: tuple[int, int] = (spec.POSE_POINTS["left_shoulder"], spec.POSE_POINTS["right_shoulder"])
 # Every left/right pair among pose 0-16 (eyes inner, eyes, eyes outer, ears, mouth corners,
 # shoulders, elbows, wrists). Mirroring swaps the pairs a selection holds, in this order; for
 # DEFAULT_POSE_INDICES that is (11, 12), (13, 14), (15, 16), as before these pairs were added.
-POSE_SWAP_PAIRS: tuple[tuple[int, int], ...] = (
-    (1, 4),
-    (2, 5),
-    (3, 6),
-    (7, 8),
-    (9, 10),
-    SHOULDERS,
-    (13, 14),
-    (15, 16),
-)
+POSE_SWAP_PAIRS: tuple[tuple[int, int], ...] = spec.POSE_SWAP_PAIRS
 
 # Slices into the selected landmark axis; POSE is open-ended because pose_indices is configurable.
 LEFT_HAND = slice(0, N_HAND)

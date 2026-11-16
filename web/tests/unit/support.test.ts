@@ -7,6 +7,7 @@ import { assignHands, blockForLabel, wristConsistency, type DetectedHand } from 
 import { validateMeta } from "../../src/meta";
 import {
   DEFAULT_SETTINGS,
+  LEGACY_STORAGE_KEY,
   STORAGE_KEY,
   loadSettings,
   sanitizeSettings,
@@ -160,5 +161,31 @@ describe("framing and runtime checks", () => {
     expect(validateMeta(raw).num_classes).toBe(raw.labels.length);
     expect(() => validateMeta({ ...raw, labels: raw.labels.slice(1) })).toThrow(/labels/);
     expect(() => validateMeta({ ...raw, model_sha256: "x" })).toThrow(/sha256/);
+  });
+});
+
+describe("settings defaults and migration", () => {
+  it("defaults to the GPU delegate, pose every 2nd frame and automatic aspect correction", () => {
+    expect(DEFAULT_SETTINGS.delegate).toBe("GPU");
+    expect(DEFAULT_SETTINGS.poseEvery).toBe(2);
+    expect(DEFAULT_SETTINGS.aspectMode).toBe("frame");
+    expect(DEFAULT_SETTINGS).toMatchObject({ handRule: "nearest_pose_wrist", autoSegmenter: "motion", resampling: "time", decision: "calibrated", detectMirrored: false });
+    expect(sanitizeSettings({ poseEvery: 4, aspectK: 9, aspectMode: "sideways" })).toMatchObject({ poseEvery: 2, aspectK: 1, aspectMode: "frame" });
+    expect(sanitizeSettings({ handRule: "guess", resampling: "x", decision: 1, autoSegmenter: "y", classifierThreads: 9 })).toMatchObject({
+      handRule: "nearest_pose_wrist",
+      resampling: "time",
+      decision: "calibrated",
+      autoSegmenter: "motion",
+      classifierThreads: 0,
+    });
+    expect(sanitizeSettings({ poseEvery: 3, aspectK: 0.4, aspectMode: "manual" })).toMatchObject({ poseEvery: 3, aspectK: 0.4, aspectMode: "manual" });
+  });
+
+  it("keeps earlier settings except the delegate, whose default changed", () => {
+    const store = new MemoryStore();
+    store.setItem(LEGACY_STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, delegate: "CPU", endFrames: 12 }));
+    expect(loadSettings(store)).toMatchObject({ delegate: "GPU", endFrames: 12 });
+    store.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, delegate: "CPU" }));
+    expect(loadSettings(store).delegate).toBe("CPU");
   });
 });

@@ -1,0 +1,39 @@
+--- a/web/src/main.ts
++++ b/web/src/main.ts
+@@ -357,9 +357,21 @@
+   float16_overflow: "coordinates out of range",
+ };
+ 
++
++// live-gap instrumentation (not part of the shipped build): every segment's outcome.
++const liveGapSegments: Record<string, unknown>[] = [];
++(window as unknown as { __segments: unknown }).__segments = liveGapSegments;
++function liveGapSoftmax(logits: ArrayLike<number>): number[] {
++  const values = Array.from(logits);
++  const max = Math.max(...values);
++  const exps = values.map((value) => Math.exp(value - max));
++  const sum = exps.reduce((a, b) => a + b, 0);
++  return exps.map((value) => value / sum);
++}
+ async function handleSegmentEvent(event: SegmenterEvent<Float64Array>, completedAt: number): Promise<void> {
+   if (event.type === "discarded") {
+     ui.segmentState.textContent = `Segment discarded: ${event.handFrames} frames with a hand, ${config().minHandFrames} needed.`;
++    liveGapSegments.push({ kind: "discarded", reason: event.reason, start_ms: event.startTime, end_ms: event.endTime, frames: null, hand_frames: event.handFrames, excluded: null, probabilities: null });
+     return;
+   }
+   if (!meta) return;
+@@ -373,12 +385,14 @@
+     const reason = result.info.reason ?? "float16_overflow";
+     ui.segmentState.textContent = `No sign recognised: ${REASON_TEXT[reason] ?? reason}.`;
+     windows.preprocess.push(p1 - p0);
++    liveGapSegments.push({ kind: "segment", reason: segment.reason, start_ms: segment.startTime, end_ms: segment.endTime, frames: segment.frames.length, hand_frames: segment.handFrames, excluded: reason, probabilities: null });
+     return;
+   }
+   lastSegmentInput = input;
+   const logits = await runClassifier(input);
+   const p2 = performance.now();
+   const decision = decide(logits, meta.labels, threshold());
++  liveGapSegments.push({ kind: "segment", reason: segment.reason, start_ms: segment.startTime, end_ms: segment.endTime, frames: segment.frames.length, hand_frames: segment.handFrames, excluded: null, probabilities: liveGapSoftmax(logits) });
+   showDecision(decision);
+   const p3 = performance.now();
+   windows.preprocess.push(p1 - p0);

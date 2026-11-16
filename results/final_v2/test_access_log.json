@@ -1,0 +1,18 @@
+[
+  {
+    "timestamp_utc": "2026-11-06T17:20:09.342554+00:00",
+    "git_commit": "3fbafa3e0ef28019b9a8aae3520cc1a023ba6d54",
+    "git_dirty": true,
+    "runs_evaluated": [
+      "b_cnn_v2feat_v1recipe/seed_0",
+      "b_cnn_v2feat_v1recipe/seed_1",
+      "b_cnn_v2feat_v1recipe/seed_2",
+      "c_cnn_v2feat_v2recipe/seed_0",
+      "c_cnn_v2feat_v2recipe/seed_1",
+      "c_cnn_v2feat_v2recipe/seed_2",
+      "d_hybrid_v2feat_v2recipe/seed_0",
+      "d_hybrid_v2feat_v2recipe/seed_1",
+      "d_hybrid_v2feat_v2recipe/seed_2"
+    ]
+  }
+]

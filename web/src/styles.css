@@ -393,3 +393,45 @@ input[type="radio"] {
   font-size: 1rem;
   border-top: 1px solid var(--border);
 }
+
+.settings fieldset.aspect {
+  grid-column: 1 / -1;
+  margin: 0.5rem 0;
+}
+
+.settings .aspect label {
+  grid-column: 1 / -1;
+}
+
+.settings input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.segment-debug {
+  margin: 0.5rem 0;
+  color: var(--muted);
+}
+
+.segment-debug p {
+  margin: 0.25rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.candidates[data-state="sure"] li:first-child {
+  font-weight: 700;
+}
+
+#label-search,
+#label-select {
+  display: block;
+  width: 100%;
+  max-width: 28rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 0.25rem;
+  padding: 0.3rem 0.5rem;
+  margin: 0.25rem 0 0.75rem;
+}

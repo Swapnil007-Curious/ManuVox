@@ -2,10 +2,20 @@
 // missing, blocked or throws, the app keeps working with in-memory settings.
 
 import { DEFAULT_GUIDANCE_SETTINGS } from "./guidance";
+import { HAND_RULES, type HandRule } from "./livePipeline";
+import type { BackendPreference } from "./ortBackend";
+import { DEFAULT_POSE_EVERY, MAX_POSE_EVERY, MIN_POSE_EVERY } from "./poseInterpolation";
 import { DEFAULT_SEGMENTER_SETTINGS, type SegmenterMode } from "./segmenter";
 
 export type Framing = "full" | "portrait";
 export type Delegate = "CPU" | "GPU";
+/** frame: k from the frame's width / height (features_spec.json aspect); auto: body-ratio calibration. */
+export type AspectMode = "frame" | "auto" | "manual" | "off";
+/** motion: the motion-energy state machine; presence: the first demo's hand-count rule. */
+export type AutoSegmenter = "motion" | "presence";
+export type Resampling = "time" | "index";
+/** calibrated: temperature-scaled softmax and meta.json's calibration threshold; raw: softmax and meta.json's threshold. */
+export type DecisionMode = "calibrated" | "raw";
 
 export interface Settings {
   mode: SegmenterMode;
@@ -19,7 +29,27 @@ export interface Settings {
   framing: Framing;
   swapHands: boolean;
   speak: boolean;
+  /** Requested MediaPipe delegate; GPU falls back to CPU when it fails. */
   delegate: Delegate;
+  /** Pose landmarker every Nth frame (1-3); poses in between are interpolated. */
+  poseEvery: number;
+  /** Aspect correction: calibrated at camera start, a manual k, or off (k = 1). */
+  aspectMode: AspectMode;
+  /** k used in manual mode. */
+  aspectK: number;
+  /** How detected hands map to the model's left/right blocks (features_spec.json live.hand_assignment). */
+  handRule: HandRule;
+  /** Detect on the horizontally flipped frame (an ablation of the live-gap study; off for use). */
+  detectMirrored: boolean;
+  /** Automatic capture: the motion segmenter or the first demo's presence rule. */
+  autoSegmenter: AutoSegmenter;
+  /** Place the 32 model frames by capture time (time) or by frame count (index). */
+  resampling: Resampling;
+  decision: DecisionMode;
+  /** onnxruntime-web backend; auto tries WebGPU and keeps it only when it is faster. */
+  classifierBackend: BackendPreference;
+  /** wasm threads for the classifier; 0 picks them from the device (1 without cross-origin isolation). */
+  classifierThreads: number;
   lowLightThreshold: number;
   minShoulderDistance: number;
   maxShoulderDistance: number;
@@ -35,13 +65,28 @@ export const DEFAULT_SETTINGS: Settings = {
   framing: "full",
   swapHands: false,
   speak: false,
-  delegate: "CPU",
+  delegate: "GPU",
+  poseEvery: DEFAULT_POSE_EVERY,
+  aspectMode: "frame",
+  aspectK: 1,
+  handRule: "nearest_pose_wrist",
+  detectMirrored: false,
+  autoSegmenter: "motion",
+  resampling: "time",
+  decision: "calibrated",
+  classifierBackend: "auto",
+  classifierThreads: 0,
   lowLightThreshold: DEFAULT_GUIDANCE_SETTINGS.lowLightThreshold,
   minShoulderDistance: DEFAULT_GUIDANCE_SETTINGS.minShoulderDistance,
   maxShoulderDistance: DEFAULT_GUIDANCE_SETTINGS.maxShoulderDistance,
 };
 
-export const STORAGE_KEY = "edge-vision.settings.v1";
+export const STORAGE_KEY = "edge-vision.settings.v3";
+/** Settings stored before the GPU default; read once, without their delegate. */
+export const LEGACY_STORAGE_KEY = "edge-vision.settings.v1";
+/** Settings stored before the live-pipeline fixes; read once, without the settings whose defaults changed. */
+export const V2_STORAGE_KEY = "edge-vision.settings.v2";
+const V2_CHANGED: readonly string[] = ["aspectMode", "swapHands"];
 
 interface NumberRule {
   min: number;
@@ -50,7 +95,17 @@ interface NumberRule {
 }
 
 export const NUMBER_RULES: Record<
-  "startFrames" | "endFrames" | "maxDurationS" | "minHandFrames" | "confidenceThreshold" | "lowLightThreshold" | "minShoulderDistance" | "maxShoulderDistance",
+  | "startFrames"
+  | "endFrames"
+  | "maxDurationS"
+  | "minHandFrames"
+  | "confidenceThreshold"
+  | "poseEvery"
+  | "aspectK"
+  | "classifierThreads"
+  | "lowLightThreshold"
+  | "minShoulderDistance"
+  | "maxShoulderDistance",
   NumberRule
 > = {
   startFrames: { min: 1, max: 30, integer: true },
@@ -58,6 +113,9 @@ export const NUMBER_RULES: Record<
   maxDurationS: { min: 0.5, max: 10, integer: false },
   minHandFrames: { min: 1, max: 60, integer: true },
   confidenceThreshold: { min: 0, max: 1, integer: false },
+  poseEvery: { min: MIN_POSE_EVERY, max: MAX_POSE_EVERY, integer: true },
+  aspectK: { min: 0.25, max: 4, integer: false },
+  classifierThreads: { min: 0, max: 8, integer: true },
   lowLightThreshold: { min: 0, max: 255, integer: false },
   minShoulderDistance: { min: 0, max: 2, integer: false },
   maxShoulderDistance: { min: 0, max: 2, integer: false },
@@ -95,6 +153,16 @@ export function sanitizeSettings(raw: unknown): Settings {
     swapHands: typeof source.swapHands === "boolean" ? source.swapHands : DEFAULT_SETTINGS.swapHands,
     speak: typeof source.speak === "boolean" ? source.speak : DEFAULT_SETTINGS.speak,
     delegate: pick(source.delegate, ["CPU", "GPU"] as const, DEFAULT_SETTINGS.delegate),
+    poseEvery: number("poseEvery", DEFAULT_SETTINGS.poseEvery),
+    aspectMode: pick(source.aspectMode, ["frame", "auto", "manual", "off"] as const, DEFAULT_SETTINGS.aspectMode),
+    aspectK: number("aspectK", DEFAULT_SETTINGS.aspectK),
+    handRule: pick(source.handRule, HAND_RULES, DEFAULT_SETTINGS.handRule),
+    detectMirrored: typeof source.detectMirrored === "boolean" ? source.detectMirrored : DEFAULT_SETTINGS.detectMirrored,
+    autoSegmenter: pick(source.autoSegmenter, ["motion", "presence"] as const, DEFAULT_SETTINGS.autoSegmenter),
+    resampling: pick(source.resampling, ["time", "index"] as const, DEFAULT_SETTINGS.resampling),
+    decision: pick(source.decision, ["calibrated", "raw"] as const, DEFAULT_SETTINGS.decision),
+    classifierBackend: pick(source.classifierBackend, ["auto", "wasm", "webgpu"] as const, DEFAULT_SETTINGS.classifierBackend),
+    classifierThreads: number("classifierThreads", DEFAULT_SETTINGS.classifierThreads),
     lowLightThreshold: number("lowLightThreshold", DEFAULT_SETTINGS.lowLightThreshold),
     minShoulderDistance: number("minShoulderDistance", DEFAULT_SETTINGS.minShoulderDistance),
     maxShoulderDistance: number("maxShoulderDistance", DEFAULT_SETTINGS.maxShoulderDistance),
@@ -124,7 +192,18 @@ export function browserStorage(): KeyValueStore | null {
 export function loadSettings(store: KeyValueStore | null): Settings {
   try {
     const text = store?.getItem(STORAGE_KEY);
-    return sanitizeSettings(text ? JSON.parse(text) : null);
+    if (text) return sanitizeSettings(JSON.parse(text));
+    const v2 = store?.getItem(V2_STORAGE_KEY);
+    if (v2) {
+      const parsed: unknown = JSON.parse(v2);
+      if (parsed !== null && typeof parsed === "object") for (const key of V2_CHANGED) delete (parsed as Record<string, unknown>)[key];
+      return sanitizeSettings(parsed);
+    }
+    // Earlier settings keep everything except the delegate, whose default changed to GPU.
+    const legacy = store?.getItem(LEGACY_STORAGE_KEY);
+    const parsed: unknown = legacy ? JSON.parse(legacy) : null;
+    if (parsed !== null && typeof parsed === "object") delete (parsed as Record<string, unknown>).delegate;
+    return sanitizeSettings(parsed);
   } catch {
     return { ...DEFAULT_SETTINGS };
   }

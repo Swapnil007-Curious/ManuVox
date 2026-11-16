@@ -16,9 +16,10 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from edgevision import spec
 from edgevision.data.landmarks import DEFAULT_POSE_INDICES, num_selected, validate_pose_indices
 
-NUM_FRAMES = 32
+NUM_FRAMES = spec.NUM_FRAMES
 POSE_INDICES: tuple[int, ...] = DEFAULT_POSE_INDICES
 NUM_LANDMARKS = num_selected(POSE_INDICES)
 COORDS_PER_LANDMARK = 2
@@ -27,8 +28,8 @@ PRESENCE_LEFT = NUM_COORDS
 PRESENCE_RIGHT = NUM_COORDS + 1
 FRAME_DIM = NUM_COORDS + 2
 
-INPUT_NAME = "landmarks"
-OUTPUT_NAME = "logits"
+INPUT_NAME = spec.INPUT_NAME
+OUTPUT_NAME = spec.OUTPUT_NAME
 
 
 @dataclass(frozen=True)

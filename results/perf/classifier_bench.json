@@ -1,0 +1,107 @@
+{
+  "browser": "157.0.8103.52",
+  "measured_at": "2026-11-16T00:15:22.985Z",
+  "results": [
+    {
+      "ep": "wasm",
+      "threads": 1,
+      "backend": "wasm",
+      "crossOriginIsolated": true,
+      "webgpu": true,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "hardwareConcurrency": 4,
+      "model": {
+        "file": "model.onnx",
+        "sha256": "92e3aea130734f2f5456ab309dcabfaac4e06a86e57ab2d13fc3f2534871372a",
+        "variant": "fp16",
+        "bytes": 6928969
+      },
+      "sessionMs": 983.9399999976158,
+      "runs": 200,
+      "p50": 18.569999992847443,
+      "p95": 26.064999997615814,
+      "mean": 19.056699999272823,
+      "maxAbsDiffVsWasm1": null,
+      "top1AgreesWithWasm1": null,
+      "error": null,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ]
+    },
+    {
+      "ep": "wasm",
+      "threads": 2,
+      "backend": "wasm",
+      "crossOriginIsolated": true,
+      "webgpu": true,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "hardwareConcurrency": 4,
+      "model": {
+        "file": "model.onnx",
+        "sha256": "92e3aea130734f2f5456ab309dcabfaac4e06a86e57ab2d13fc3f2534871372a",
+        "variant": "fp16",
+        "bytes": 6928969
+      },
+      "sessionMs": 822.0049999952316,
+      "runs": 200,
+      "p50": 29.90499997138977,
+      "p95": 41.5450000166893,
+      "mean": 29.474749999046324,
+      "maxAbsDiffVsWasm1": 0,
+      "top1AgreesWithWasm1": true,
+      "error": null,
+      "consoleErrors": []
+    },
+    {
+      "ep": "wasm",
+      "threads": 4,
+      "backend": "wasm",
+      "crossOriginIsolated": true,
+      "webgpu": true,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "hardwareConcurrency": 4,
+      "model": {
+        "file": "model.onnx",
+        "sha256": "92e3aea130734f2f5456ab309dcabfaac4e06a86e57ab2d13fc3f2534871372a",
+        "variant": "fp16",
+        "bytes": 6928969
+      },
+      "sessionMs": 856.625,
+      "runs": 200,
+      "p50": 32.310000002384186,
+      "p95": 54.3649999499321,
+      "mean": 34.355324998795986,
+      "maxAbsDiffVsWasm1": 0,
+      "top1AgreesWithWasm1": true,
+      "error": null,
+      "consoleErrors": []
+    },
+    {
+      "ep": "webgpu",
+      "threads": 1,
+      "backend": "webgpu",
+      "crossOriginIsolated": true,
+      "webgpu": true,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+      "hardwareConcurrency": 4,
+      "model": {
+        "file": "model.onnx",
+        "sha256": "92e3aea130734f2f5456ab309dcabfaac4e06a86e57ab2d13fc3f2534871372a",
+        "variant": "fp16",
+        "bytes": 6928969
+      },
+      "sessionMs": 1510.910000026226,
+      "runs": 200,
+      "p50": 50.09500002861023,
+      "p95": 66.38999998569489,
+      "mean": 52.7979000005126,
+      "maxAbsDiffVsWasm1": 0.027036666870117188,
+      "top1AgreesWithWasm1": true,
+      "error": null,
+      "consoleErrors": [
+        "\u001b[0;93m2026-11-16 05:45:05.908789 [W:onnxruntime:, session_state.cc:1598 VerifyEachNodeIsAssignedToAnEp] Some nodes were not assigned to the preferred execution providers which may or may not have an negative impact on performance. e.g. ORT explicitly assigns shape related ops to CPU to improve perf.\u001b[m",
+        "\u001b[0;93m2026-11-16 05:45:05.910969 [W:onnxruntime:, session_state.cc:1600 VerifyEachNodeIsAssignedToAnEp] Rerunning with verbose output on a non-minimal build will show node assignments.\u001b[m"
+      ]
+    }
+  ]
+}

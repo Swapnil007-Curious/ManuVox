@@ -105,7 +105,9 @@ python scripts/run_grid.py --grid v2 --processed-dir <processed_v2 dir> --max-ho
 ```
 
 `--max-hours` stops starting new runs once that much wall time has passed; a rerun resumes.
-`scripts/export_web.py` and quantisation handle v1-feature runs only.
+Quantisation handles v1-feature runs only; `scripts/export_web.py` also exports v2 runs (as fp32,
+since they have no quantised variants) and, with `--ensemble`, the seed ensemble of a run's
+experiment.
 `src/edgevision/export/ensemble.py` exports the seeds of one experiment as one ONNX file that
 averages their logits.
 
@@ -199,9 +201,13 @@ Live: <https://swapnil007-curious.github.io/edge-vision/>
 
 `web/` is an installable, offline-capable browser app (Vite and strict TypeScript, no UI
 framework) that recognises one isolated sign at a time from the webcam. MediaPipe Tasks
-HandLandmarker (two hands) and PoseLandmarker lite produce landmarks for each frame, a TypeScript
-port of the Python preprocessing (`web/src/preprocess.ts`) turns each captured segment into the
-model input, and onnxruntime-web runs the exported classifier. Every step runs in the browser.
+HandLandmarker (two hands) and PoseLandmarker lite produce landmarks for each frame in a Web
+Worker, a TypeScript port of the Python live pipeline (`web/src/livePipeline.ts`, `live.ts`,
+`preprocess.ts`) maps them to the Holistic layout the model was trained on and segments the
+stream into signs, and onnxruntime-web runs the exported classifier in a second worker. Every
+step runs in the browser. The shipped model is the v2 hybrid (fp16), chosen in
+`results/model_selection.md`; the live-gap evaluation on recorded webcam clips is in
+`results/live_gap.md`.
 
 - **Scope.** Recognises single isolated signs from a 250-sign ASL vocabulary (the asl-signs
   labels). It does not translate sentences.
@@ -226,53 +232,248 @@ Camera access needs a secure context; `localhost` qualifies. `npm run fetch-asse
 file against a pinned or npm-provided sha256, writes `public/mediapipe/ASSETS.json` (URL, sha256,
 size, licence) and skips files that are already present.
 
-Tests: `npx tsc --noEmit`, `npx vitest run` (preprocessing against the Python golden vectors,
-segmentation, scoring, settings) and, after `npm run build`, `npx playwright install chromium`
-then `npx playwright test` (model and preprocessing parity in Chromium, offline reload through
-the service worker, and a camera smoke test with Chromium's fake camera). For a build under
-another base path, set `BASE_PATH` (for example `/edge-vision/`) for both the build and the tests.
+Tests: `npx tsc --noEmit`, `npx vitest run` (the live-pipeline parity test on 20 val sequences,
+preprocessing for the v1 and v2 landmark selections and the aspect correction against the Python
+golden vectors, calibration, the recordings schema, pose interpolation, segmentation, scoring,
+settings) and, after `npm run build`,
+`npx playwright install chromium` then `npx playwright test` (model and preprocessing parity in
+Chromium, offline reload through the service worker, a camera smoke test and a Record test signs
+run with Chromium's fake camera). For a build under another base path, set `BASE_PATH` (for
+example `/edge-vision/`) for both the build and the tests.
+
+### Features spec: one source of truth
+
+`features_spec.json` at the repository root holds every landmark constant: the selected
+landmarks and their order (both hands, then the pose set; no face or lip points), the pose
+points by name and the left/right pairs mirroring swaps, missing-point handling (NaN raw, a hand
+present only when all 21 points are finite, 0.0 after resampling), the dominant-hand flip, the
+shoulder normalisation and its fallback, the 32-frame resampling (by kept-frame index in
+training, on the kept-frame clock live), z dropped, the model input layout, the aspect constants
+and the live segmenter's thresholds. `src/edgevision/spec.py` reads it for training, export and
+the offline pipeline and `web/src/spec.ts` imports it into the app bundle; neither defines those
+constants itself. `scripts/calibrate_live.py` derives the data-dependent values (the training
+aspect and the segmenter thresholds) from the train and val splits only.
+
+Parity is tested end to end. `scripts/export_live_golden.py` writes
+`web/tests/golden/live_parity.json`: 20 val sequences as raw landmarks (dataset rows and
+MediaPipe Tasks-style frames with handedness labels), the Python pipeline's model inputs and the
+exported model's logits, plus a stream of four sequences for motion energy and segmentation.
+`web/tests/unit/liveParity.test.ts` runs the web pipeline and onnxruntime on the same raw
+landmarks and fails unless every model input matches within 1e-4 and the top-1 is the same;
+`tests/test_live_parity.py` checks that the fixture still matches Python, the committed model and
+the spec.
+
+### Live pipeline
+
+Each frame, in order (`src/edgevision/live/pipeline.py` is the reference, `web/src/livePipeline.ts`
+the port):
+
+1. **Tracker mapping.** MediaPipe Tasks landmarks are mapped to Holistic's layout. Holistic's
+   `left_hand` is the hand it crops at pose landmark 15 (the signer's left wrist), so a detected
+   hand goes to the block of the nearer pose wrist, and two hands take the pairing with the
+   smaller total distance; without a pose, Tasks' handedness label decides. z is dropped, as in
+   training, so the different z scales of the two trackers never reach the model.
+2. **Mirroring.** The landmarkers get the unmirrored camera frame; only the preview is drawn
+   mirrored. Left-handed signing is flipped to the trained side by preprocessing's own rule (the
+   left hand present in more kept frames than the right).
+3. **Aspect.** Coordinates are fractions of the frame's width and height, and the training videos
+   are portrait phone recordings. Every y is scaled about the frame's shoulder midpoint by
+   k = train_width_over_height / (width / height), from the real size of the frame given to the
+   landmarkers; train_width_over_height (0.723) comes from the face proportions of the training
+   data. The body-ratio calibration below is kept as an alternative.
+4. **Motion energy.** The speed of the wrist and fingertips over 100 ms, in shoulder widths per
+   second, on the aspect-corrected points.
+5. **Segmentation.** IDLE -> SIGNING when a hand is present and its energy reaches
+   `start_energy`; SIGNING ends when the hands are gone for 200 ms, stay below `still_energy` for
+   400 ms, or after 3 s. The thresholds are percentiles of the val split's energies
+   (`calibrate_live.py`). While signing, an early guess is shown every 500 ms after the first
+   600 ms; the model runs once on the finished segment.
+6. **Resampling by time.** Every frame carries its capture time (`requestVideoFrameCallback`'s
+   `captureTime`), and the 32 model frames are placed on the kept-frame clock (each kept frame
+   advances it by its own capture interval, capped at 200 ms) instead of the kept-frame index.
+   At a constant frame rate this is training's rule exactly; at 8-30 fps, or with dropped frames,
+   the sign keeps its timing (`tests/test_live_resampling.py`).
+7. **Decision.** softmax(logits / T) with the temperature T fitted on val (NLL), and a
+   confidence threshold chosen on val to maximise coverage x (2 x selective accuracy - 1), i.e.
+   accuracy traded against coverage, where an accepted wrong sign costs as much as an accepted
+   right one gains. Both are stored in `meta.json` (`calibration`). Below the threshold the
+   result reads "Not sure".
 
 ### Capture
 
-In automatic mode a segment starts after 3 consecutive frames with a hand and ends after 8
-frames without one, or after 3.0 s. Segments with fewer hand frames than the model's
-`min_hand_frames` are discarded. In "hold to record" mode, hold Space or press and hold the large
-button while signing. If the top softmax probability reaches the threshold stored in `meta.json`,
-the sign is shown; otherwise the app shows "Not sure" with the three most likely signs. All
-thresholds can be changed under Settings; settings are kept in `localStorage` when the browser
-allows it. Framing can be the full camera frame or a centred 3:4 portrait crop, applied before
-MediaPipe. Guidance messages report missing hands, hands partly out of frame, low light, and a
-signer too close or too far (shoulder distance in normalised units).
+The default automatic mode uses the motion segmenter above. Settings also offer the first demo's
+presence rule (a segment starts after 3 consecutive frames with a hand and ends after 8 frames
+without one, or after 3.0 s) and "hold to record": hold Space or press and hold the large button
+while signing. Segments with fewer hand frames than the model's `min_hand_frames` are discarded.
+The three most likely signs are always listed with their probabilities; if the top probability
+reaches the threshold the top sign is shown large, otherwise the result reads "Not sure". "Segment details" under the result shows, for the last
+segment, its frame count, normalisation method, aspect factor k, and the share of frames with
+both shoulders visible and with a hand. All thresholds can be changed under Settings; settings
+are kept in `localStorage` when the browser allows it. Framing can be the full camera frame or a
+centred 3:4 portrait crop, applied before MediaPipe. Guidance messages report missing hands, hands
+partly out of frame, low light, and a signer too close or too far (shoulder distance in
+normalised units).
+
+The pose selection and the left/right pose pairs that mirroring swaps come from `meta.json`, so
+the same app runs v1 (7 pose points) and v2 (pose 0-16) models. MediaPipe runs on the GPU
+delegate by default and falls back to the CPU if the GPU fails (at creation or while detecting) or is too slow;
+the Performance panel shows which is in use and why. The hand landmarker runs on every frame and
+the pose landmarker on every Nth frame (Settings, 1 to 3, default 2); pose points for the frames
+in between are interpolated linearly in time between two runs, and frames after the last run of a
+segment keep that run's pose.
+
+### Aspect calibration (alternative mode)
+
+The default aspect mode ("From the camera's frame size") uses the frame's width and height as described
+above. The calibrated mode, the first demo's default, measures the body instead. The ratio
+r = |y_nose - y_shoulder_mid| / |x_shoulder_left - x_shoulder_right| measures it;
+`meta.json` carries the training median r_train from `preprocess_report.json`'s `aspect_stats`.
+For 2 seconds after the camera starts (and on "Recalibrate"), the app takes the median r_live
+over frames where the nose and both shoulders are inside the frame with visibility >= 0.5, and
+sets k = r_train / r_live, clamped to [0.25, 4]. Before preprocessing, every landmark's y becomes
+y_mid + (y - y_mid) * k, with y_mid the frame's shoulder-midpoint y (0.5 without both shoulders);
+x is unchanged. Without visible shoulders the app asks the signer to move back and keeps k = 1.
+Settings offer From the camera's frame size (default), Calibrated, Manual (a slider) and Off; the
+Performance panel shows k and r_live. `src/edgevision/live/aspect.py` implements the same functions, and the web tests compare
+them value for value.
+
+### Record test signs and offline diagnosis
+
+The "Record test signs" panel keeps, for every completed segment (classified, excluded or
+discarded), the raw landmarks of each frame (hands after assignment and the 33 pose points, in
+unmirrored normalised coordinates, before the aspect correction), frame times, pose visibility,
+the camera resolution, framing, calibration and the app's features, model input and top-5, with
+the sign chosen from a searchable list of the model's labels. No video or images are stored, and
+recordings stay in memory until "Download recordings" saves them as one JSON file. Keep such
+files under `data/live/`, which git ignores, then run:
+
+```powershell
+python scripts/live_diagnose.py --recordings data/live/<file>.json --meta web/public/model/meta.json --model web/public/model/model.onnx --processed-dir data/processed
+```
+
+It replays each recording through Python preprocessing and checks the app's features against it
+(max |diff| <= 1e-4, exit code 1 otherwise), then evaluates top-1 and top-5 with no aspect
+correction, with the app's recorded k, and with k = r_train / r_live computed offline per
+recording session. It reports the predicted-label distribution, normalisation methods, shoulder
+visibility, hand presence, segment lengths against the training lengths, r_live against
+`aspect_stats`, and the standardised mean shift of each feature group against the model's own
+FeatureBlock statistics, in `results/live/diagnosis_<timestamp>.json` and `.md`.
+
+### Live-gap evaluation on recorded clips
+
+The gap between dataset accuracy and the live demo is measured on webcam clips (file name = sign)
+kept in `test_clips/`, which git ignores. Both pipelines see the same pixels: the offline Python
+pipeline with legacy MediaPipe Holistic (the tracker asl-signs was built with), and the web app
+in Chromium with the clip as its fake camera. Each config of `experiments/live_gap.json` changes
+one setting, cumulatively from the shipped demo to the final pipeline, plus leave-one-out rows
+that undo one fix at a time. Nothing is tuned on the clips: the constants come from
+`features_spec.json` and `meta.json`, which are derived from the train and val splits.
+
+```powershell
+.venv-live\Scripts\python scripts/prepare_live_clips.py --clips test_clips --out data/live_clips  # requirements-live.txt
+.venv-live\Scripts\python scripts/extract_holistic.py --clips data/live_clips
+python scripts/live_gap.py python                                   # results/live_gap/python/
+cd web; npm run build; npm run preview                              # another shell
+node scripts/live-gap.mjs --channel chrome --delegate GPU           # results/live_gap/web/
+cd ..; python scripts/live_gap.py report                            # results/live_gap.csv, .md
+```
+
+`prepare_live_clips.py` handles clips that are screen recordings of the demo page: it finds the
+camera preview, removes the drawn landmark overlay by inpainting, flips the preview back to the
+unmirrored camera view and writes 640 x 480, 30 fps `.y4m` files. The `c0_head_build` config runs
+the demo as committed in 3fbafa3 (built with `experiments/head_build_hook.patch`, which only
+records each segment's softmax) from a second preview server on port 4190.
 
 ### Exporting a model
 
-`scripts/export_web.py` copies one quantised variant to `web/public/model/model.onnx` and writes
-`web/public/model/meta.json` (labels, input layout, landmark order, preprocessing settings,
-sha256 of the ONNX file and of `best.pt`, opset, and the confidence threshold), plus the golden
+`scripts/export_web.py` copies one ONNX variant to `web/public/model/model.onnx` and writes
+`web/public/model/meta.json` (labels, feature set, input layout, landmark order, preprocessing
+settings with the pose swap pairs, the training aspect statistics, sha256 of the ONNX file and of
+each `best.pt`, opset, every variant candidate and the confidence threshold), plus the golden
 vectors in `web/tests/golden/`:
 
 ```powershell
-python scripts/export_web.py --run results/runs/<model>_signer_independent/seed_0 --variant int8_static --quant-root results/quant --processed-dir data/processed
+python scripts/export_web.py --run results/runs/cnn_signer_independent/seed_0 --processed-dir data/processed --verify-wasm
 ```
 
-- **Variant rule.** Use `int8_static` if its val top-1 (from `quant_report.json`) is within 1.0
-  percentage point of fp32 val top-1, otherwise `fp32`. The script prints the comparison;
-  `--variant` decides, and `meta.json` records both.
+- **Variant rule.** Among fp32, fp16, int8_dynamic and int8_static, the smallest file whose val
+  top-1 is within 0.5 percentage points of fp32 val top-1. For a run with a `quant_report.json`
+  the candidates are its variants; otherwise (v2 runs, ensembles) they are built into
+  `--work-dir`. Every candidate, with its size, val top-1 and why it was or was not eligible, is
+  printed and stored in `meta.json`; `--variant <name>` overrides the rule and is recorded as
+  forced.
+- **onnxruntime-web check.** With `--verify-wasm` each exported file is built into the app and
+  run through the Playwright model-parity test; if onnxruntime-web cannot run it, the next
+  eligible variant is exported instead and the failure is recorded under `fallbacks`.
+- **Seed ensemble.** `--ensemble` exports every seed of the run's experiment that has a `best.pt`
+  as one ONNX file averaging their logits (`src/edgevision/export/ensemble.py`), and applies the
+  same rule to its fp32, fp16 and int8_dynamic builds (int8_static finds the FeatureBlock by a
+  node scope that ensemble members do not have, so it is not built).
+- **Aspect statistics.** Taken from the processed dir's `preprocess_report.json`. A report written
+  before `aspect_stats` existed can borrow them with `--aspect-report <report>` from another
+  preprocessing run of the same raw data; the export checks that counts, kept sequences, split
+  settings and the kept-frame rule match and that both selections hold the nose and shoulders.
 - **Confidence threshold.** Computed on val only, from the exported variant's softmax: the
   smallest threshold t at which top-1 accuracy among val sequences with max probability >= t
-  reaches `--target-precision` (default 0.90). If no t reaches it, the t with the highest
+  reaches `--target-precision` (default 0.80). If no t reaches it, the t with the highest
   accuracy among those accepting at least 20% of val is used and `meta.json` records a warning.
   Coverage, accuracy above t and overall val top-1 are stored with it. The test split is never
-  read.
-- **Golden vectors.** `preprocess_cases.json` holds synthetic sequences built with the test
-  suite's fixture builders (mirroring, ties, hand fallback, gaps, short and long sequences and
-  both exclusion reasons) with the Python outputs; `model_cases.json` holds 16 processed val
-  inputs and the logits Python onnxruntime gives for them. The Python tests check that the
-  committed files still match the Python preprocessing and the committed model.
+  read. The app uses this threshold only with the uncalibrated ("raw") decision setting.
+- **Calibration.** Also on val only: a temperature T fitted by minimising the NLL of
+  softmax(logits / T), then the threshold on the scaled probabilities that maximises
+  coverage x (2 x selective accuracy - 1). `meta.json`'s `calibration` block stores T, the
+  threshold, NLL and ECE before and after, coverage, selective accuracy and val top-1 / top-3;
+  the app's default decision uses it.
+- **Golden vectors.** `preprocess_cases.json` (v1 selection) and `preprocess_cases_v2.json`
+  (pose 0-16) hold synthetic sequences built with the test suite's fixture builders (mirroring,
+  ties, hand fallback, gaps, short and long sequences and both exclusion reasons) with the Python
+  outputs; `aspect_cases.json` holds calibration, visibility and per-frame correction cases with
+  the preprocessing that follows; `recording_example.json` is a recordings file in the download
+  schema; `model_cases.json` holds 16 processed val inputs and the logits Python onnxruntime gives
+  for them. The Python tests check that the committed files still match Python and the committed
+  model.
 - `--data-source synthetic` marks fixture data in `meta.json`; the app then shows a banner that
   the model does not recognise real signs. `meta.json` always states which data the committed
   model came from.
 - Commit `model.onnx` only while it is under 10 MB; `.gitignore` admits only that one ONNX file.
+
+### Performance
+
+- **Workers.** `web/src/inference.worker.ts` runs in two instances: one holds the landmarkers and
+  gets every frame as a transferred `ImageBitmap`, the other holds the onnxruntime-web session,
+  so classifying a segment never stalls tracking. Frames are captured with
+  `requestVideoFrameCallback`; while a detection runs, only the newest frame is kept and it goes
+  to the worker the moment the detection finishes.
+- **MediaPipe** runs on the GPU delegate (WebGL in the worker) and falls back to the CPU when the
+  GPU fails, or when two frames after warm-up take over 250 ms each: with software-rendered
+  WebGL (a blocklisted GPU, headless Chromium) the GPU delegate took ~1.3 s per frame against
+  ~90 ms on the CPU.
+- **onnxruntime-web** uses the wasm backend with SIMD. Wasm threads need cross-origin isolation:
+  the dev and preview servers send COOP/COEP, and on GitHub Pages the service worker adds them to
+  every response it serves (coi-serviceworker style), reloading the first visit once when it
+  takes over. On the target laptop threads only slowed this model down, so the default is one
+  thread (Settings can raise it). "Auto" also tries WebGPU and keeps it only if it is faster than
+  wasm and its logits agree; otherwise, or on any WebGPU error, it falls back to wasm.
+
+Measured on the target laptop (i3-1115G4, 4 logical cores, Intel UHD, 20 GB, Chrome 157), with a
+recorded clip as the fake camera and the app's 60-second benchmark:
+
+```powershell
+npm run build; npm run preview            # in web/, another shell
+node scripts/benchmark-tracking.mjs       # results/perf/tracking_gpu.json (--delegate CPU, --threads N)
+node scripts/benchmark.mjs                # classifier alone: wasm x1/2/4 and WebGPU
+```
+
+| Configuration | Tracking fps | Hand landmarker p50 / p95 | Classifier per segment p50 / p95 |
+| --- | --- | --- | --- |
+| GPU delegate, classifier wasm x1 (default) | 24.1 | 30.6 / 43.0 ms | 18.6 / 27.2 ms |
+| GPU delegate, classifier wasm x2 | 24.3 | 30.2 / 43.1 ms | 19.9 / 45.1 ms |
+| GPU delegate, classifier wasm x3 | 22.5 | 33.3 / 46.4 ms | 40.4 / 81.5 ms |
+| CPU delegate (fallback), wasm x1 | 9.8 | 85.2 / 127.6 ms | 20.6 / 22.0 ms |
+
+The default meets the targets of at least 15 fps tracking and under 60 ms of model time per
+segment; the CPU fallback does not reach 15 fps. The first demo (main thread, before these
+changes) ran at 5-13 fps on the same clips.
 
 ### In-browser benchmark
 
@@ -282,7 +483,10 @@ pose landmarker, preprocessing, classifier and the total per frame. At the end a
 downloaded with the user agent, `hardwareConcurrency`, `deviceMemory` where available, the actual
 camera resolution and frame rate, the settings, the model variant and sha256, raw per-frame and
 per-segment timings, p50/p95 summaries, end-to-end FPS, and 50 classifier runs on a fixed input.
-The camera is requested at 640 x 480 and 30 fps. The file is only saved locally.
+It also records the requested and active MediaPipe delegate with any fallback reason, the pose
+interval N (pose timings cover the frames where the pose landmarker ran), and the aspect mode, k,
+r_live and r_train. The camera is requested at 640 x 480 and 30 fps. The file is only saved
+locally.
 
 ### Deployment
 
@@ -297,18 +501,23 @@ Settings -> Pages -> Source must be set to "GitHub Actions". The `web` job in
   demo uses MediaPipe Tasks HandLandmarker and PoseLandmarker lite, whose landmarks, detection
   thresholds and failure modes are not identical, so accuracy in the browser can be lower than on
   the dataset.
-- **Hand assignment.** Holistic's `left_hand` is the signer's own left hand. HandLandmarker labels
-  handedness as if the image were mirrored, and the demo feeds it the unmirrored frame, so its
-  "Left" label goes to `right_hand` and "Right" to `left_hand`. A "Swap hands" setting reverses
-  this, and the Performance panel shows how often each hand sits at the matching pose wrist.
+- **Hand assignment.** Hands are assigned by the nearer pose wrist, Holistic's own rule. On
+  frames without a pose the handedness label decides, and a hand far from both wrists (or two
+  hands crossing) can still land in the wrong block. The Performance panel shows how often each
+  hand sits at the matching pose wrist.
 - **Camera aspect ratio.** Coordinates are normalised by the image width and height, so a camera
-  whose aspect ratio differs from the recordings changes the geometry the model sees. The portrait
-  crop narrows the gap for landscape webcams.
+  whose aspect ratio differs from the recordings changes the geometry the model sees. The aspect
+  correction (above) rescales y from the frame size (or, calibrated, from the nose and
+  shoulders); it cannot correct lens distortion or a different viewing angle.
 - **Isolated signs only.** Each segment is classified as one sign from the vocabulary; there is no
   sentence-level recognition, and signs outside the vocabulary are still mapped to one of its
   labels unless the confidence threshold rejects them.
-- **Single-threaded inference.** GitHub Pages cannot send COOP/COEP headers, so onnxruntime-web
-  runs without wasm threads. WebAssembly SIMD is required.
+- **CPU fallback is slow.** Without a working GPU delegate the hand landmarker takes about 85 ms
+  per frame on the target laptop (it searches for a second hand on every frame), so tracking
+  drops to about 10 fps. WebAssembly SIMD is required.
+- **Small live evaluation.** The live-gap numbers come from 10 clips of one signer, two pairs of
+  which are byte-identical files (see `results/live_gap.md`); they show the direction of each
+  fix, not a precise accuracy.
 
 ## Tests
 
@@ -324,5 +533,12 @@ Tests use synthetic fixtures only; the real dataset is not needed.
 ## Results
 
 Result tables are generated into `results/tables/` by `scripts/aggregate_val.py`,
-`scripts/final_eval.py`, `scripts/quantize.py` and `scripts/benchmark.py`. None are reported here
-yet.
+`scripts/final_eval.py`, `scripts/quantize.py` and `scripts/benchmark.py`; the v1 and v2
+experiments together are in `results/tables/selection/`. For the web demo:
+
+- `results/model_selection.md` (`scripts/model_selection.py`): test accuracy against classifier
+  latency in Chrome on the target laptop, and the shipped model.
+- `results/live_gap.md` and `.csv` (`scripts/live_gap.py report`): the live-gap ablation on the
+  recorded clips, for the Python + Holistic and the browser + Tasks pipelines.
+- `results/perf/`: the tracking and classifier benchmarks (`web/scripts/benchmark-tracking.mjs`,
+  `web/scripts/benchmark.mjs`).
