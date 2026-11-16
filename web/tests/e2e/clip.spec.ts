@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { skipOnboarding } from "./helpers";
 
 // End to end on a recorded sign: a clip prepared by scripts/prepare_live_clips.py plays as the fake
 // camera, and the app must classify at least one segment with no page or console error. The clips
@@ -22,6 +23,7 @@ test("a recorded clip runs end to end: segments are classified, no errors", asyn
     // MediaPipe prints its INFO lines through console.error.
     if (message.type() === "error" && !message.text().startsWith("INFO:")) errors.push(`console: ${message.text()}`);
   });
+  await skipOnboarding(page);
   await page.goto("./?debug=1");
   await page.waitForFunction(() => window.__edgevision !== undefined);
   await page.evaluate(() => window.__edgevision?.ready);
@@ -34,7 +36,7 @@ test("a recorded clip runs end to end: segments are classified, no errors", asyn
       intervals: [1000],
     })
     .toBeGreaterThan(0);
-  await page.locator("#stop").click();
+  await page.locator("#camera-toggle").click();
   await expect(page.locator("#status")).not.toHaveText(/failed|Could not/);
   expect(errors).toEqual([]);
 });

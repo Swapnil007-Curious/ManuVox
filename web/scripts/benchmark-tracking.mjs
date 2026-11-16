@@ -3,7 +3,7 @@
 // (src/benchmark.ts). The downloaded report is saved as JSON and summarised.
 //
 //   npm run build && npm run preview          (in another shell; serves COOP/COEP headers)
-//   node scripts/benchmark-tracking.mjs [--delegate GPU|CPU] [--threads N] [--chromium] [--clip <y4m>] [--out <json>]
+//   node scripts/benchmark-tracking.mjs [--delegate GPU|CPU] [--threads N] [--hud on|off] [--chromium] [--clip <y4m>] [--out <json>]
 //
 // The clip (default data/live_clips/water.y4m, scripts/prepare_live_clips.py) loops for the whole
 // run. Every other setting is the app default, so the numbers are what the demo does as shipped:
@@ -27,9 +27,11 @@ const option = (name, fallback) => {
 const origin = option("--origin", "http://localhost:4173");
 const delegate = option("--delegate", "GPU");
 const threads = Number(option("--threads", "0"));
+// The hand skeleton over the video: on (the default) or off, to measure what drawing it costs.
+const hud = option("--hud", "on") !== "off";
 const channel = flag("--chromium") ? undefined : "chrome";
 const clip = resolve(option("--clip", join(repo, "data", "live_clips", "water.y4m")));
-const suffix = `${delegate.toLowerCase()}${threads > 0 ? `_t${threads}` : ""}${channel ? "" : "_chromium"}`;
+const suffix = `${delegate.toLowerCase()}${threads > 0 ? `_t${threads}` : ""}${hud ? "" : "_nohud"}${channel ? "" : "_chromium"}`;
 const out = resolve(option("--out", join(repo, "results", "perf", `tracking_${suffix}.json`)));
 
 const browser = await chromium.launch({
@@ -46,6 +48,8 @@ page.on("console", (message) => {
 await page.goto(`${origin}/?debug=1`);
 const stored = JSON.parse((await page.evaluate(() => localStorage.getItem("edge-vision.settings.v3"))) ?? "{}");
 await page.evaluate((value) => localStorage.setItem("edge-vision.settings.v3", JSON.stringify(value)), { ...stored, delegate, classifierThreads: threads });
+// Skip the first-run overlay; draw the HUD or not.
+await page.evaluate((on) => localStorage.setItem("edge-vision.ui.v1", JSON.stringify({ onboarded: true, hud: on })), hud);
 await page.reload();
 await page.waitForFunction(() => window.__edgevision !== undefined);
 await page.evaluate(() => window.__edgevision.ready);
@@ -54,9 +58,16 @@ await page.click("#start");
 await page.waitForFunction(() => window.__edgevision.status().running, null, { timeout: 120_000 });
 // The GPU delegate compiles its shaders while warming up; start timing once frames flow.
 await page.waitForFunction(() => window.__edgevision.status().frames >= 30, null, { timeout: 120_000 });
-await page.waitForSelector("#benchmark:not([disabled])", { timeout: 60_000 });
 const download = page.waitForEvent("download", { timeout: 180_000 });
-await page.click("#benchmark");
+// The benchmark button lives in the collapsed diagnostics drawer; the debug hook starts the same run.
+const started = await page.evaluate(() => (typeof window.__edgevision.startBenchmark === "function" ? window.__edgevision.startBenchmark() : null));
+if (started === null) {
+  // Builds before the redesign: the button is on the page.
+  await page.waitForSelector("#benchmark:not([disabled])", { timeout: 60_000 });
+  await page.click("#benchmark");
+} else if (!started) {
+  throw new Error("the benchmark did not start");
+}
 const file = await (await download).path();
 const report = JSON.parse(readFileSync(file, "utf8"));
 const version = browser.version();
@@ -69,7 +80,7 @@ writeFileSync(out, JSON.stringify(record, null, 2) + "\n");
 const s = report.summary;
 const fmt = (summary) => (summary && summary.n > 0 ? `p50 ${summary.p50.toFixed(1)} / p95 ${summary.p95.toFixed(1)} ms (n ${summary.n})` : "–");
 const ortInfo = report.context.ort_wasm;
-console.log(`${version} ${channel ?? "chromium"}, delegate ${report.context.mediapipe.delegate} (requested ${delegate}), isolated ${report.environment.cross_origin_isolated}, classifier ${ortInfo.execution_provider} x${ortInfo.num_threads}`);
+console.log(`${version} ${channel ?? "chromium"}, delegate ${report.context.mediapipe.delegate} (requested ${delegate}), isolated ${report.environment.cross_origin_isolated}, classifier ${ortInfo.execution_provider} x${ortInfo.num_threads}, HUD ${report.context.settings.hud === false ? "off" : "on"}`);
 console.log(`tracking: ${report.frames.count} frames in ${report.duration_s.toFixed(1)} s = ${report.frames.end_to_end_fps.toFixed(1)} fps`);
 console.log(`hand landmarker ${fmt(s.hand_landmarker_ms)}; pose landmarker ${fmt(s.pose_landmarker_ms)}; capture to processed ${fmt(s.frame_total_ms)}`);
 console.log(`per segment: preprocess ${fmt(s.preprocess_ms)}; classifier ${fmt(s.classifier_ms)}; end of sign to result ${fmt(s.segment_end_to_end_ms)}`);

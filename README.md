@@ -199,22 +199,71 @@ Outputs: `results/bench/bench_raw.csv` (one row per configuration and round),
 
 Live: <https://swapnil007-curious.github.io/edge-vision/>
 
-`web/` is an installable, offline-capable browser app (Vite and strict TypeScript, no UI
-framework) that recognises one isolated sign at a time from the webcam. MediaPipe Tasks
-HandLandmarker (two hands) and PoseLandmarker lite produce landmarks for each frame in a Web
-Worker, a TypeScript port of the Python live pipeline (`web/src/livePipeline.ts`, `live.ts`,
-`preprocess.ts`) maps them to the Holistic layout the model was trained on and segments the
-stream into signs, and onnxruntime-web runs the exported classifier in a second worker. Every
-step runs in the browser. The shipped model is the v2 hybrid (fp16), chosen in
+`web/` is an installable, offline-capable sign-to-speech app (Vite and strict TypeScript, no UI
+framework). MediaPipe Tasks HandLandmarker (two hands) and PoseLandmarker lite produce landmarks
+for each frame in a Web Worker; a TypeScript port of the Python live pipeline
+(`web/src/livePipeline.ts`, `live.ts`, `preprocess.ts`) maps them to the Holistic layout the
+model was trained on and cuts the stream into signs; onnxruntime-web runs the classifier in a
+second worker. `web/src/engine.ts` holds that pipeline; the interface (`web/src/main.ts`,
+`web/src/ui/`) only listens to its events. The shipped model is the v2 hybrid (fp16), chosen in
 `results/model_selection.md`; the live-gap evaluation on recorded webcam clips is in
 `results/live_gap.md`.
 
-- **Scope.** Recognises single isolated signs from a 250-sign ASL vocabulary (the asl-signs
-  labels). It does not translate sentences.
-- **Privacy.** Video never leaves the device. There is no analytics or telemetry, and after the
-  first load the app makes no network requests: a Content-Security-Policy restricts every request
-  to the app's own origin, and a service worker serves the app, the model and the MediaPipe files
-  from the device. Spoken results, which are off by default, use on-device voices only.
+- **Scope.** Recognises 250 isolated ASL signs (the asl-signs labels) and builds simple sentences
+  from them. It is not a full ASL translator: grammar carried by facial expression, space and
+  movement is not captured, and every sign is read on its own.
+- **Privacy.** Video never leaves the device; only recognised words are sent for sentence
+  translation. A Content-Security-Policy restricts every request to the app's own origin plus the
+  translation Worker's origin, a service worker serves the app, the model and the MediaPipe files
+  from the device after the first load, and there is no analytics or telemetry. Sentences are
+  spoken with on-device voices only.
+
+![Edge-Vision recognising "hello"](docs/screenshots/04-word-landing-1440x900-dark.png)
+
+### The interface ("Duet")
+
+Two hands, two colours, one voice: the signer's left hand is periwinkle (#7AA2FF) and the right
+hand peach (#FF9E7A) everywhere (skeleton, fingertip trails, the hand chips, the timeline lanes);
+accent gold marks confirmed words and the primary action. Display type is Bricolage Grotesque, the
+interface Manrope, numbers JetBrains Mono (self-hosted Latin subsets from @fontsource).
+
+- **Translate.** The camera fills a 16:9 stage (full screen on phones) with a glass HUD: a status
+  pill driven by the segmenter (Ready, Signing with a pulsing ring, Reading with a spinner, then
+  the word), the hand chips, hints ("Too dark", "Hands partly out of frame", a gentle "Raise your
+  hands" after 10 s without one) and a two-lane timeline with one chip per sign, in the lane of
+  the hand that signed it and sized by its duration. A recognised word rises into the centre in
+  its confidence ring (the arc fills to the calibrated confidence) and flies into the transcript.
+  Below the confidence threshold a "Not sure" picker shows the top 3 and nothing is added until
+  one is picked. Candidates 1-3 also replace the last word; Backspace undoes. After 2 s without
+  signing (a setting) the glosses are translated into a sentence, which is shown, can be copied
+  and is spoken (auto-speak on by default; voice and rate in Settings), and kept in a history.
+- **Practice.** A target sign with its description: Go, a 3-2-1 countdown, then the next sign is
+  scored correct (top guess, a small burst and XP with a streak bonus), close (in the top 3) or
+  try again (with what the model saw). Streaks, accuracy per sign and "your hardest signs" are
+  kept in localStorage.
+- **Signs.** All 250 signs, searchable, each with a short reminder of the handshape and motion,
+  a link to a dictionary video on SignASL.org (no video is copied) and "Practise". The top bar's
+  "Knows 250 signs · see list" chip opens it from anywhere.
+- **Diagnostics** (the fps chip on the stage): tracking fps, model latency, hands detected,
+  lighting, the classifier backend, MediaPipe delegate, aspect correction, the 60-second benchmark
+  and Record test signs.
+- **First run.** A three-step overlay: why the camera is needed (before the browser's own
+  prompt), framing yourself (a dotted upper-body outline that turns green), then trying "hello".
+  Camera blocked, no camera, camera busy, loading (a byte-level progress bar), unsupported
+  browser and errors each have their own state on the stage.
+- **Keyboard.** Space starts or stops the camera, 1/2/3 pick a candidate, Backspace undoes,
+  Enter translates, S speaks. Focus is always visible, recognised words and sentences are
+  announced through an aria-live region, targets are at least 44 px.
+- **Motion.** Springs (damping ratio 1.0, interruptible, velocity-carrying, transform and opacity
+  only) for movement, with the one bounce kept for the word landing; the mobile bottom sheet
+  follows the finger with momentum projection between its two detents. With
+  prefers-reduced-motion everything fades instead and the fingertip trails are off;
+  prefers-reduced-transparency makes the glass opaque. While the camera runs, glass over the video
+  is not blurred: re-blurring a moving video every frame took GPU time MediaPipe needs (tracking
+  fell to about 8 fps on the target laptop with blur).
+- **Contrast.** `npm run contrast` checks every text / background pair of both themes for WCAG AA
+  from the colour tokens in `src/styles.css`; text on glass over the video is checked against the
+  surface composited over both a black and a white frame.
 
 ### Run locally
 
@@ -228,18 +277,28 @@ npm run build          # production build into dist/
 npm run preview        # serves dist/ at http://localhost:4173/
 ```
 
-Camera access needs a secure context; `localhost` qualifies. `npm run fetch-assets` checks every
+`site.config.json` holds the translation Worker's URL (empty: sentences are joined on the
+device and marked "basic"); `VITE_WORKER_URL` overrides it for a build. Camera access needs a
+secure context; `localhost` qualifies. `npm run fetch-assets` checks every
 file against a pinned or npm-provided sha256, writes `public/mediapipe/ASSETS.json` (URL, sha256,
 size, licence) and skips files that are already present.
 
-Tests: `npx tsc --noEmit`, `npx vitest run` (the live-pipeline parity test on 20 val sequences,
-preprocessing for the v1 and v2 landmark selections and the aspect correction against the Python
-golden vectors, calibration, the recordings schema, pose interpolation, segmentation, scoring,
-settings) and, after `npm run build`,
+Tests: `npx tsc --noEmit`, `npm run contrast`, `npx vitest run` (the live-pipeline parity test
+on 20 val sequences, preprocessing and aspect correction against the Python golden vectors, the
+offline sentence joiner, the translation client and its fallbacks, the transcript's
+replace/undo rules, practice scoring, preferences and history with blocked storage, the colour
+contrast and the Worker vocabulary staying in sync) and, after `npm run build`,
 `npx playwright install chromium` then `npx playwright test` (model and preprocessing parity in
-Chromium, offline reload through the service worker, a camera smoke test and a Record test signs
-run with Chromium's fake camera). For a build under another base path, set `BASE_PATH` (for
-example `/edge-vision/`) for both the build and the tests.
+Chromium, offline reload through the service worker, a camera smoke test, the interface flow
+driven through the debug hook, Record test signs, and a recorded clip end to end when
+`data/live_clips/hello.y4m` exists). For a build under another base path, set `BASE_PATH` (for
+example `/edge-vision/`) for both the build and the tests. Node 22.18 or newer runs the contrast
+script (it imports TypeScript directly).
+
+Screenshots: `docs/screenshots/` (`npm run screenshots`; the header of
+`web/scripts/screenshots.mjs` says which states are captured live from a recorded clip and which
+are staged through the debug hook). The camera video is blurred in every screenshot for the
+signer's privacy; the hand skeleton and the interface are captured as rendered.
 
 ### Features spec: one source of truth
 
@@ -301,26 +360,16 @@ the port):
 
 ### Capture
 
-The default automatic mode uses the motion segmenter above. Settings also offer the first demo's
-presence rule (a segment starts after 3 consecutive frames with a hand and ends after 8 frames
-without one, or after 3.0 s) and "hold to record": hold Space or press and hold the large button
-while signing. Segments with fewer hand frames than the model's `min_hand_frames` are discarded.
-The three most likely signs are always listed with their probabilities; if the top probability
-reaches the threshold the top sign is shown large, otherwise the result reads "Not sure". "Segment details" under the result shows, for the last
-segment, its frame count, normalisation method, aspect factor k, and the share of frames with
-both shoulders visible and with a hand. All thresholds can be changed under Settings; settings
-are kept in `localStorage` when the browser allows it. Framing can be the full camera frame or a
-centred 3:4 portrait crop, applied before MediaPipe. Guidance messages report missing hands, hands
-partly out of frame, low light, and a signer too close or too far (shoulder distance in
-normalised units).
-
-The pose selection and the left/right pose pairs that mirroring swaps come from `meta.json`, so
-the same app runs v1 (7 pose points) and v2 (pose 0-16) models. MediaPipe runs on the GPU
-delegate by default and falls back to the CPU if the GPU fails (at creation or while detecting) or is too slow;
-the Performance panel shows which is in use and why. The hand landmarker runs on every frame and
-the pose landmarker on every Nth frame (Settings, 1 to 3, default 2); pose points for the frames
-in between are interpolated linearly in time between two runs, and frames after the last run of a
-segment keep that run's pose.
+The default automatic mode uses the motion segmenter above. Settings > Advanced also offers the
+first demo's presence rule (a segment starts after 3 consecutive frames with a hand and ends after
+8 frames without one, or after 3.0 s) and "hold to record", which shows a button under the stage
+to press and hold while signing. Segments with fewer hand frames than the model's
+`min_hand_frames` are discarded. The pose selection and the left/right pose pairs that mirroring
+swaps come from `meta.json`, so the same app runs v1 (7 pose points) and v2 (pose 0-16) models.
+MediaPipe runs on the GPU delegate by default and falls back to the CPU if the GPU fails (at
+creation or while detecting) or is too slow; Diagnostics shows which is in use and why. The hand
+landmarker runs on every frame and the pose landmarker on every Nth frame (1 to 3, default 2);
+pose points for the frames in between are interpolated linearly in time.
 
 ### Aspect calibration (alternative mode)
 
@@ -437,6 +486,38 @@ python scripts/export_web.py --run results/runs/cnn_signer_independent/seed_0 --
   model came from.
 - Commit `model.onnx` only while it is under 10 MB; `.gitignore` admits only that one ONNX file.
 
+### Sentence translation
+
+The transcript holds glosses (HELLO MOM DRINK WATER). Translate (or 2 s without signing) sends
+them to a small Cloudflare Worker in `deploy/worker/` (the same pattern as Veridex's proxy), which
+asks Groq's OpenAI-compatible API for one sentence with a fixed prompt: "Turn this ASL gloss
+sequence into one short, natural English sentence; do not add facts that the glosses don't
+support; return only the sentence." It accepts only glosses from the app's vocabulary
+(`deploy/worker/src/vocabulary.json`, generated by `npm run vocabulary` and checked by a web unit
+test), at most 24 per request, and asks for at most 120 output tokens. Rate limits per client
+address live in a Durable Object: 30 requests per 10 minutes and 300 per day, plus a global cap of
+3000 a day. The API key is the `LLM_API_KEY` secret; glosses and sentences are not stored or
+logged. CORS allows `ALLOWED_ORIGINS` (the Pages site) and localhost.
+
+When the Worker is not configured, offline, slow (6 s), rate-limited or failing, the app joins the
+glosses on the device instead (lower-cased, compound glosses split such as THANKYOU -> "thank
+you", the first word capitalised, a comma after a leading greeting, a question mark after a
+question word) and marks the sentence "(basic)".
+
+Deploying (from `deploy/worker/`, with a Cloudflare account and a Groq API key):
+
+```powershell
+npm ci
+npx wrangler login
+npx wrangler secret put LLM_API_KEY      # paste the Groq key when asked
+npx wrangler deploy                      # prints https://edge-vision-translate.<account>.workers.dev
+npx vitest run                           # tests in workerd, upstream mocked
+```
+
+Then give the Pages build the URL, either as the repository variable
+(`gh variable set WORKER_URL --body "https://edge-vision-translate.<account>.workers.dev"`, or
+Settings -> Secrets and variables -> Actions -> Variables) or in `web/site.config.json`.
+
 ### Performance
 
 - **Workers.** `web/src/inference.worker.ts` runs in two instances: one holds the landmarkers and
@@ -460,7 +541,7 @@ recorded clip as the fake camera and the app's 60-second benchmark:
 
 ```powershell
 npm run build; npm run preview            # in web/, another shell
-node scripts/benchmark-tracking.mjs       # results/perf/tracking_gpu.json (--delegate CPU, --threads N)
+node scripts/benchmark-tracking.mjs       # results/perf/tracking_gpu.json (--delegate CPU, --threads N, --hud off)
 node scripts/benchmark.mjs                # classifier alone: wasm x1/2/4 and WebGPU
 ```
 
@@ -473,27 +554,71 @@ node scripts/benchmark.mjs                # classifier alone: wasm x1/2/4 and We
 
 The default meets the targets of at least 15 fps tracking and under 60 ms of model time per
 segment; the CPU fallback does not reach 15 fps. The first demo (main thread, before these
-changes) ran at 5-13 fps on the same clips.
+changes) ran at 5-13 fps on the same clips. These rows were measured with the interface before
+the Duet redesign.
+
+With the Duet interface, the HUD on and off and the previous interface were measured back to back
+in one later session (the same laptop on AC power, but charging from 13% and running warmer, so
+compare rows within this table rather than with the one above):
+
+```powershell
+node scripts/benchmark-tracking.mjs --out ../results/perf/tracking_duet_gpu.json              # HUD on
+node scripts/benchmark-tracking.mjs --hud off --out ../results/perf/tracking_duet_gpu_nohud.json
+```
+
+| Interface | Tracking fps | Hand landmarker p50 / p95 | Classifier per segment p50 / p95 |
+| --- | --- | --- | --- |
+| Duet, hand skeleton (HUD) on (default) | 19.0 | 39.7 / 61.1 ms | 27.7 / 76.0 ms |
+| Duet, HUD off | 20.4 | 38.0 / 54.9 ms | 26.0 / 32.4 ms |
+| Previous interface (same session) | 21.5 | 36.7 / 51.1 ms | 21.7 / 26.5 ms |
+
+Drawing the HUD costs about 1.4 fps; the new interface as a whole about 2.5 fps against the
+previous one. Its first version used backdrop-filter blur on the glass over the running video,
+which dropped tracking to about 8 fps on this GPU, so the glass over the video is unblurred while
+the camera runs. The classifier's p95 with the HUD on comes from one slow call among 13 segments
+(p50 27.7 ms).
+
+The final Duet build was measured again on an idle laptop on AC power, two runs per setting in
+alternating order (on, off, off, on), in the installed Chrome
+(`results/perf/tracking_duet_final_gpu*.json`):
+
+| Duet, final build | Tracking fps (runs) | Hand landmarker p50 / p95 | Classifier per segment p50 / p95 |
+| --- | --- | --- | --- |
+| HUD on (default) | 25.2 (25.6, 24.8) | 28.6 / 39.7, 28.3 / 43.2 ms | 16.5 / 21.6, 17.0 / 37.6 ms |
+| HUD off | 24.8 (23.0, 26.5) | 27.6 / 51.0, 26.3 / 39.8 ms | 19.6 / 106.0, 16.0 / 48.0 ms |
+
+The second run of each pair was the slower one, so the order of the runs (the laptop warming up)
+moved tracking by more than the HUD did; drawing the HUD has no cost that two runs can resolve. Every
+run stays well above 15 fps. With 13 to 16 segments per run, the classifier's p95 is close to its
+slowest call: it was under 60 ms in three of the four runs, and one call of the first HUD-off run
+took over 100 ms (p50 19.6 ms).
 
 ### In-browser benchmark
 
-Start the camera, open Performance and press "Run 60-second benchmark", then sign a few times.
-The panel shows live FPS and rolling p50/p95 over the last 300 samples for the hand landmarker,
-pose landmarker, preprocessing, classifier and the total per frame. At the end a JSON file is
+Start the camera, open Diagnostics (the fps chip on the stage) and press "Run 60-second
+benchmark", then sign a few times. The drawer shows live fps and the p50/p95 of the hand and pose
+landmarkers and of the classifier over the last 300 samples. At the end a JSON file is
 downloaded with the user agent, `hardwareConcurrency`, `deviceMemory` where available, the actual
 camera resolution and frame rate, the settings, the model variant and sha256, raw per-frame and
 per-segment timings, p50/p95 summaries, end-to-end FPS, and 50 classifier runs on a fixed input.
 It also records the requested and active MediaPipe delegate with any fallback reason, the pose
 interval N (pose timings cover the frames where the pose landmarker ran), and the aspect mode, k,
-r_live and r_train. The camera is requested at 640 x 480 and 30 fps. The file is only saved
-locally.
+r_live and r_train, and whether the hand skeleton (HUD) was drawn. The camera is requested at
+640 x 480 and 30 fps. The file is only saved locally.
 
 ### Deployment
 
 `.github/workflows/pages.yml` builds `web/` with base `/edge-vision/` on every push to `main` and
-deploys it with `actions/upload-pages-artifact` and `actions/deploy-pages`. In the repository,
-Settings -> Pages -> Source must be set to "GitHub Actions". The `web` job in
-`.github/workflows/ci.yml` runs the type check, unit tests, build and browser tests.
+deploys it with `actions/upload-pages-artifact` and `actions/deploy-pages`. The translation
+Worker's URL comes from the repository variable `WORKER_URL` when it is set and non-blank, else
+from `web/site.config.json` (an unset variable expands to an empty string, which never overrides
+the file); the build prints the URL it uses and, with `REQUIRE_WORKER_URL=true`, fails when both
+are empty, so deploy the Worker first. One-time setup: Settings -> Pages -> Source "GitHub
+Actions" (or `gh api -X POST repos/Swapnil007-Curious/edge-vision/pages -f build_type=workflow`).
+The `web` job in `.github/workflows/ci.yml` runs the type check, the contrast check, unit tests,
+build and browser tests; the `worker` job type-checks and tests `deploy/worker`. The service
+worker adds the COOP/COEP headers GitHub Pages cannot send (the coi-serviceworker approach), so
+wasm threads are available there too.
 
 ### Known limitations
 
@@ -515,6 +640,15 @@ Settings -> Pages -> Source must be set to "GitHub Actions". The `web` job in
 - **CPU fallback is slow.** Without a working GPU delegate the hand landmarker takes about 85 ms
   per frame on the target laptop (it searches for a second hand on every frame), so tracking
   drops to about 10 fps. WebAssembly SIMD is required.
+- **Sentences are a reading of glosses.** The Worker's language model only sees the recognised
+  glosses, so word order, tense and anything carried by facial expression or space are guesses
+  (the prompt forbids adding facts); the offline "(basic)" joiner keeps the glosses in order and
+  does not attempt grammar. A misrecognised sign becomes a wrong word in the sentence.
+- **Sign descriptions are reminders.** The library's handshape/motion notes are short and not
+  verified by a signer; regional variants exist. Each links to dictionary videos.
+- **Hold to record on phones.** The hold-to-record capture mode (Settings > Advanced) shows its
+  button under the stage, which the full-screen phone layout does not have; phones use automatic
+  capture.
 - **Small live evaluation.** The live-gap numbers come from 10 clips of one signer, two pairs of
   which are byte-identical files (see `results/live_gap.md`); they show the direction of each
   fix, not a precise accuracy.

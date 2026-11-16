@@ -2,197 +2,412 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Edge-Vision</title>
-    <meta name="description" content="Recognises isolated signs from your webcam, entirely on this device." />
-    <meta name="theme-color" content="#0b0c0c" />
+    <meta name="description" content="Sign to speech in the browser: recognises 250 isolated ASL signs from your webcam on this device and builds simple sentences." />
+    <meta name="theme-color" content="#0F1115" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F3F5F9" media="(prefers-color-scheme: light)" />
+    <meta name="color-scheme" content="dark light" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to main content</a>
-    <header class="site-header">
-      <h1>Edge-Vision</h1>
-      <ul class="notices">
-        <li id="notice-scope">Recognises single isolated signs from a 250-sign ASL vocabulary. It does not translate sentences.</li>
-        <li id="notice-privacy">Video never leaves this device.</li>
-      </ul>
-      <p id="synthetic-warning" class="warning" hidden>
-        Demo build: this model was trained on synthetic data and does not recognise real signs.
-      </p>
-      <p id="status" class="status" role="status">Loading…</p>
-    </header>
+    <svg width="0" height="0" class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3.5 7.5h3l1.6-2.2h7.8l1.6 2.2h3v11h-17z" /><circle cx="12" cy="12.8" r="3.6" /></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2.5" /></symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" /><circle cx="15" cy="7" r="2.2" /><circle cx="9" cy="17" r="2.2" /></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.8" /><path d="M12 11v5.6M12 7.6v.1" /></symbol>
+      <symbol id="i-speak" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.2 6.4a8 8 0 0 1 0 11.2" /></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.5" /><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" /></symbol>
+      <symbol id="i-translate" viewBox="0 0 24 24"><path d="M4.5 6.5h9M9 4.5v2M6.5 6.5c.6 3.4 3 6.2 6 7.5M11.5 6.5c-.7 3.3-3.1 6.4-6.5 7.8" /><path d="m12.5 19.5 3.5-8.5 3.5 8.5M13.7 16.7h4.6" /></symbol>
+      <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 6.5 4.5 11 9 15.5" /><path d="M4.5 11h9.5a5 5 0 0 1 0 10H11" /></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11" /></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M13.5 4.5h6v6M19.5 4.5 11 13" /><path d="M17.5 13.5v4.5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18V8A1.5 1.5 0 0 1 6 6.5h4.5" /></symbol>
+      <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3.5 12h4l2-5 4.5 10 2-5h4.5" /></symbol>
+      <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M4 7h3.5c4.5 0 4.5 10 9 10H20M4 17h3.5c1.4 0 2.3-.9 3-2.1M14 9.1c.7-1.2 1.6-2.1 3-2.1H20" /><path d="m17.5 4.5 2.5 2.5-2.5 2.5M17.5 14.5l2.5 2.5-2.5 2.5" /></symbol>
+    </svg>
 
-    <main id="main">
-      <section class="stage" aria-labelledby="camera-heading">
-        <h2 id="camera-heading">Camera</h2>
-        <div class="preview">
-          <video id="video" playsinline muted></video>
-          <canvas id="preview" role="img" aria-label="Mirrored camera preview with hand and pose landmarks"></canvas>
-          <p id="preview-placeholder" class="preview-placeholder">Camera is off.</p>
+    <a class="skip-link" href="#panel">Skip to the transcript</a>
+
+    <div class="app" id="app" data-mode="translate">
+      <header class="topbar">
+        <div class="brand">
+          <svg class="mark" viewBox="0 0 64 44" aria-hidden="true">
+            <defs><clipPath id="mark-left"><circle cx="21" cy="22" r="20" /></clipPath></defs>
+            <circle cx="21" cy="22" r="20" fill="#7AA2FF" />
+            <circle cx="43" cy="22" r="20" fill="#FF9E7A" />
+            <circle cx="43" cy="22" r="20" fill="#F5D76E" clip-path="url(#mark-left)" />
+          </svg>
+          <span class="wordmark">Edge-Vision</span>
         </div>
-        <p class="legend">
-          <span class="swatch swatch-left" aria-hidden="true"></span> your left hand and left wrist
-          <span class="swatch swatch-right" aria-hidden="true"></span> your right hand and right wrist
-        </p>
-        <ul id="guidance" class="guidance" aria-label="Camera guidance"></ul>
-        <div class="controls">
-          <button id="start" type="button" disabled>Start camera</button>
-          <button id="stop" type="button" disabled>Stop camera</button>
-          <button id="recalibrate" type="button" disabled>Recalibrate</button>
-          <fieldset class="mode">
-            <legend>Capture mode</legend>
-            <label><input type="radio" name="mode" value="auto" /> Automatic</label>
-            <label><input type="radio" name="mode" value="manual" /> Hold to record</label>
-          </fieldset>
+        <nav class="modes" role="tablist" aria-label="Mode">
+          <span class="modes-indicator" aria-hidden="true"></span>
+          <button type="button" role="tab" id="tab-translate" data-mode="translate" aria-controls="view-translate" aria-selected="true">Translate</button>
+          <button type="button" role="tab" id="tab-practice" data-mode="practice" aria-controls="view-practice" aria-selected="false" tabindex="-1">Practice</button>
+          <button type="button" role="tab" id="tab-signs" data-mode="signs" aria-controls="view-signs" aria-selected="false" tabindex="-1">Signs</button>
+        </nav>
+        <div class="topbar-actions">
+          <button type="button" class="vocab-chip" id="vocab-chip">Knows <b class="mono" id="vocab-count">250</b> signs · see list</button>
+          <button type="button" class="icon-button" id="open-settings" aria-label="Settings" aria-haspopup="dialog"><svg><use href="#i-gear" /></svg></button>
+          <button type="button" class="icon-button" id="open-about" aria-label="About Edge-Vision" aria-haspopup="dialog"><svg><use href="#i-info" /></svg></button>
         </div>
-        <button id="record" type="button" class="record" aria-pressed="false" aria-describedby="record-help" hidden>
-          Hold to record a sign
-        </button>
-        <p id="record-help" class="help" hidden>Hold Space, or press and hold the button, while you sign. Release to recognise.</p>
-        <p id="calibration-status" class="help" role="status">Aspect calibration runs for 2 seconds when the camera starts.</p>
-        <p id="segment-state" class="segment-state">Not capturing.</p>
-      </section>
+      </header>
 
-      <section class="result-panel" aria-labelledby="result-heading">
-        <h2 id="result-heading">Result</h2>
-        <p id="result-sign" class="result-sign">–</p>
-        <p id="result-detail" class="result-detail"></p>
-        <ol id="candidates" class="candidates" aria-label="Top 3 candidates" hidden></ol>
-        <details id="segment-debug" class="segment-debug">
-          <summary>Segment details</summary>
-          <p id="segment-debug-text">No segment yet.</p>
-        </details>
-        <div id="announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
-        <h3>History</h3>
-        <ol id="history" class="history" aria-label="Last 10 results"></ol>
-      </section>
+      <main class="workspace">
+        <div class="stage-column">
+          <section class="stage" id="stage" aria-label="Camera" data-state="off" data-running="false">
+            <video id="video" playsinline muted aria-hidden="true"></video>
+            <canvas id="hud" class="hud" aria-hidden="true"></canvas>
 
-      <section class="panel" aria-labelledby="settings-heading">
-        <details id="settings-details">
-          <summary><h2 id="settings-heading">Settings</h2></summary>
-          <form id="settings" class="settings" novalidate>
-            <fieldset>
-              <legend>Segmentation</legend>
-              <label for="startFrames">Frames with a hand to start a segment</label>
-              <input id="startFrames" name="startFrames" type="number" min="1" max="30" step="1" required />
-              <label for="endFrames">Frames without a hand to end a segment</label>
-              <input id="endFrames" name="endFrames" type="number" min="1" max="60" step="1" required />
-              <label for="maxDurationS">Maximum segment length (seconds)</label>
-              <input id="maxDurationS" name="maxDurationS" type="number" min="0.5" max="10" step="0.1" required />
-              <label for="minHandFrames">Minimum frames with a hand (blank: model default)</label>
-              <input id="minHandFrames" name="minHandFrames" type="number" min="1" max="60" step="1" />
-            </fieldset>
-            <fieldset>
-              <legend>Recognition</legend>
-              <label for="confidenceThreshold">Confidence threshold, 0 to 1 (blank: calibrated value)</label>
-              <input id="confidenceThreshold" name="confidenceThreshold" type="number" min="0" max="1" step="0.01" />
-              <label class="check"><input id="speak" name="speak" type="checkbox" /> Speak recognised signs (on-device voice only)</label>
-            </fieldset>
-            <fieldset>
-              <legend>Camera</legend>
-              <label for="framing">Framing</label>
-              <select id="framing" name="framing">
-                <option value="full">Full frame</option>
-                <option value="portrait">Portrait centre crop (3:4)</option>
-              </select>
-              <label class="check"><input id="swapHands" name="swapHands" type="checkbox" /> Swap hands</label>
-              <label for="delegate">Landmark backend</label>
-              <select id="delegate" name="delegate">
-                <option value="GPU">GPU (WebGL), CPU if it fails</option>
-                <option value="CPU">CPU</option>
-              </select>
-              <label for="classifierBackend">Classifier backend</label>
-              <select id="classifierBackend" name="classifierBackend">
-                <option value="auto">Automatic (WebGPU if it is faster here, else WebAssembly)</option>
-                <option value="wasm">WebAssembly</option>
-                <option value="webgpu">WebGPU, WebAssembly if it fails</option>
-              </select>
-              <label for="classifierThreads">Classifier threads (0 = automatic)</label>
-              <input id="classifierThreads" name="classifierThreads" type="number" min="0" max="8" step="1" required />
-              <label for="poseEvery">Pose landmarker runs every</label>
-              <select id="poseEvery" name="poseEvery">
-                <option value="1">frame</option>
-                <option value="2">2nd frame (poses in between interpolated)</option>
-                <option value="3">3rd frame (poses in between interpolated)</option>
-              </select>
-              <fieldset class="aspect">
-                <legend>Aspect correction</legend>
-                <label><input type="radio" name="aspectMode" value="frame" /> From the camera's frame size</label>
-                <label><input type="radio" name="aspectMode" value="auto" /> Calibrated at camera start (head and shoulders)</label>
-                <label><input type="radio" name="aspectMode" value="manual" /> Manual</label>
-                <label><input type="radio" name="aspectMode" value="off" /> Off</label>
-                <label for="aspectK">Manual factor k: <output id="aspectK-value" for="aspectK">1.00</output></label>
-                <input id="aspectK" name="aspectK" type="range" min="0.25" max="4" step="0.01" />
-              </fieldset>
-              <label for="lowLightThreshold">Low-light warning below brightness (0 to 255)</label>
-              <input id="lowLightThreshold" name="lowLightThreshold" type="number" min="0" max="255" step="1" required />
-              <label for="minShoulderDistance">"Too far" below shoulder distance</label>
-              <input id="minShoulderDistance" name="minShoulderDistance" type="number" min="0" max="2" step="0.01" required />
-              <label for="maxShoulderDistance">"Too close" above shoulder distance</label>
-              <input id="maxShoulderDistance" name="maxShoulderDistance" type="number" min="0" max="2" step="0.01" required />
-            </fieldset>
-            <div class="settings-actions">
-              <button id="reset-settings" type="button">Reset to defaults</button>
-              <p id="settings-note" class="help" role="status"></p>
+            <div class="framing-guide" id="framing-guide" aria-hidden="true" hidden>
+              <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMax meet">
+                <path class="silhouette" d="M200 46c26 0 44 21 44 49s-18 54-44 54-44-26-44-54 18-49 44-49Zm-108 254c4-60 30-96 74-106 10 12 22 18 34 18s24-6 34-18c44 10 70 46 74 106" />
+              </svg>
+              <p class="framing-caption"><span class="dot"></span><span id="framing-text">Fit your upper body in the frame</span></p>
             </div>
-          </form>
-        </details>
-      </section>
 
-      <section class="panel" aria-labelledby="perf-heading">
-        <details id="perf-details" open>
-          <summary><h2 id="perf-heading">Performance</h2></summary>
-          <p class="fps">FPS: <output id="fps" aria-label="Frames per second">–</output></p>
-          <table class="perf-table">
-            <caption>Latency over the last 300 samples, in milliseconds</caption>
-            <thead>
-              <tr><th scope="col">Stage</th><th scope="col">p50</th><th scope="col">p95</th><th scope="col">Samples</th></tr>
-            </thead>
-            <tbody id="perf-body"></tbody>
-          </table>
-          <dl class="diagnostics">
-            <dt>Camera</dt><dd id="diag-camera">–</dd>
-            <dt>Shoulder distance</dt><dd id="diag-shoulders">–</dd>
-            <dt>Brightness</dt><dd id="diag-light">–</dd>
-            <dt>Hands match pose wrists</dt><dd id="diag-wrists">–</dd>
-            <dt>Aspect correction</dt><dd id="diag-aspect">–</dd>
-            <dt>Landmarks</dt><dd id="diag-mediapipe">–</dd>
-          </dl>
-          <button id="benchmark" type="button" disabled>Run 60-second benchmark</button>
-          <p id="benchmark-status" class="help" role="status">Start the camera first. Sign a few times during the run so whole segments are timed.</p>
-        </details>
-      </section>
+            <div class="stage-top">
+              <div class="status-pill glass" id="status-pill" data-state="off" aria-live="off">
+                <span class="status-ring" aria-hidden="true"><i></i></span>
+                <span class="status-label" id="status-label">Camera off</span>
+              </div>
+              <ul class="hand-chips" aria-label="Hands in view">
+                <li class="hand-chip glass" data-hand="left" data-on="false"><span class="swatch"></span>Left</li>
+                <li class="hand-chip glass" data-hand="right" data-on="false"><span class="swatch"></span>Right</li>
+              </ul>
+              <button type="button" class="diag-toggle glass" id="diag-toggle" aria-expanded="false" aria-controls="diagnostics">
+                <svg aria-hidden="true"><use href="#i-pulse" /></svg><span class="mono" id="diag-fps">– fps</span>
+              </button>
+            </div>
 
-      <section class="panel" aria-labelledby="recorder-heading">
-        <details id="recorder-details">
-          <summary><h2 id="recorder-heading">Record test signs</h2></summary>
-          <p class="help">
-            Saves the landmarks of each completed segment, with the settings and the app's result, for offline
-            diagnosis with scripts/live_diagnose.py. No video or images are stored. Recordings stay in this tab until
-            you download them and are lost when it closes.
-          </p>
-          <label class="check"><input id="recorder-on" type="checkbox" /> Record each completed segment</label>
-          <label for="label-search">Find the sign you will perform</label>
-          <input id="label-search" type="search" autocomplete="off" aria-controls="label-select" aria-describedby="label-help" />
-          <p id="label-help" class="help">Type to filter, then press Down Arrow to move to the list.</p>
-          <label for="label-select">Intended sign</label>
-          <select id="label-select" size="6"></select>
-          <p id="recorder-status" class="help" role="status">No recordings.</p>
-          <div class="controls">
-            <button id="recorder-download" type="button" disabled>Download recordings</button>
-            <button id="recorder-clear" type="button" disabled>Clear recordings</button>
+            <ul class="hints" id="hints" aria-live="polite"></ul>
+
+            <div class="landing" id="landing" aria-hidden="true">
+              <svg class="landing-ring" viewBox="0 0 220 220">
+                <circle class="track" cx="110" cy="110" r="100" />
+                <circle class="arc" id="landing-arc" cx="110" cy="110" r="100" pathLength="100" />
+              </svg>
+              <span class="landing-word display" id="landing-word"></span>
+              <span class="landing-confidence mono" id="landing-confidence"></span>
+            </div>
+
+            <div class="unsure glass" id="unsure" hidden>
+              <p class="unsure-title"><span class="unsure-badge">Not sure</span> <span>Tap the sign you meant<span class="kbd-only">, or press 1, 2 or 3</span>.</span></p>
+              <ol class="choice-row" id="unsure-choices"></ol>
+            </div>
+
+            <div class="countdown display" id="countdown" aria-live="assertive" hidden></div>
+            <div class="burst" id="burst" aria-hidden="true"></div>
+
+            <div class="stage-state" id="stage-state">
+              <div class="state-card" id="state-card">
+                <p class="state-eyebrow" id="state-eyebrow">Loading</p>
+                <h2 class="state-title display" id="state-title">Getting the sign model ready</h2>
+                <p class="state-body" id="state-body">The model and hand tracking load once, then work offline.</p>
+                <div class="progress" id="progress" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                  <span class="progress-bar" id="progress-bar"></span>
+                </div>
+                <p class="progress-detail mono" id="progress-detail"></p>
+                <div class="state-actions">
+                  <button type="button" class="button primary large" id="start" disabled><svg aria-hidden="true"><use href="#i-camera" /></svg><span>Start camera</span></button>
+                  <button type="button" class="button ghost large" id="state-secondary" hidden></button>
+                </div>
+                <p class="privacy-line">Video never leaves your device. Only recognised words are sent for sentence translation.</p>
+              </div>
+            </div>
+
+            <div class="timeline glass" id="timeline" aria-label="Signs so far: lanes for the left and right hand">
+              <div class="lane" data-hand="left"><span class="lane-label">L</span><ol class="lane-track" id="lane-left"></ol></div>
+              <div class="lane" data-hand="right"><span class="lane-label">R</span><ol class="lane-track" id="lane-right"></ol></div>
+            </div>
+
+            <section class="diagnostics glass" id="diagnostics" aria-label="Live diagnostics" hidden>
+              <header class="diag-head">
+                <h2>Diagnostics</h2>
+                <button type="button" class="icon-button small" id="diag-close" aria-label="Close diagnostics"><svg><use href="#i-close" /></svg></button>
+              </header>
+              <dl class="diag-grid">
+                <dt>Tracking</dt><dd class="mono" id="fps">–</dd>
+                <dt>Model latency</dt><dd class="mono" id="diag-latency">–</dd>
+                <dt>Hands detected</dt><dd class="mono" id="diag-hands">–</dd>
+                <dt>Lighting</dt><dd id="diag-light">–</dd>
+                <dt>Backend</dt><dd id="diag-backend">–</dd>
+                <dt>Landmarks</dt><dd id="diag-mediapipe">–</dd>
+                <dt>Camera</dt><dd id="diag-camera">–</dd>
+                <dt>Aspect</dt><dd id="diag-aspect">–</dd>
+                <dt>Hands match wrists</dt><dd id="diag-wrists">–</dd>
+              </dl>
+              <p class="diag-note" id="calibration-status">Aspect correction from the frame size.</p>
+              <p class="diag-note" id="segment-debug-text">No segment yet.</p>
+              <div class="diag-actions">
+                <button type="button" class="button small" id="recalibrate" disabled>Recalibrate</button>
+                <button type="button" class="button small" id="benchmark" disabled>Run 60-second benchmark</button>
+              </div>
+              <p class="diag-note" id="benchmark-status" role="status">Start the camera first. Sign a few times during the run so whole segments are timed.</p>
+              <details class="diag-recorder" id="recorder-details">
+                <summary>Record test signs</summary>
+                <p class="diag-note">Saves the landmarks of each completed segment, with the settings and the result, for offline diagnosis with scripts/live_diagnose.py. No video or images are stored; recordings stay in this tab until you download them.</p>
+                <label class="check"><input id="recorder-on" type="checkbox" /> Record each completed segment</label>
+                <label for="label-search">Find the sign you will perform</label>
+                <input id="label-search" type="search" autocomplete="off" aria-controls="label-select" />
+                <label for="label-select">Intended sign</label>
+                <select id="label-select" size="5"></select>
+                <p class="diag-note" id="recorder-status" role="status">No recordings.</p>
+                <div class="diag-actions">
+                  <button type="button" class="button small" id="recorder-download" disabled>Download recordings</button>
+                  <button type="button" class="button small" id="recorder-clear" disabled>Clear recordings</button>
+                </div>
+                <ol class="diag-list" id="recorder-list" aria-label="Last 10 recordings"></ol>
+              </details>
+            </section>
+          </section>
+
+          <div class="stage-footer">
+            <button type="button" class="button" id="camera-toggle" disabled><svg aria-hidden="true"><use href="#i-camera" /></svg><span id="camera-toggle-label">Start camera</span></button>
+            <button type="button" class="button primary" id="record" aria-pressed="false" hidden>Hold to record a sign</button>
+            <p class="stage-footer-note"><kbd>Space</kbd> start or stop <span class="sep">·</span> <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> pick <span class="sep">·</span> <kbd>⌫</kbd> undo <span class="sep">·</span> <kbd>Enter</kbd> translate <span class="sep">·</span> <kbd>S</kbd> speak</p>
           </div>
-          <ol id="recorder-list" class="history" aria-label="Last 10 recordings"></ol>
-        </details>
-      </section>
-    </main>
+        </div>
 
-    <footer class="site-footer">
-      <p id="model-info">Model: loading…</p>
-      <p id="offline-status">Offline use: not yet available.</p>
-    </footer>
+        <aside class="panel" id="panel" aria-label="Transcript and controls" tabindex="-1">
+          <div class="sheet-handle" id="sheet-handle" role="button" tabindex="0" aria-label="Expand the panel" aria-expanded="false"><span></span></div>
+          <!-- Phones only: the top bar has no room for these, so they ride on the sheet, visible at both detents. -->
+          <div class="sheet-bar">
+            <button type="button" class="vocab-chip" id="sheet-vocab-chip">Knows <b class="mono">250</b> signs · see list</button>
+            <button type="button" class="icon-button small" id="sheet-about" aria-label="About Edge-Vision" aria-haspopup="dialog"><svg><use href="#i-info" /></svg></button>
+          </div>
+
+          <section class="view" id="view-translate" role="tabpanel" aria-labelledby="tab-translate">
+            <header class="view-head">
+              <h2 class="eyebrow">Transcript</h2>
+              <span class="view-count mono" id="word-count">0 signs</span>
+            </header>
+            <ol class="transcript" id="transcript" aria-label="Signs in the sentence"></ol>
+            <p class="transcript-empty" id="transcript-empty">Sign a word and it lands here. <span class="muted">Try “hello”.</span></p>
+
+            <div class="candidates" id="candidates">
+              <h3 class="eyebrow">Top 3 <span class="muted" id="candidates-hint">for the last sign</span></h3>
+              <ol class="choice-row" id="candidate-list"></ol>
+            </div>
+
+            <div class="sentence-card" id="sentence-card" data-state="empty">
+              <h3 class="eyebrow">Sentence <span class="sentence-source" id="sentence-source"></span></h3>
+              <p class="sentence" id="sentence" aria-live="polite">Your sentence appears here after a short pause in signing.</p>
+              <div class="sentence-actions">
+                <button type="button" class="button" id="copy-sentence" disabled><svg aria-hidden="true"><use href="#i-copy" /></svg><span>Copy</span></button>
+                <button type="button" class="button" id="speak-sentence" disabled><svg aria-hidden="true"><use href="#i-speak" /></svg><span>Speak</span></button>
+              </div>
+            </div>
+
+            <div class="controls">
+              <button type="button" class="button primary" id="translate" disabled><svg aria-hidden="true"><use href="#i-translate" /></svg><span>Translate</span></button>
+              <button type="button" class="button" id="undo" disabled><svg aria-hidden="true"><use href="#i-undo" /></svg><span>Undo</span></button>
+              <button type="button" class="button ghost" id="clear-transcript" disabled>Clear</button>
+            </div>
+
+            <details class="history" id="history-details">
+              <summary>History <span class="mono muted" id="history-count"></span></summary>
+              <ol class="history-list" id="history"></ol>
+              <button type="button" class="button ghost small" id="history-clear">Clear history</button>
+            </details>
+          </section>
+
+          <section class="view" id="view-practice" role="tabpanel" aria-labelledby="tab-practice" hidden>
+            <header class="view-head">
+              <h2 class="eyebrow">Practice</h2>
+              <span class="view-count mono" id="practice-xp">0 XP</span>
+            </header>
+            <article class="target-card" id="target-card">
+              <p class="eyebrow muted">Sign this</p>
+              <h3 class="target-word display" id="target-word">HELLO</h3>
+              <p class="target-desc" id="target-desc"></p>
+              <a class="link" id="target-link" target="_blank" rel="noopener noreferrer">Watch it in a dictionary <svg aria-hidden="true"><use href="#i-external" /></svg></a>
+              <div class="target-actions">
+                <button type="button" class="button primary large" id="practice-go"><span>Go</span></button>
+                <button type="button" class="button" id="practice-next"><svg aria-hidden="true"><use href="#i-shuffle" /></svg><span>Another sign</span></button>
+              </div>
+            </article>
+            <div class="practice-result" id="practice-result" data-outcome="none" aria-live="polite"></div>
+            <dl class="practice-stats">
+              <div><dt>Streak</dt><dd class="mono" id="practice-streak">0</dd></div>
+              <div><dt>Best</dt><dd class="mono" id="practice-best">0</dd></div>
+              <div><dt>Accuracy</dt><dd class="mono" id="practice-accuracy">–</dd></div>
+            </dl>
+            <section class="hardest">
+              <h3 class="eyebrow">Your hardest signs</h3>
+              <ol class="hardest-list" id="hardest"></ol>
+              <p class="muted small" id="hardest-empty">Signs you miss more than once show up here.</p>
+            </section>
+          </section>
+
+          <section class="view" id="view-signs" role="tabpanel" aria-labelledby="tab-signs" hidden>
+            <header class="view-head">
+              <h2 class="eyebrow">Signs</h2>
+              <span class="view-count mono" id="signs-count">250 signs</span>
+            </header>
+            <label class="search">
+              <span class="visually-hidden">Search the 250 signs</span>
+              <input id="sign-search" type="search" placeholder="Search 250 signs" autocomplete="off" />
+            </label>
+            <p class="muted small library-note">Descriptions are short reminders, not instruction: open the dictionary for videos. Regional variants exist.</p>
+            <ul class="sign-list" id="sign-list"></ul>
+          </section>
+        </aside>
+      </main>
+
+      <div class="visually-hidden" id="announcer" aria-live="polite" aria-atomic="true"></div>
+      <p class="visually-hidden" id="status" role="status">Loading…</p>
+    </div>
+
+    <dialog class="sheet-dialog" id="settings-dialog" aria-labelledby="settings-title">
+      <form method="dialog" class="dialog-inner">
+        <header class="dialog-head">
+          <h2 id="settings-title" class="display">Settings</h2>
+          <button class="icon-button" value="close" aria-label="Close settings"><svg><use href="#i-close" /></svg></button>
+        </header>
+        <fieldset>
+          <legend>Speech</legend>
+          <label for="pref-voice">Voice (on-device voices only)</label>
+          <select id="pref-voice"></select>
+          <label for="pref-rate">Speaking rate <output class="mono" id="pref-rate-value">1.0×</output></label>
+          <input id="pref-rate" type="range" min="0.6" max="1.6" step="0.1" />
+          <label class="check"><input id="pref-autospeak" type="checkbox" /> Speak each new sentence</label>
+        </fieldset>
+        <fieldset>
+          <legend>Sentences</legend>
+          <label class="check"><input id="pref-autotranslate" type="checkbox" /> Translate after 2 seconds without signing</label>
+        </fieldset>
+        <fieldset>
+          <legend>Appearance</legend>
+          <div class="segmented-small" role="radiogroup" aria-label="Theme">
+            <label><input type="radio" name="pref-theme" value="system" /> System</label>
+            <label><input type="radio" name="pref-theme" value="dark" /> Dark</label>
+            <label><input type="radio" name="pref-theme" value="light" /> Light</label>
+          </div>
+          <label class="check"><input id="pref-hud" type="checkbox" /> Draw the hand skeleton over the video</label>
+        </fieldset>
+      </form>
+      <details class="advanced">
+        <summary>Advanced recognition settings</summary>
+        <form id="settings" class="settings" novalidate>
+          <fieldset>
+            <legend>Capture</legend>
+            <div class="radio-row">
+              <label><input type="radio" name="mode" value="auto" /> Automatic</label>
+              <label><input type="radio" name="mode" value="manual" /> Hold to record</label>
+            </div>
+            <label for="autoSegmenter">Automatic segmentation</label>
+            <select id="autoSegmenter" name="autoSegmenter">
+              <option value="motion">Motion (start and stop with your hands)</option>
+              <option value="presence">Hand presence (the first demo's rule)</option>
+            </select>
+            <label for="startFrames">Frames with a hand to start (presence rule)</label>
+            <input id="startFrames" name="startFrames" type="number" min="1" max="30" step="1" required />
+            <label for="endFrames">Frames without a hand to end (presence rule)</label>
+            <input id="endFrames" name="endFrames" type="number" min="1" max="60" step="1" required />
+            <label for="maxDurationS">Maximum segment length (seconds, presence rule)</label>
+            <input id="maxDurationS" name="maxDurationS" type="number" min="0.5" max="10" step="0.1" required />
+            <label for="minHandFrames">Minimum frames with a hand (blank: model default)</label>
+            <input id="minHandFrames" name="minHandFrames" type="number" min="1" max="60" step="1" />
+          </fieldset>
+          <fieldset>
+            <legend>Recognition</legend>
+            <label for="confidenceThreshold">Confidence threshold, 0 to 1 (blank: calibrated value)</label>
+            <input id="confidenceThreshold" name="confidenceThreshold" type="number" min="0" max="1" step="0.01" />
+          </fieldset>
+          <fieldset>
+            <legend>Camera and tracking</legend>
+            <label for="framing">Framing</label>
+            <select id="framing" name="framing">
+              <option value="full">Full frame</option>
+              <option value="portrait">Portrait centre crop (3:4)</option>
+            </select>
+            <label for="delegate">Landmark backend</label>
+            <select id="delegate" name="delegate">
+              <option value="GPU">GPU (WebGL), CPU if it fails or is slow</option>
+              <option value="CPU">CPU</option>
+            </select>
+            <label for="classifierBackend">Classifier backend</label>
+            <select id="classifierBackend" name="classifierBackend">
+              <option value="auto">Automatic (WebGPU if it is faster here, else WebAssembly)</option>
+              <option value="wasm">WebAssembly</option>
+              <option value="webgpu">WebGPU, WebAssembly if it fails</option>
+            </select>
+            <label for="classifierThreads">Classifier threads (0 = automatic)</label>
+            <input id="classifierThreads" name="classifierThreads" type="number" min="0" max="8" step="1" required />
+            <label for="poseEvery">Pose landmarker runs every</label>
+            <select id="poseEvery" name="poseEvery">
+              <option value="1">frame</option>
+              <option value="2">2nd frame (poses in between interpolated)</option>
+              <option value="3">3rd frame (poses in between interpolated)</option>
+            </select>
+            <fieldset class="nested">
+              <legend>Aspect correction</legend>
+              <label><input type="radio" name="aspectMode" value="frame" /> From the camera's frame size</label>
+              <label><input type="radio" name="aspectMode" value="auto" /> Calibrated at camera start (head and shoulders)</label>
+              <label><input type="radio" name="aspectMode" value="manual" /> Manual</label>
+              <label><input type="radio" name="aspectMode" value="off" /> Off</label>
+              <label for="aspectK">Manual factor k: <output class="mono" id="aspectK-value" for="aspectK">1.00</output></label>
+              <input id="aspectK" name="aspectK" type="range" min="0.25" max="4" step="0.01" />
+            </fieldset>
+            <label class="check"><input id="swapHands" name="swapHands" type="checkbox" /> Swap hands (label rules only)</label>
+            <label for="lowLightThreshold">"Too dark" below brightness (0 to 255)</label>
+            <input id="lowLightThreshold" name="lowLightThreshold" type="number" min="0" max="255" step="1" required />
+            <label for="minShoulderDistance">"Move closer" below shoulder distance</label>
+            <input id="minShoulderDistance" name="minShoulderDistance" type="number" min="0" max="2" step="0.01" required />
+            <label for="maxShoulderDistance">"Move back" above shoulder distance</label>
+            <input id="maxShoulderDistance" name="maxShoulderDistance" type="number" min="0" max="2" step="0.01" required />
+          </fieldset>
+          <div class="settings-actions">
+            <button id="reset-settings" type="button" class="button small">Reset recognition settings</button>
+            <p id="settings-note" class="diag-note" role="status"></p>
+          </div>
+        </form>
+      </details>
+    </dialog>
+
+    <dialog class="sheet-dialog" id="about-dialog" aria-labelledby="about-title">
+      <div class="dialog-inner">
+        <header class="dialog-head">
+          <h2 id="about-title" class="display">Edge-Vision</h2>
+          <button type="button" class="icon-button" id="about-close" aria-label="Close"><svg><use href="#i-close" /></svg></button>
+        </header>
+        <p class="about-lede">Recognises 250 isolated ASL signs and builds simple sentences. Not a full ASL translator.</p>
+        <ul class="about-list">
+          <li>Video never leaves your device. Only recognised words are sent for sentence translation; without a connection, sentences are joined on the device and marked “basic”.</li>
+          <li>Each sign is recognised on its own, from a fixed vocabulary of 250 signs. Grammar from facial expressions, space and movement is not captured, so a sentence is a rough English reading of the glosses.</li>
+          <li>Spoken sentences use your device's own voices.</li>
+        </ul>
+        <h3 class="eyebrow">Keyboard</h3>
+        <dl class="kbd-list">
+          <div><dt><kbd>Space</kbd></dt><dd>Start or stop the camera</dd></div>
+          <div><dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></dt><dd>Pick a candidate</dd></div>
+          <div><dt><kbd>Backspace</kbd></dt><dd>Undo the last sign</dd></div>
+          <div><dt><kbd>Enter</kbd></dt><dd>Translate</dd></div>
+          <div><dt><kbd>S</kbd></dt><dd>Speak the sentence</dd></div>
+        </dl>
+        <p class="muted small" id="model-info">Model: loading…</p>
+        <p class="muted small" id="offline-status">Offline use: not yet available.</p>
+        <p class="muted small">Sign videos open on <a class="link" href="https://www.signasl.org/" target="_blank" rel="noopener noreferrer">SignASL.org</a>. Source: <a class="link" href="https://github.com/Swapnil007-Curious/edge-vision" target="_blank" rel="noopener noreferrer">github.com/Swapnil007-Curious/edge-vision</a>.</p>
+      </div>
+    </dialog>
+
+    <div class="onboarding" id="onboarding" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" hidden>
+      <div class="onboarding-card glass-strong" id="onboarding-card">
+        <ol class="steps" aria-label="Steps">
+          <li data-step="1" aria-current="step">Camera</li>
+          <li data-step="2">Frame</li>
+          <li data-step="3">Try a sign</li>
+        </ol>
+        <h2 class="display" id="onboarding-title">Allow the camera</h2>
+        <p id="onboarding-body">Edge-Vision reads your hands from the camera to recognise signs. Video stays on this device; nothing is recorded. Your browser will ask for permission next.</p>
+        <div class="onboarding-actions">
+          <button type="button" class="button primary large" id="onboarding-primary">Allow camera</button>
+          <button type="button" class="button ghost" id="onboarding-skip">Skip</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

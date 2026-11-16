@@ -124,6 +124,7 @@ async function runClip(entry, config) {
   const url = `${origin}/?debug=1&model=${modelDirs[config.model]}`;
   await page.goto(url);
   await page.evaluate((value) => localStorage.setItem("edge-vision.settings.v3", JSON.stringify(value)), settingsFor(config));
+  await page.evaluate(() => localStorage.setItem("edge-vision.ui.v1", JSON.stringify({ onboarded: true })));
   await page.reload();
   await page.waitForFunction(() => window.__edgevision !== undefined);
   await page.evaluate(() => window.__edgevision.ready);

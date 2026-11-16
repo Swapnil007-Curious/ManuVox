@@ -1,16 +1,30 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defaultClientConditions } from "vite";
 import { defineConfig } from "vitest/config";
 import { CROSS_ORIGIN_ISOLATION_HEADERS, contentSecurityPolicy, serviceWorker } from "./config/plugins.ts";
+import { assertWorkerUrl, describeWorkerUrl, resolveWorkerUrl, workerOrigin, type SiteFile } from "./site-config.ts";
 
 // GitHub Pages serves the app under /edge-vision/; set BASE_PATH=/edge-vision/ for that build.
 const base = process.env.BASE_PATH ?? "/";
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const site = JSON.parse(readFileSync(new URL("./site.config.json", import.meta.url), "utf8")) as SiteFile;
+// The translation Worker's URL: VITE_WORKER_URL when non-blank (the Pages workflow passes the
+// repository variable WORKER_URL, "" when unset), else site.config.json. Empty: sentences are
+// joined on the device ("basic"); with REQUIRE_WORKER_URL=true the build fails instead.
+const worker = resolveWorkerUrl(process.env.VITE_WORKER_URL, site.workerUrl);
+if (process.argv.includes("build")) {
+  console.log(describeWorkerUrl(worker));
+  if (process.env.REQUIRE_WORKER_URL === "true") assertWorkerUrl(worker);
+}
 
 export default defineConfig({
   base,
+  define: {
+    __WORKER_URL__: JSON.stringify(worker.value),
+  },
   plugins: [
-    contentSecurityPolicy(),
+    contentSecurityPolicy(workerOrigin(worker.value)),
     serviceWorker(fileURLToPath(new URL("./config/service-worker.template.js", import.meta.url))),
   ],
   resolve: {

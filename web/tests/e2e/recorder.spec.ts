@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { validateRecordingsFile, type RecordingsFile } from "../../src/recorder";
+import { skipOnboarding } from "./helpers";
 
 test.use({
   launchOptions: {
@@ -13,9 +14,22 @@ test.use({
 // here; the default takes k from the frame size) finds no shoulders and a held segment has no hand
 // frames: it is discarded by the segmenter and recorded as such.
 test("record test signs: one segment from the fake camera, downloaded and schema-valid", async ({ page }) => {
+  await skipOnboarding(page);
   await page.goto("./");
-  await expect(page.locator("#start")).toBeEnabled();
+  await expect(page.locator("#start")).toBeEnabled({ timeout: 120_000 });
 
+  // Advanced settings: hold-to-record capture and the calibrated aspect mode.
+  await page.locator("#open-settings").click();
+  await page.locator("#settings-dialog details.advanced > summary").click();
+  await page.locator('input[name="mode"][value="manual"]').check();
+  await page.locator('input[name="aspectMode"][value="auto"]').check();
+  await page.locator('#settings-dialog button[value="close"]').click();
+
+  await page.locator("#start").click();
+  await expect(page.locator("#status")).toHaveText(/Running/, { timeout: 120_000 });
+
+  // Record test signs lives in the diagnostics drawer.
+  await page.locator("#diag-toggle").click();
   await page.locator("#recorder-details > summary").click();
   await page.locator("#recorder-on").check();
   await page.locator("#label-search").fill("bir");
@@ -23,20 +37,15 @@ test("record test signs: one segment from the fake camera, downloaded and schema
   await expect(page.locator("#label-select")).toBeFocused();
   await page.locator("#label-select").selectOption({ label: "bird" });
   await expect(page.locator("#recorder-status")).toContainText("bird");
-
-  await page.locator('input[name="mode"][value="manual"]').check();
-  await page.locator("#settings-details > summary").click();
-  await page.locator('input[name="aspectMode"][value="auto"]').check();
-  await page.locator("#start").click();
-  await expect(page.locator("#status")).toHaveText(/Running/, { timeout: 120_000 });
   await expect(page.locator("#calibration-status")).toContainText("Move back so your shoulders are visible", { timeout: 60_000 });
-  await expect(page.locator("#diag-aspect")).toContainText("k 1.000");
+  await page.locator("#diag-close").click();
 
   const record = page.locator("#record");
   await record.focus();
   await page.keyboard.down("Enter");
   await page.waitForTimeout(1500);
   await page.keyboard.up("Enter");
+  await page.locator("#diag-toggle").click();
   await expect(page.locator("#recorder-status")).toContainText("1 recording", { timeout: 30_000 });
   await expect(page.locator("#segment-debug-text")).toContainText("discarded");
 
@@ -60,5 +69,6 @@ test("record test signs: one segment from the fake camera, downloaded and schema
     `recorder: ${recording.frames.t_ms.length} frames, pose ran on ${recording.frames.pose_ran.filter(Boolean).length}, ` +
       `camera ${recording.camera.width}x${recording.camera.height}, landmarks: ${await page.locator("#diag-mediapipe").textContent()}`,
   );
-  await page.locator("#stop").click();
+  await page.locator("#diag-close").click();
+  await page.locator("#camera-toggle").click();
 });

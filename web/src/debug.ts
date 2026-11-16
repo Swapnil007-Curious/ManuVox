@@ -1,5 +1,6 @@
 // Test hook, installed only when the page URL has ?debug=1.
 
+import type { SegmentResult } from "./engine";
 import type { WebMeta } from "./meta";
 import type { LongRows, SequenceInfo } from "./preprocess";
 import type { RecordingsFile } from "./recorder";
@@ -52,6 +53,12 @@ export interface DebugHook {
   status(): DebugStatus;
   /** Stop the camera; a sign in progress is still recognised. */
   stop(): void;
+  /** Start the 60-second benchmark (the camera must be running); false when it cannot start. */
+  startBenchmark(): boolean;
+  /** Show a result as if a segment had just been classified (screenshots and UI tests). */
+  simulate(result: SegmentResult): void;
+  /** Drop real segments' results and guesses (simulate still shows its own). */
+  muteResults(on: boolean): void;
 }
 
 declare global {

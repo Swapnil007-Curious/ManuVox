@@ -42,3 +42,16 @@ export function argmax(values: readonly number[]): number {
 export function maxAbsDiff(a: readonly number[], b: readonly number[]): number {
   return a.reduce((max, value, i) => Math.max(max, Math.abs(value - (b[i] as number))), 0);
 }
+
+/** Mark the first-run overlay as done, so tests reach the app directly. */
+export async function skipOnboarding(page: Page, extra: Record<string, unknown> = {}): Promise<void> {
+  await page.addInitScript((prefs) => {
+    try {
+      // Merged with what is stored, so a reload keeps preferences the test changed.
+      const stored = JSON.parse(localStorage.getItem("edge-vision.ui.v1") ?? "{}") as Record<string, unknown>;
+      localStorage.setItem("edge-vision.ui.v1", JSON.stringify({ ...prefs, ...stored, onboarded: true }));
+    } catch {
+      // Storage blocked: the overlay can still be skipped by the test.
+    }
+  }, extra);
+}

@@ -1,0 +1,1756 @@
+{
+ "description": "The demo's 250 signs (the model's labels, in model order): the gloss shown in the app, plain English words for the offline sentence joiner, the slug of the external dictionary page (https://www.signasl.org/sign/<slug>, every slug checked to return videos on 2026-11-16) and a short handshape/motion reminder. Descriptions are reminders, not instruction; regional variants exist.",
+ "dictionary": "https://www.signasl.org/sign/",
+ "signs": [
+  {
+   "label": "TV",
+   "gloss": "TV",
+   "words": "TV",
+   "slug": "tv",
+   "description": "Fingerspell T-V."
+  },
+  {
+   "label": "after",
+   "gloss": "AFTER",
+   "words": "after",
+   "slug": "after",
+   "description": "Dominant flat hand starts on the back of the other hand and moves forward, off and away."
+  },
+  {
+   "label": "airplane",
+   "gloss": "AIRPLANE",
+   "words": "airplane",
+   "slug": "airplane",
+   "description": "Thumb, index and pinky out, palm down, the hand flies forward through the air."
+  },
+  {
+   "label": "all",
+   "gloss": "ALL",
+   "words": "all",
+   "slug": "all",
+   "description": "Dominant hand circles around the other open palm and lands in it."
+  },
+  {
+   "label": "alligator",
+   "gloss": "ALLIGATOR",
+   "words": "alligator",
+   "slug": "alligator",
+   "description": "Both hands clawed, one above the other, snap open and shut like jaws."
+  },
+  {
+   "label": "animal",
+   "gloss": "ANIMAL",
+   "words": "animal",
+   "slug": "animal",
+   "description": "Bent fingertips on the chest, hands rock in and out."
+  },
+  {
+   "label": "another",
+   "gloss": "ANOTHER",
+   "words": "another",
+   "slug": "another",
+   "description": "Thumb-up fist flips over and out to the side."
+  },
+  {
+   "label": "any",
+   "gloss": "ANY",
+   "words": "any",
+   "slug": "any",
+   "description": "Thumb-up fist twists from palm in to palm out."
+  },
+  {
+   "label": "apple",
+   "gloss": "APPLE",
+   "words": "apple",
+   "slug": "apple",
+   "description": "Knuckle of a bent index finger twists against the cheek."
+  },
+  {
+   "label": "arm",
+   "gloss": "ARM",
+   "words": "arm",
+   "slug": "arm",
+   "description": "Dominant hand slides up along the other forearm."
+  },
+  {
+   "label": "aunt",
+   "gloss": "AUNT",
+   "words": "aunt",
+   "slug": "aunt",
+   "description": "A-hand (fist, thumb alongside) near the cheek, shaken slightly."
+  },
+  {
+   "label": "awake",
+   "gloss": "AWAKE",
+   "words": "awake",
+   "slug": "awake",
+   "description": "Pinched thumbs and index fingers beside the eyes spring open."
+  },
+  {
+   "label": "backyard",
+   "gloss": "BACKYARD",
+   "words": "backyard",
+   "slug": "backyard",
+   "description": "Thumb points back over the shoulder, then both flat hands sweep out over an area."
+  },
+  {
+   "label": "bad",
+   "gloss": "BAD",
+   "words": "bad",
+   "slug": "bad",
+   "description": "Fingertips touch the lips, then the hand turns down and drops away."
+  },
+  {
+   "label": "balloon",
+   "gloss": "BALLOON",
+   "words": "balloon",
+   "slug": "balloon",
+   "description": "Hands start at the mouth and spread apart in a sphere, as if blowing it up."
+  },
+  {
+   "label": "bath",
+   "gloss": "BATH",
+   "words": "bath",
+   "slug": "bath",
+   "description": "Fists rub up and down on the chest, like washing."
+  },
+  {
+   "label": "because",
+   "gloss": "BECAUSE",
+   "words": "because",
+   "slug": "because",
+   "description": "Index finger touches the forehead, then pulls out into a thumb-up fist."
+  },
+  {
+   "label": "bed",
+   "gloss": "BED",
+   "words": "bed",
+   "slug": "bed",
+   "description": "Head tilts onto the flat palm, like a pillow."
+  },
+  {
+   "label": "bedroom",
+   "gloss": "BEDROOM",
+   "words": "bedroom",
+   "slug": "bedroom",
+   "description": "BED (head on the palm), then ROOM (flat hands outline a box)."
+  },
+  {
+   "label": "bee",
+   "gloss": "BEE",
+   "words": "bee",
+   "slug": "bee",
+   "description": "Index finger touches the cheek, then the hand brushes it away."
+  },
+  {
+   "label": "before",
+   "gloss": "BEFORE",
+   "words": "before",
+   "slug": "before",
+   "description": "Back of the dominant hand moves toward you, away from the other palm."
+  },
+  {
+   "label": "beside",
+   "gloss": "BESIDE",
+   "words": "beside",
+   "slug": "beside",
+   "description": "Dominant flat hand moves along next to the other flat hand."
+  },
+  {
+   "label": "better",
+   "gloss": "BETTER",
+   "words": "better",
+   "slug": "better",
+   "description": "Flat hand at the chin moves out and closes into a thumb-up fist."
+  },
+  {
+   "label": "bird",
+   "gloss": "BIRD",
+   "words": "bird",
+   "slug": "bird",
+   "description": "Index finger and thumb open and close at the mouth like a beak."
+  },
+  {
+   "label": "black",
+   "gloss": "BLACK",
+   "words": "black",
+   "slug": "black",
+   "description": "Index finger slides across the forehead."
+  },
+  {
+   "label": "blow",
+   "gloss": "BLOW",
+   "words": "blow",
+   "slug": "blow",
+   "description": "Hand near the mouth springs open as if blowing air out."
+  },
+  {
+   "label": "blue",
+   "gloss": "BLUE",
+   "words": "blue",
+   "slug": "blue",
+   "description": "B-hand (flat, thumb tucked) twists back and forth."
+  },
+  {
+   "label": "boat",
+   "gloss": "BOAT",
+   "words": "boat",
+   "slug": "boat",
+   "description": "Cupped hands side by side form a hull and bob forward."
+  },
+  {
+   "label": "book",
+   "gloss": "BOOK",
+   "words": "book",
+   "slug": "book",
+   "description": "Flat palms together open like a book."
+  },
+  {
+   "label": "boy",
+   "gloss": "BOY",
+   "words": "boy",
+   "slug": "boy",
+   "description": "Hand at the forehead opens and closes, like gripping a cap's brim."
+  },
+  {
+   "label": "brother",
+   "gloss": "BROTHER",
+   "words": "brother",
+   "slug": "brother",
+   "description": "L-hand starts at the forehead and comes down onto the other L-hand."
+  },
+  {
+   "label": "brown",
+   "gloss": "BROWN",
+   "words": "brown",
+   "slug": "brown",
+   "description": "B-hand slides down the cheek."
+  },
+  {
+   "label": "bug",
+   "gloss": "BUG",
+   "words": "bug",
+   "slug": "bug",
+   "description": "Thumb on the nose, index and middle fingers bend twice like antennae."
+  },
+  {
+   "label": "bye",
+   "gloss": "BYE",
+   "words": "bye",
+   "slug": "bye",
+   "description": "Open hand waves."
+  },
+  {
+   "label": "callonphone",
+   "gloss": "PHONE-CALL",
+   "words": "call",
+   "slug": "phone",
+   "description": "Thumb and pinky out (Y-hand) held at the ear like a phone."
+  },
+  {
+   "label": "can",
+   "gloss": "CAN",
+   "words": "can",
+   "slug": "can",
+   "description": "Both fists move down together firmly."
+  },
+  {
+   "label": "car",
+   "gloss": "CAR",
+   "words": "car",
+   "slug": "car",
+   "description": "Both fists steer an imaginary wheel."
+  },
+  {
+   "label": "carrot",
+   "gloss": "CARROT",
+   "words": "carrot",
+   "slug": "carrot",
+   "description": "Fist near the mouth twists, as if munching a carrot."
+  },
+  {
+   "label": "cat",
+   "gloss": "CAT",
+   "words": "cat",
+   "slug": "cat",
+   "description": "Pinched fingers pull out from the cheek like whiskers."
+  },
+  {
+   "label": "cereal",
+   "gloss": "CEREAL",
+   "words": "cereal",
+   "slug": "cereal",
+   "description": "Bent index finger brushes across the chin repeatedly."
+  },
+  {
+   "label": "chair",
+   "gloss": "CHAIR",
+   "words": "chair",
+   "slug": "chair",
+   "description": "Two bent fingers tap twice onto the other hand's two fingers, like sitting."
+  },
+  {
+   "label": "cheek",
+   "gloss": "CHEEK",
+   "words": "cheek",
+   "slug": "cheek",
+   "description": "Index finger touches the cheek."
+  },
+  {
+   "label": "child",
+   "gloss": "CHILD",
+   "words": "child",
+   "slug": "child",
+   "description": "Flat palm, facing down, pats the air at a child's height."
+  },
+  {
+   "label": "chin",
+   "gloss": "CHIN",
+   "words": "chin",
+   "slug": "chin",
+   "description": "Index finger touches the chin."
+  },
+  {
+   "label": "chocolate",
+   "gloss": "CHOCOLATE",
+   "words": "chocolate",
+   "slug": "chocolate",
+   "description": "C-hand circles on the back of the other hand."
+  },
+  {
+   "label": "clean",
+   "gloss": "CLEAN",
+   "words": "clean",
+   "slug": "clean",
+   "description": "Flat palm wipes across the other flat palm."
+  },
+  {
+   "label": "close",
+   "gloss": "CLOSE",
+   "words": "close",
+   "slug": "close",
+   "description": "Both flat hands swing together, like doors closing."
+  },
+  {
+   "label": "closet",
+   "gloss": "CLOSET",
+   "words": "closet",
+   "slug": "closet",
+   "description": "Hooked index finger slides along the other index finger, like hangers on a rail."
+  },
+  {
+   "label": "cloud",
+   "gloss": "CLOUD",
+   "words": "cloud",
+   "slug": "cloud",
+   "description": "Both clawed hands circle above the head, outlining clouds."
+  },
+  {
+   "label": "clown",
+   "gloss": "CLOWN",
+   "words": "clown",
+   "slug": "clown",
+   "description": "Clawed hand in front of the nose, like a round clown nose."
+  },
+  {
+   "label": "cow",
+   "gloss": "COW",
+   "words": "cow",
+   "slug": "cow",
+   "description": "Thumb and pinky out, thumb at the temple, the hand twists forward like a horn."
+  },
+  {
+   "label": "cowboy",
+   "gloss": "COWBOY",
+   "words": "cowboy",
+   "slug": "cowboy",
+   "description": "Both hands at the hips, thumbs and index fingers out, like holstered pistols."
+  },
+  {
+   "label": "cry",
+   "gloss": "CRY",
+   "words": "cry",
+   "slug": "cry",
+   "description": "Index fingers trace tears down both cheeks."
+  },
+  {
+   "label": "cut",
+   "gloss": "CUT",
+   "words": "cut",
+   "slug": "cut",
+   "description": "Index and middle fingers snip like scissors."
+  },
+  {
+   "label": "cute",
+   "gloss": "CUTE",
+   "words": "cute",
+   "slug": "cute",
+   "description": "Index and middle fingers brush down the chin."
+  },
+  {
+   "label": "dad",
+   "gloss": "DAD",
+   "words": "dad",
+   "slug": "dad",
+   "description": "Thumb of the open hand taps the forehead."
+  },
+  {
+   "label": "dance",
+   "gloss": "DANCE",
+   "words": "dance",
+   "slug": "dance",
+   "description": "Two fingers swing back and forth over the other flat palm, like dancing legs."
+  },
+  {
+   "label": "dirty",
+   "gloss": "DIRTY",
+   "words": "dirty",
+   "slug": "dirty",
+   "description": "Back of the hand under the chin, fingers wiggle."
+  },
+  {
+   "label": "dog",
+   "gloss": "DOG",
+   "words": "dog",
+   "slug": "dog",
+   "description": "Pat the thigh, then snap the fingers."
+  },
+  {
+   "label": "doll",
+   "gloss": "DOLL",
+   "words": "doll",
+   "slug": "doll",
+   "description": "Hooked index finger brushes down the nose."
+  },
+  {
+   "label": "donkey",
+   "gloss": "DONKEY",
+   "words": "donkey",
+   "slug": "donkey",
+   "description": "Flat hand at the temple bends forward and back, like a floppy ear."
+  },
+  {
+   "label": "down",
+   "gloss": "DOWN",
+   "words": "down",
+   "slug": "down",
+   "description": "Index finger points down."
+  },
+  {
+   "label": "drawer",
+   "gloss": "DRAWER",
+   "words": "drawer",
+   "slug": "drawer",
+   "description": "Both hands grip and pull an imaginary drawer toward you."
+  },
+  {
+   "label": "drink",
+   "gloss": "DRINK",
+   "words": "drink",
+   "slug": "drink",
+   "description": "C-hand tips toward the mouth, like a cup."
+  },
+  {
+   "label": "drop",
+   "gloss": "DROP",
+   "words": "drop",
+   "slug": "drop",
+   "description": "Closed hand opens as it moves down, letting go."
+  },
+  {
+   "label": "dry",
+   "gloss": "DRY",
+   "words": "dry",
+   "slug": "dry",
+   "description": "Hooked index finger slides across the chin."
+  },
+  {
+   "label": "dryer",
+   "gloss": "DRYER",
+   "words": "dryer",
+   "slug": "dryer",
+   "description": "DRY (hooked index finger across the chin), then a machine sign."
+  },
+  {
+   "label": "duck",
+   "gloss": "DUCK",
+   "words": "duck",
+   "slug": "duck",
+   "description": "Index, middle finger and thumb open and close at the mouth like a bill."
+  },
+  {
+   "label": "ear",
+   "gloss": "EAR",
+   "words": "ear",
+   "slug": "ear",
+   "description": "Index finger touches the ear."
+  },
+  {
+   "label": "elephant",
+   "gloss": "ELEPHANT",
+   "words": "elephant",
+   "slug": "elephant",
+   "description": "Hand starts at the nose and curves down and out, tracing a trunk."
+  },
+  {
+   "label": "empty",
+   "gloss": "EMPTY",
+   "words": "empty",
+   "slug": "empty",
+   "description": "Middle finger slides across the back of the other hand."
+  },
+  {
+   "label": "every",
+   "gloss": "EVERY",
+   "words": "every",
+   "slug": "every",
+   "description": "Thumb of one fist brushes down the other fist's thumb, repeatedly."
+  },
+  {
+   "label": "eye",
+   "gloss": "EYE",
+   "words": "eye",
+   "slug": "eye",
+   "description": "Index finger points at the eye."
+  },
+  {
+   "label": "face",
+   "gloss": "FACE",
+   "words": "face",
+   "slug": "face",
+   "description": "Index finger circles the face."
+  },
+  {
+   "label": "fall",
+   "gloss": "FALL",
+   "words": "fall",
+   "slug": "fall",
+   "description": "Two fingers stand on the other palm, then flip over and fall."
+  },
+  {
+   "label": "farm",
+   "gloss": "FARM",
+   "words": "farm",
+   "slug": "farm",
+   "description": "Thumb of the open hand drags across the chin."
+  },
+  {
+   "label": "fast",
+   "gloss": "FAST",
+   "words": "fast",
+   "slug": "fast",
+   "description": "Both L-hands pull back quickly as the index fingers bend."
+  },
+  {
+   "label": "feet",
+   "gloss": "FEET",
+   "words": "feet",
+   "slug": "feet",
+   "description": "Point down at the feet."
+  },
+  {
+   "label": "find",
+   "gloss": "FIND",
+   "words": "find",
+   "slug": "find",
+   "description": "Hand above the other picks something up between thumb and index finger."
+  },
+  {
+   "label": "fine",
+   "gloss": "FINE",
+   "words": "fine",
+   "slug": "fine",
+   "description": "Thumb of the open hand taps the chest."
+  },
+  {
+   "label": "finger",
+   "gloss": "FINGER",
+   "words": "finger",
+   "slug": "finger",
+   "description": "Index finger touches the other index finger."
+  },
+  {
+   "label": "finish",
+   "gloss": "FINISH",
+   "words": "finish",
+   "slug": "finish",
+   "description": "Both open hands flip outward, palms turning down."
+  },
+  {
+   "label": "fireman",
+   "gloss": "FIREMAN",
+   "words": "fireman",
+   "slug": "fireman",
+   "description": "Flat hand, palm out, touches the forehead like a helmet badge."
+  },
+  {
+   "label": "first",
+   "gloss": "FIRST",
+   "words": "first",
+   "slug": "first",
+   "description": "Index finger taps the thumb of the other hand."
+  },
+  {
+   "label": "fish",
+   "gloss": "FISH",
+   "words": "fish",
+   "slug": "fish",
+   "description": "Flat hand wiggles forward like a swimming fish."
+  },
+  {
+   "label": "flag",
+   "gloss": "FLAG",
+   "words": "flag",
+   "slug": "flag",
+   "description": "Forearm upright with the elbow on the other hand; the hand waves like a flag."
+  },
+  {
+   "label": "flower",
+   "gloss": "FLOWER",
+   "words": "flower",
+   "slug": "flower",
+   "description": "Fingertips together touch one nostril, then the other."
+  },
+  {
+   "label": "food",
+   "gloss": "FOOD",
+   "words": "food",
+   "slug": "food",
+   "description": "Fingertips together tap the lips."
+  },
+  {
+   "label": "for",
+   "gloss": "FOR",
+   "words": "for",
+   "slug": "for",
+   "description": "Index finger at the temple twists forward and out."
+  },
+  {
+   "label": "frenchfries",
+   "gloss": "FRENCH-FRIES",
+   "words": "french fries",
+   "slug": "french-fries",
+   "description": "F-hand (thumb and index touching) bounces sideways twice."
+  },
+  {
+   "label": "frog",
+   "gloss": "FROG",
+   "words": "frog",
+   "slug": "frog",
+   "description": "Fingers flick out from under the chin."
+  },
+  {
+   "label": "garbage",
+   "gloss": "GARBAGE",
+   "words": "garbage",
+   "slug": "garbage",
+   "description": "Toss something down into the other hand's cupped 'bin'."
+  },
+  {
+   "label": "gift",
+   "gloss": "GIFT",
+   "words": "gift",
+   "slug": "gift",
+   "description": "Both hooked index fingers move forward together, handing over a present."
+  },
+  {
+   "label": "giraffe",
+   "gloss": "GIRAFFE",
+   "words": "giraffe",
+   "slug": "giraffe",
+   "description": "C-hand at the neck rises, tracing a long neck."
+  },
+  {
+   "label": "girl",
+   "gloss": "GIRL",
+   "words": "girl",
+   "slug": "girl",
+   "description": "Thumb of the fist traces down the jawline."
+  },
+  {
+   "label": "give",
+   "gloss": "GIVE",
+   "words": "give",
+   "slug": "give",
+   "description": "Fingertips-together hands move forward and open, handing something over."
+  },
+  {
+   "label": "glasswindow",
+   "gloss": "WINDOW",
+   "words": "window",
+   "slug": "window",
+   "description": "Flat hands stacked; the top one lifts and lowers like a window sash."
+  },
+  {
+   "label": "go",
+   "gloss": "GO",
+   "words": "go",
+   "slug": "go",
+   "description": "Both index fingers point and arc forward."
+  },
+  {
+   "label": "goose",
+   "gloss": "GOOSE",
+   "words": "goose",
+   "slug": "goose",
+   "description": "Like DUCK, the fingers open and close like a bill, with the arm held up for the long neck."
+  },
+  {
+   "label": "grandma",
+   "gloss": "GRANDMA",
+   "words": "grandma",
+   "slug": "grandma",
+   "description": "Thumb of the open hand at the chin, then arcs forward twice."
+  },
+  {
+   "label": "grandpa",
+   "gloss": "GRANDPA",
+   "words": "grandpa",
+   "slug": "grandpa",
+   "description": "Thumb of the open hand at the forehead, then arcs forward twice."
+  },
+  {
+   "label": "grass",
+   "gloss": "GRASS",
+   "words": "grass",
+   "slug": "grass",
+   "description": "Bent open hand brushes up under the chin."
+  },
+  {
+   "label": "green",
+   "gloss": "GREEN",
+   "words": "green",
+   "slug": "green",
+   "description": "G-hand (index and thumb pointing) twists back and forth."
+  },
+  {
+   "label": "gum",
+   "gloss": "GUM",
+   "words": "gum",
+   "slug": "gum",
+   "description": "Index and middle fingertips at the cheek bend up and down, like chewing."
+  },
+  {
+   "label": "hair",
+   "gloss": "HAIR",
+   "words": "hair",
+   "slug": "hair",
+   "description": "Pinch a lock of hair between thumb and index finger."
+  },
+  {
+   "label": "happy",
+   "gloss": "HAPPY",
+   "words": "happy",
+   "slug": "happy",
+   "description": "Flat hand brushes up the chest in circles."
+  },
+  {
+   "label": "hat",
+   "gloss": "HAT",
+   "words": "hat",
+   "slug": "hat",
+   "description": "Flat hand pats the top of the head."
+  },
+  {
+   "label": "hate",
+   "gloss": "HATE",
+   "words": "hate",
+   "slug": "hate",
+   "description": "Middle fingers flick out from the thumbs, away from you."
+  },
+  {
+   "label": "have",
+   "gloss": "HAVE",
+   "words": "have",
+   "slug": "have",
+   "description": "Bent fingertips of both hands touch the chest."
+  },
+  {
+   "label": "haveto",
+   "gloss": "HAVE-TO",
+   "words": "have to",
+   "slug": "have-to",
+   "description": "Hooked index finger bends down firmly, like MUST."
+  },
+  {
+   "label": "head",
+   "gloss": "HEAD",
+   "words": "head",
+   "slug": "head",
+   "description": "Bent fingers touch the temple, then the jaw."
+  },
+  {
+   "label": "hear",
+   "gloss": "HEAR",
+   "words": "hear",
+   "slug": "hear",
+   "description": "Index finger points to the ear."
+  },
+  {
+   "label": "helicopter",
+   "gloss": "HELICOPTER",
+   "words": "helicopter",
+   "slug": "helicopter",
+   "description": "Flat hand rests on the other index finger and shakes, like rotor blades."
+  },
+  {
+   "label": "hello",
+   "gloss": "HELLO",
+   "words": "hello",
+   "slug": "hello",
+   "description": "Flat hand salutes out from the forehead."
+  },
+  {
+   "label": "hen",
+   "gloss": "HEN",
+   "words": "hen",
+   "slug": "hen",
+   "description": "Index and thumb open and close at the mouth (BIRD), then peck at the other palm."
+  },
+  {
+   "label": "hesheit",
+   "gloss": "HE/SHE/IT",
+   "words": "he",
+   "slug": "he",
+   "description": "Point at the person or thing."
+  },
+  {
+   "label": "hide",
+   "gloss": "HIDE",
+   "words": "hide",
+   "slug": "hide",
+   "description": "Thumb of the fist at the lips, then it slips under the other cupped hand."
+  },
+  {
+   "label": "high",
+   "gloss": "HIGH",
+   "words": "high",
+   "slug": "high",
+   "description": "Two fingers held sideways rise up."
+  },
+  {
+   "label": "home",
+   "gloss": "HOME",
+   "words": "home",
+   "slug": "home",
+   "description": "Fingertips together tap near the mouth, then near the ear."
+  },
+  {
+   "label": "horse",
+   "gloss": "HORSE",
+   "words": "horse",
+   "slug": "horse",
+   "description": "Thumb at the temple, two fingers bend up and down like an ear."
+  },
+  {
+   "label": "hot",
+   "gloss": "HOT",
+   "words": "hot",
+   "slug": "hot",
+   "description": "Clawed hand at the mouth twists out and away."
+  },
+  {
+   "label": "hungry",
+   "gloss": "HUNGRY",
+   "words": "hungry",
+   "slug": "hungry",
+   "description": "C-hand moves down the chest."
+  },
+  {
+   "label": "icecream",
+   "gloss": "ICE-CREAM",
+   "words": "ice cream",
+   "slug": "ice-cream",
+   "description": "Fist near the mouth moves down twice, like licking a cone."
+  },
+  {
+   "label": "if",
+   "gloss": "IF",
+   "words": "if",
+   "slug": "if",
+   "description": "F-hands (thumb and index touching) move alternately up and down, like weighing."
+  },
+  {
+   "label": "into",
+   "gloss": "INTO",
+   "words": "into",
+   "slug": "into",
+   "description": "Fingertips-together hand slides into the other C-hand."
+  },
+  {
+   "label": "jacket",
+   "gloss": "JACKET",
+   "words": "jacket",
+   "slug": "jacket",
+   "description": "Thumbs of both fists slide down the chest along a coat's edges."
+  },
+  {
+   "label": "jeans",
+   "gloss": "JEANS",
+   "words": "jeans",
+   "slug": "jeans",
+   "description": "Pinky fingers brush down the front of the hips."
+  },
+  {
+   "label": "jump",
+   "gloss": "JUMP",
+   "words": "jump",
+   "slug": "jump",
+   "description": "Two fingers jump up off the other flat palm."
+  },
+  {
+   "label": "kiss",
+   "gloss": "KISS",
+   "words": "kiss",
+   "slug": "kiss",
+   "description": "Fingertips touch the lips, then the cheek."
+  },
+  {
+   "label": "kitty",
+   "gloss": "KITTY",
+   "words": "kitty",
+   "slug": "kitty",
+   "description": "Pinched fingers pull out from the cheek like whiskers."
+  },
+  {
+   "label": "lamp",
+   "gloss": "LAMP",
+   "words": "lamp",
+   "slug": "lamp",
+   "description": "Hand hanging down opens, like light spreading from a bulb."
+  },
+  {
+   "label": "later",
+   "gloss": "LATER",
+   "words": "later",
+   "slug": "later",
+   "description": "L-hand pivots forward on the other palm."
+  },
+  {
+   "label": "like",
+   "gloss": "LIKE",
+   "words": "like",
+   "slug": "like",
+   "description": "Thumb and middle finger pull out from the chest and close together."
+  },
+  {
+   "label": "lion",
+   "gloss": "LION",
+   "words": "lion",
+   "slug": "lion",
+   "description": "Clawed hand moves back over the head, like a mane."
+  },
+  {
+   "label": "lips",
+   "gloss": "LIPS",
+   "words": "lips",
+   "slug": "lips",
+   "description": "Index finger traces the lips."
+  },
+  {
+   "label": "listen",
+   "gloss": "LISTEN",
+   "words": "listen",
+   "slug": "listen",
+   "description": "Bent hand cups the ear."
+  },
+  {
+   "label": "look",
+   "gloss": "LOOK",
+   "words": "look",
+   "slug": "look",
+   "description": "Two fingers point out from the eyes."
+  },
+  {
+   "label": "loud",
+   "gloss": "LOUD",
+   "words": "loud",
+   "slug": "loud",
+   "description": "Index finger at the ear, then both hands shake outward."
+  },
+  {
+   "label": "mad",
+   "gloss": "MAD",
+   "words": "mad",
+   "slug": "mad",
+   "description": "Clawed hand in front of the face, fingers tense."
+  },
+  {
+   "label": "make",
+   "gloss": "MAKE",
+   "words": "make",
+   "slug": "make",
+   "description": "Fists stacked; the top one twists back and forth."
+  },
+  {
+   "label": "man",
+   "gloss": "MAN",
+   "words": "man",
+   "slug": "man",
+   "description": "Thumb of the open hand at the forehead, then at the chest."
+  },
+  {
+   "label": "many",
+   "gloss": "MANY",
+   "words": "many",
+   "slug": "many",
+   "description": "Fists flick open into open hands, palms up, twice."
+  },
+  {
+   "label": "milk",
+   "gloss": "MILK",
+   "words": "milk",
+   "slug": "milk",
+   "description": "Fist squeezes open and closed, like milking."
+  },
+  {
+   "label": "minemy",
+   "gloss": "MY/MINE",
+   "words": "my",
+   "slug": "my",
+   "description": "Flat palm on the chest."
+  },
+  {
+   "label": "mitten",
+   "gloss": "MITTEN",
+   "words": "mitten",
+   "slug": "mitten",
+   "description": "Outline a mitten's thumb and hand around the other hand."
+  },
+  {
+   "label": "mom",
+   "gloss": "MOM",
+   "words": "mom",
+   "slug": "mom",
+   "description": "Thumb of the open hand taps the chin."
+  },
+  {
+   "label": "moon",
+   "gloss": "MOON",
+   "words": "moon",
+   "slug": "moon",
+   "description": "Curved thumb and index finger beside the eye, then lifted toward the sky."
+  },
+  {
+   "label": "morning",
+   "gloss": "MORNING",
+   "words": "morning",
+   "slug": "morning",
+   "description": "Flat hand rises from the crook of the other arm, like the sun coming up."
+  },
+  {
+   "label": "mouse",
+   "gloss": "MOUSE",
+   "words": "mouse",
+   "slug": "mouse",
+   "description": "Index finger brushes across the tip of the nose."
+  },
+  {
+   "label": "mouth",
+   "gloss": "MOUTH",
+   "words": "mouth",
+   "slug": "mouth",
+   "description": "Index finger circles the mouth."
+  },
+  {
+   "label": "nap",
+   "gloss": "NAP",
+   "words": "nap",
+   "slug": "nap",
+   "description": "Flat palm at the cheek; the head tilts briefly, as if dozing."
+  },
+  {
+   "label": "napkin",
+   "gloss": "NAPKIN",
+   "words": "napkin",
+   "slug": "napkin",
+   "description": "Fingertips wipe across the lips in small circles."
+  },
+  {
+   "label": "night",
+   "gloss": "NIGHT",
+   "words": "night",
+   "slug": "night",
+   "description": "Bent hand dips over the back of the other hand, like the sun setting."
+  },
+  {
+   "label": "no",
+   "gloss": "NO",
+   "words": "no",
+   "slug": "no",
+   "description": "Index and middle fingers snap shut onto the thumb."
+  },
+  {
+   "label": "noisy",
+   "gloss": "NOISY",
+   "words": "noisy",
+   "slug": "noisy",
+   "description": "Index fingers at the ears, then both hands shake outward."
+  },
+  {
+   "label": "nose",
+   "gloss": "NOSE",
+   "words": "nose",
+   "slug": "nose",
+   "description": "Index finger touches the nose."
+  },
+  {
+   "label": "not",
+   "gloss": "NOT",
+   "words": "not",
+   "slug": "not",
+   "description": "Thumb of the fist flicks out from under the chin."
+  },
+  {
+   "label": "now",
+   "gloss": "NOW",
+   "words": "now",
+   "slug": "now",
+   "description": "Both bent hands, palms up, drop slightly."
+  },
+  {
+   "label": "nuts",
+   "gloss": "NUTS",
+   "words": "nuts",
+   "slug": "nuts",
+   "description": "Thumb flicks forward from behind the front teeth."
+  },
+  {
+   "label": "old",
+   "gloss": "OLD",
+   "words": "old",
+   "slug": "old",
+   "description": "Fist at the chin pulls down, like stroking a beard."
+  },
+  {
+   "label": "on",
+   "gloss": "ON",
+   "words": "on",
+   "slug": "on",
+   "description": "Flat hand lands on the back of the other hand."
+  },
+  {
+   "label": "open",
+   "gloss": "OPEN",
+   "words": "open",
+   "slug": "open",
+   "description": "Both flat hands side by side swing apart, like doors opening."
+  },
+  {
+   "label": "orange",
+   "gloss": "ORANGE",
+   "words": "orange",
+   "slug": "orange",
+   "description": "Fist at the mouth squeezes open and closed."
+  },
+  {
+   "label": "outside",
+   "gloss": "OUTSIDE",
+   "words": "outside",
+   "slug": "outside",
+   "description": "Open hand pulls up out of the other C-hand and closes."
+  },
+  {
+   "label": "owie",
+   "gloss": "OUCH",
+   "words": "ouch",
+   "slug": "hurt",
+   "description": "Index fingers point at each other and twist, like HURT."
+  },
+  {
+   "label": "owl",
+   "gloss": "OWL",
+   "words": "owl",
+   "slug": "owl",
+   "description": "Circles of thumb and fingers around the eyes twist, like big owl eyes."
+  },
+  {
+   "label": "pajamas",
+   "gloss": "PAJAMAS",
+   "words": "pajamas",
+   "slug": "pajamas",
+   "description": "Hand closes down over the face (SLEEP), then thumbs brush down the chest (CLOTHES)."
+  },
+  {
+   "label": "pen",
+   "gloss": "PEN",
+   "words": "pen",
+   "slug": "pen",
+   "description": "Write on the palm with pinched thumb and index finger."
+  },
+  {
+   "label": "pencil",
+   "gloss": "PENCIL",
+   "words": "pencil",
+   "slug": "pencil",
+   "description": "Pinched fingers touch the lips, then write on the palm."
+  },
+  {
+   "label": "penny",
+   "gloss": "PENNY",
+   "words": "penny",
+   "slug": "penny",
+   "description": "Index finger at the temple flicks forward."
+  },
+  {
+   "label": "person",
+   "gloss": "PERSON",
+   "words": "person",
+   "slug": "person",
+   "description": "P-hands move straight down at the sides of the body."
+  },
+  {
+   "label": "pig",
+   "gloss": "PIG",
+   "words": "pig",
+   "slug": "pig",
+   "description": "Flat hand under the chin, fingers bend down and up."
+  },
+  {
+   "label": "pizza",
+   "gloss": "PIZZA",
+   "words": "pizza",
+   "slug": "pizza",
+   "description": "Fingerspell P-Z-Z-A, or a bent V-hand brings a slice to the mouth."
+  },
+  {
+   "label": "please",
+   "gloss": "PLEASE",
+   "words": "please",
+   "slug": "please",
+   "description": "Flat palm circles on the chest."
+  },
+  {
+   "label": "police",
+   "gloss": "POLICE",
+   "words": "police",
+   "slug": "police",
+   "description": "C-hand taps the left side of the chest, like a badge."
+  },
+  {
+   "label": "pool",
+   "gloss": "POOL",
+   "words": "pool",
+   "slug": "pool",
+   "description": "Hands sweep forward and apart, like swimming strokes."
+  },
+  {
+   "label": "potty",
+   "gloss": "POTTY",
+   "words": "potty",
+   "slug": "potty",
+   "description": "T-hand (thumb between index and middle) shakes side to side."
+  },
+  {
+   "label": "pretend",
+   "gloss": "PRETEND",
+   "words": "pretend",
+   "slug": "pretend",
+   "description": "Index finger at the temple circles, then moves forward, like imagining."
+  },
+  {
+   "label": "pretty",
+   "gloss": "PRETTY",
+   "words": "pretty",
+   "slug": "pretty",
+   "description": "Open hand circles the face and closes at the chin."
+  },
+  {
+   "label": "puppy",
+   "gloss": "PUPPY",
+   "words": "puppy",
+   "slug": "puppy",
+   "description": "Pat the thigh and snap the fingers (DOG), small and quick."
+  },
+  {
+   "label": "puzzle",
+   "gloss": "PUZZLE",
+   "words": "puzzle",
+   "slug": "puzzle",
+   "description": "Both hands fit imaginary puzzle pieces together."
+  },
+  {
+   "label": "quiet",
+   "gloss": "QUIET",
+   "words": "quiet",
+   "slug": "quiet",
+   "description": "Index finger at the lips, then both flat hands lower to the sides."
+  },
+  {
+   "label": "radio",
+   "gloss": "RADIO",
+   "words": "radio",
+   "slug": "radio",
+   "description": "Cupped hands over the ears twist, like headphones."
+  },
+  {
+   "label": "rain",
+   "gloss": "RAIN",
+   "words": "rain",
+   "slug": "rain",
+   "description": "Clawed hands drop down, fingers wiggling."
+  },
+  {
+   "label": "read",
+   "gloss": "READ",
+   "words": "read",
+   "slug": "read",
+   "description": "Two fingers move down over the other flat palm, like eyes scanning a page."
+  },
+  {
+   "label": "red",
+   "gloss": "RED",
+   "words": "red",
+   "slug": "red",
+   "description": "Index finger brushes down the lips."
+  },
+  {
+   "label": "refrigerator",
+   "gloss": "REFRIGERATOR",
+   "words": "refrigerator",
+   "slug": "refrigerator",
+   "description": "Fingerspell R-E-F, or both fists pull open an imaginary fridge door."
+  },
+  {
+   "label": "ride",
+   "gloss": "RIDE",
+   "words": "ride",
+   "slug": "ride",
+   "description": "Two bent fingers sit in the other C-hand and move forward together."
+  },
+  {
+   "label": "room",
+   "gloss": "ROOM",
+   "words": "room",
+   "slug": "room",
+   "description": "Flat hands outline a box: front and back walls, then the sides."
+  },
+  {
+   "label": "sad",
+   "gloss": "SAD",
+   "words": "sad",
+   "slug": "sad",
+   "description": "Both open hands slide down in front of the face."
+  },
+  {
+   "label": "same",
+   "gloss": "SAME",
+   "words": "same",
+   "slug": "same",
+   "description": "Index fingers side by side tap together."
+  },
+  {
+   "label": "say",
+   "gloss": "SAY",
+   "words": "say",
+   "slug": "say",
+   "description": "Index finger at the lips flicks forward."
+  },
+  {
+   "label": "scissors",
+   "gloss": "SCISSORS",
+   "words": "scissors",
+   "slug": "scissors",
+   "description": "Index and middle fingers open and close like scissors."
+  },
+  {
+   "label": "see",
+   "gloss": "SEE",
+   "words": "see",
+   "slug": "see",
+   "description": "Two fingers move forward from the eyes."
+  },
+  {
+   "label": "shhh",
+   "gloss": "SHH",
+   "words": "shh",
+   "slug": "shh",
+   "description": "Index finger held to the lips."
+  },
+  {
+   "label": "shirt",
+   "gloss": "SHIRT",
+   "words": "shirt",
+   "slug": "shirt",
+   "description": "Pinch the shirt fabric near the shoulder."
+  },
+  {
+   "label": "shoe",
+   "gloss": "SHOE",
+   "words": "shoe",
+   "slug": "shoe",
+   "description": "Fists tap together twice."
+  },
+  {
+   "label": "shower",
+   "gloss": "SHOWER",
+   "words": "shower",
+   "slug": "shower",
+   "description": "Fist above the head opens downward, like spraying water."
+  },
+  {
+   "label": "sick",
+   "gloss": "SICK",
+   "words": "sick",
+   "slug": "sick",
+   "description": "Middle finger touches the forehead; the other middle finger touches the stomach."
+  },
+  {
+   "label": "sleep",
+   "gloss": "SLEEP",
+   "words": "sleep",
+   "slug": "sleep",
+   "description": "Open hand closes down over the face as the eyes close."
+  },
+  {
+   "label": "sleepy",
+   "gloss": "SLEEPY",
+   "words": "sleepy",
+   "slug": "sleepy",
+   "description": "Hand in front of the face droops down, eyes closing."
+  },
+  {
+   "label": "smile",
+   "gloss": "SMILE",
+   "words": "smile",
+   "slug": "smile",
+   "description": "Index fingers trace a smile up the cheeks."
+  },
+  {
+   "label": "snack",
+   "gloss": "SNACK",
+   "words": "snack",
+   "slug": "snack",
+   "description": "Pinched fingers tap the mouth briefly, picking at food."
+  },
+  {
+   "label": "snow",
+   "gloss": "SNOW",
+   "words": "snow",
+   "slug": "snow",
+   "description": "Both open hands drift down, fingers wiggling."
+  },
+  {
+   "label": "stairs",
+   "gloss": "STAIRS",
+   "words": "stairs",
+   "slug": "stairs",
+   "description": "Fingers climb up, step by step."
+  },
+  {
+   "label": "stay",
+   "gloss": "STAY",
+   "words": "stay",
+   "slug": "stay",
+   "description": "Thumb and pinky out (Y-hand), the hand pushes down and stays."
+  },
+  {
+   "label": "sticky",
+   "gloss": "STICKY",
+   "words": "sticky",
+   "slug": "sticky",
+   "description": "Middle finger touches the thumb and pulls apart, as if stuck."
+  },
+  {
+   "label": "store",
+   "gloss": "STORE",
+   "words": "store",
+   "slug": "store",
+   "description": "Fingertips-together hands swing forward and back at the wrists."
+  },
+  {
+   "label": "story",
+   "gloss": "STORY",
+   "words": "story",
+   "slug": "story",
+   "description": "Thumbs and index fingers link and pull apart repeatedly, like a chain of events."
+  },
+  {
+   "label": "stuck",
+   "gloss": "STUCK",
+   "words": "stuck",
+   "slug": "stuck",
+   "description": "V-hand jabs toward the throat."
+  },
+  {
+   "label": "sun",
+   "gloss": "SUN",
+   "words": "sun",
+   "slug": "sun",
+   "description": "Index finger circles above the head, then the hand opens down like rays."
+  },
+  {
+   "label": "table",
+   "gloss": "TABLE",
+   "words": "table",
+   "slug": "table",
+   "description": "Forearms stacked; the top one pats the bottom one."
+  },
+  {
+   "label": "talk",
+   "gloss": "TALK",
+   "words": "talk",
+   "slug": "talk",
+   "description": "Index finger moves out from the lips, repeatedly."
+  },
+  {
+   "label": "taste",
+   "gloss": "TASTE",
+   "words": "taste",
+   "slug": "taste",
+   "description": "Middle finger touches the lips."
+  },
+  {
+   "label": "thankyou",
+   "gloss": "THANK-YOU",
+   "words": "thank you",
+   "slug": "thank-you",
+   "description": "Flat hand moves forward from the chin."
+  },
+  {
+   "label": "that",
+   "gloss": "THAT",
+   "words": "that",
+   "slug": "that",
+   "description": "Thumb and pinky out (Y-hand), it taps down on the other flat palm."
+  },
+  {
+   "label": "there",
+   "gloss": "THERE",
+   "words": "there",
+   "slug": "there",
+   "description": "Index finger points to a place over there."
+  },
+  {
+   "label": "think",
+   "gloss": "THINK",
+   "words": "think",
+   "slug": "think",
+   "description": "Index finger touches the temple."
+  },
+  {
+   "label": "thirsty",
+   "gloss": "THIRSTY",
+   "words": "thirsty",
+   "slug": "thirsty",
+   "description": "Index finger traces down the throat."
+  },
+  {
+   "label": "tiger",
+   "gloss": "TIGER",
+   "words": "tiger",
+   "slug": "tiger",
+   "description": "Clawed hands pull out from the face, like stripes."
+  },
+  {
+   "label": "time",
+   "gloss": "TIME",
+   "words": "time",
+   "slug": "time",
+   "description": "Index finger taps the back of the other wrist, like a watch."
+  },
+  {
+   "label": "tomorrow",
+   "gloss": "TOMORROW",
+   "words": "tomorrow",
+   "slug": "tomorrow",
+   "description": "Thumb of the fist on the cheek arcs forward."
+  },
+  {
+   "label": "tongue",
+   "gloss": "TONGUE",
+   "words": "tongue",
+   "slug": "tongue",
+   "description": "Index finger points to the tongue."
+  },
+  {
+   "label": "tooth",
+   "gloss": "TOOTH",
+   "words": "tooth",
+   "slug": "tooth",
+   "description": "Index finger taps a front tooth."
+  },
+  {
+   "label": "toothbrush",
+   "gloss": "TOOTHBRUSH",
+   "words": "toothbrush",
+   "slug": "toothbrush",
+   "description": "Index finger brushes side to side in front of the teeth."
+  },
+  {
+   "label": "touch",
+   "gloss": "TOUCH",
+   "words": "touch",
+   "slug": "touch",
+   "description": "Middle finger taps the back of the other hand."
+  },
+  {
+   "label": "toy",
+   "gloss": "TOY",
+   "words": "toy",
+   "slug": "toy",
+   "description": "T-hands (thumb between index and middle) twist back and forth."
+  },
+  {
+   "label": "tree",
+   "gloss": "TREE",
+   "words": "tree",
+   "slug": "tree",
+   "description": "Elbow on the other hand; the upright open hand twists like branches in the wind."
+  },
+  {
+   "label": "uncle",
+   "gloss": "UNCLE",
+   "words": "uncle",
+   "slug": "uncle",
+   "description": "U-hand (two fingers up) at the temple, shaken slightly."
+  },
+  {
+   "label": "underwear",
+   "gloss": "UNDERWEAR",
+   "words": "underwear",
+   "slug": "underwear",
+   "description": "Index fingers trace the waistband and leg openings of underwear."
+  },
+  {
+   "label": "up",
+   "gloss": "UP",
+   "words": "up",
+   "slug": "up",
+   "description": "Index finger points up."
+  },
+  {
+   "label": "vacuum",
+   "gloss": "VACUUM",
+   "words": "vacuum",
+   "slug": "vacuum",
+   "description": "Bent hand moves back and forth over the other palm, like a vacuum head."
+  },
+  {
+   "label": "wait",
+   "gloss": "WAIT",
+   "words": "wait",
+   "slug": "wait",
+   "description": "Both open hands, palms up, wiggle the fingers."
+  },
+  {
+   "label": "wake",
+   "gloss": "WAKE",
+   "words": "wake",
+   "slug": "wake",
+   "description": "Pinched thumbs and index fingers beside the eyes spring open."
+  },
+  {
+   "label": "water",
+   "gloss": "WATER",
+   "words": "water",
+   "slug": "water",
+   "description": "W-hand (three fingers up) taps the chin."
+  },
+  {
+   "label": "wet",
+   "gloss": "WET",
+   "words": "wet",
+   "slug": "wet",
+   "description": "Fingers rub against the thumbs as the hands lower, feeling something damp."
+  },
+  {
+   "label": "weus",
+   "gloss": "WE/US",
+   "words": "we",
+   "slug": "we",
+   "description": "Index finger touches one shoulder, then arcs over to the other."
+  },
+  {
+   "label": "where",
+   "gloss": "WHERE",
+   "words": "where",
+   "slug": "where",
+   "description": "Index finger wags side to side."
+  },
+  {
+   "label": "white",
+   "gloss": "WHITE",
+   "words": "white",
+   "slug": "white",
+   "description": "Open hand on the chest pulls out and closes."
+  },
+  {
+   "label": "who",
+   "gloss": "WHO",
+   "words": "who",
+   "slug": "who",
+   "description": "Index finger circles in front of the lips."
+  },
+  {
+   "label": "why",
+   "gloss": "WHY",
+   "words": "why",
+   "slug": "why",
+   "description": "Fingertips touch the forehead, then pull out into a Y-hand."
+  },
+  {
+   "label": "will",
+   "gloss": "WILL",
+   "words": "will",
+   "slug": "will",
+   "description": "Flat hand beside the head moves forward, like FUTURE."
+  },
+  {
+   "label": "wolf",
+   "gloss": "WOLF",
+   "words": "wolf",
+   "slug": "wolf",
+   "description": "Open hand at the nose pulls forward and closes, tracing a snout."
+  },
+  {
+   "label": "yellow",
+   "gloss": "YELLOW",
+   "words": "yellow",
+   "slug": "yellow",
+   "description": "Thumb and pinky out (Y-hand) twists back and forth."
+  },
+  {
+   "label": "yes",
+   "gloss": "YES",
+   "words": "yes",
+   "slug": "yes",
+   "description": "Fist nods up and down."
+  },
+  {
+   "label": "yesterday",
+   "gloss": "YESTERDAY",
+   "words": "yesterday",
+   "slug": "yesterday",
+   "description": "Thumb of the fist on the cheek arcs back toward the ear."
+  },
+  {
+   "label": "yourself",
+   "gloss": "YOURSELF",
+   "words": "yourself",
+   "slug": "yourself",
+   "description": "Thumb-up fist pushes toward the person."
+  },
+  {
+   "label": "yucky",
+   "gloss": "YUCKY",
+   "words": "yucky",
+   "slug": "yucky",
+   "description": "Fingers pinch near the nose, then flick away."
+  },
+  {
+   "label": "zebra",
+   "gloss": "ZEBRA",
+   "words": "zebra",
+   "slug": "zebra",
+   "description": "Both clawed hands drag across the chest, tracing stripes."
+  },
+  {
+   "label": "zipper",
+   "gloss": "ZIPPER",
+   "words": "zipper",
+   "slug": "zipper",
+   "description": "Pinched fingers pull up the front of the body, like zipping a jacket."
+  }
+ ]
+}

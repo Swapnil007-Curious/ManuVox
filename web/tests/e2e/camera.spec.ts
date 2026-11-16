@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { skipOnboarding } from "./helpers";
 
 test.use({
   launchOptions: {
@@ -7,7 +8,7 @@ test.use({
   permissions: ["camera"],
 });
 
-test("camera smoke: the pipeline starts and the FPS counter updates", async ({ page, baseURL }) => {
+test("camera smoke: the pipeline starts, the stage shows the video and the fps chip updates", async ({ page, baseURL }) => {
   const origin = new URL(baseURL as string).origin;
   const foreign: string[] = [];
   const cspViolations: string[] = [];
@@ -18,24 +19,25 @@ test("camera smoke: the pipeline starts and the FPS counter updates", async ({ p
   page.on("console", (message) => {
     if (message.text().includes("Content Security Policy")) cspViolations.push(message.text());
   });
-
+  await skipOnboarding(page);
   await page.goto("./");
   const start = page.locator("#start");
-  await expect(start).toBeEnabled();
+  await expect(start).toBeEnabled({ timeout: 120_000 });
   await start.click();
   await expect(page.locator("#status")).toHaveText(/Running/, { timeout: 120_000 });
+  await expect(page.locator("#stage")).toHaveAttribute("data-running", "true");
+  await expect(page.locator("#video")).toBeVisible();
+  await expect(page.locator("#status-pill")).toHaveAttribute("data-state", /idle|signing|reading/);
   await expect
-    .poll(async () => Number.parseFloat((await page.locator("#fps").textContent()) ?? ""), { timeout: 60_000 })
+    .poll(async () => Number.parseFloat((await page.locator("#diag-fps").textContent()) ?? ""), { timeout: 60_000 })
     .toBeGreaterThan(0);
-  await expect(page.locator("#preview")).toBeVisible();
-  // Let a few more frames through so the logged numbers are not from the first frame alone.
-  const totalSamples = page.locator("#perf-body tr").last().locator("td").last();
-  await expect.poll(async () => Number((await totalSamples.textContent()) ?? 0), { timeout: 60_000 }).toBeGreaterThanOrEqual(20);
-  const fps = await page.locator("#fps").textContent();
-  const rows = await page.locator("#perf-body tr").allTextContents();
-  console.log(`camera smoke: FPS ${fps}; ${rows.join(" | ")}`);
-
-  await page.locator("#stop").click();
+  await page.locator("#diag-toggle").click();
+  await expect(page.locator("#diagnostics")).toBeVisible();
+  await expect(page.locator("#fps")).toHaveText(/fps/);
+  console.log(`camera smoke: ${await page.locator("#fps").textContent()}; ${await page.locator("#diag-backend").textContent()}`);
+  await page.locator("#diag-close").click();
+  await page.locator("#camera-toggle").click();
+  await expect(page.locator("#stage")).toHaveAttribute("data-running", "false");
   await expect(page.locator("#status")).not.toHaveText(/failed|Could not/);
   expect(foreign, "requests to other origins").toEqual([]);
   expect(cspViolations, "Content-Security-Policy violations").toEqual([]);

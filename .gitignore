@@ -35,6 +35,7 @@ results_bundle.zip
 # Web demo: dependencies, fetched third-party assets (npm run fetch-assets) and test output.
 web/node_modules/
 web/dist/
+web/dist-shots/
 web/public/mediapipe/
 web/test-results/
 web/playwright-report/

@@ -7,22 +7,28 @@ import { join, relative, resolve, sep } from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
 
 /**
- * connect-src 'self' makes the browser refuse any request to another origin, whatever a library
- * tries. 'wasm-unsafe-eval' allows WebAssembly compilation only, not JavaScript eval.
+ * connect-src 'self' (plus the translation Worker's origin when one is configured) makes the
+ * browser refuse any other request, whatever a library tries. 'wasm-unsafe-eval' allows
+ * WebAssembly compilation only, not JavaScript eval.
  */
-export const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self' 'wasm-unsafe-eval'",
-  "style-src 'self'",
-  "img-src 'self' data: blob:",
-  "media-src 'self' blob: mediastream:",
-  "connect-src 'self'",
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'none'",
-].join("; ");
+export function contentSecurityPolicyText(workerOrigin = ""): string {
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'wasm-unsafe-eval'",
+    "style-src 'self'",
+    "img-src 'self' data: blob:",
+    "media-src 'self' blob: mediastream:",
+    `connect-src 'self'${workerOrigin ? ` ${workerOrigin}` : ""}`,
+    "font-src 'self'",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'none'",
+  ].join("; ");
+}
+
+export const CONTENT_SECURITY_POLICY = contentSecurityPolicyText();
 
 /**
  * Cross-origin isolation: SharedArrayBuffer, and so onnxruntime-web's wasm threads, needs
@@ -37,7 +43,7 @@ export const CROSS_ORIGIN_ISOLATION_HEADERS: Record<string, string> = {
   "Cross-Origin-Resource-Policy": "same-origin",
 };
 
-export function contentSecurityPolicy(): Plugin {
+export function contentSecurityPolicy(workerOrigin = ""): Plugin {
   return {
     name: "edge-vision-csp",
     apply: "build",
@@ -45,7 +51,7 @@ export function contentSecurityPolicy(): Plugin {
       return [
         {
           tag: "meta",
-          attrs: { "http-equiv": "Content-Security-Policy", content: CONTENT_SECURITY_POLICY },
+          attrs: { "http-equiv": "Content-Security-Policy", content: contentSecurityPolicyText(workerOrigin) },
           injectTo: "head-prepend",
         },
       ];

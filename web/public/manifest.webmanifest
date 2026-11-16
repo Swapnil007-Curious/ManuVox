@@ -1,12 +1,14 @@
 {
-  "name": "Edge-Vision",
+  "name": "Edge-Vision: sign to speech",
   "short_name": "Edge-Vision",
-  "description": "Recognises isolated signs from your webcam, entirely on this device.",
+  "description": "Recognises 250 isolated ASL signs from your webcam on this device and builds simple sentences. Not a full ASL translator.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0b0c0c",
-  "theme_color": "#0b0c0c",
+  "orientation": "any",
+  "background_color": "#0F1115",
+  "theme_color": "#0F1115",
+  "categories": ["accessibility", "education", "utilities"],
   "icons": [
     { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

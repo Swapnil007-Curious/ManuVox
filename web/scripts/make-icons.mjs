@@ -1,5 +1,6 @@
-// Generate the app icons (SVG and PNG) into public/icons/ without image libraries: a yellow lens
-// ring with a white centre on the app's dark background. Run with `npm run icons`.
+// Generate the app icons (SVG and PNG) into public/icons/ without image libraries: the Duet mark,
+// two overlapping circles in the hand colours (left periwinkle, right peach) whose overlap is the
+// accent gold, on the app's graphite background. Run with `npm run icons`.
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -7,9 +8,10 @@ import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
 
 const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "icons");
-const BACKGROUND = [0x0b, 0x0c, 0x0c];
-const RING = [0xff, 0xdd, 0x00];
-const CENTRE = [0xff, 0xff, 0xff];
+const BACKGROUND = [0x0f, 0x11, 0x15];
+const LEFT = [0x7a, 0xa2, 0xff];
+const RIGHT = [0xff, 0x9e, 0x7a];
+const BOTH = [0xf5, 0xd7, 0x6e];
 const SAMPLES = 4;
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
@@ -62,15 +64,16 @@ function png(size, colourAt) {
   ]);
 }
 
-/** Lens design in unit coordinates; `scale` shrinks it for the maskable safe zone. */
-function lens(scale) {
-  const outer = 0.36 * scale;
-  const inner = 0.25 * scale;
-  const centre = 0.11 * scale;
+/** The mark in unit coordinates; `scale` shrinks it for the maskable safe zone. */
+function duet(scale) {
+  const r = 0.2 * scale;
+  const dx = 0.115 * scale;
   return (u, v) => {
-    const r = Math.hypot(u - 0.5, v - 0.5);
-    if (r <= centre) return CENTRE;
-    if (r <= outer && r >= inner) return RING;
+    const left = Math.hypot(u - (0.5 - dx), v - 0.5) <= r;
+    const right = Math.hypot(u - (0.5 + dx), v - 0.5) <= r;
+    if (left && right) return BOTH;
+    if (left) return LEFT;
+    if (right) return RIGHT;
     return BACKGROUND;
   };
 }
@@ -78,15 +81,17 @@ function lens(scale) {
 const hex = (colour) => `#${colour.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
 
 const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="18" fill="${hex(BACKGROUND)}"/>
-  <circle cx="50" cy="50" r="30.5" fill="none" stroke="${hex(RING)}" stroke-width="11"/>
-  <circle cx="50" cy="50" r="11" fill="${hex(CENTRE)}"/>
+  <rect width="100" height="100" rx="22" fill="${hex(BACKGROUND)}"/>
+  <defs><clipPath id="l"><circle cx="38.5" cy="50" r="20"/></clipPath></defs>
+  <circle cx="38.5" cy="50" r="20" fill="${hex(LEFT)}"/>
+  <circle cx="61.5" cy="50" r="20" fill="${hex(RIGHT)}"/>
+  <circle cx="61.5" cy="50" r="20" fill="${hex(BOTH)}" clip-path="url(#l)"/>
 </svg>
 `;
 
 await mkdir(OUT_DIR, { recursive: true });
 await writeFile(join(OUT_DIR, "icon.svg"), SVG);
-await writeFile(join(OUT_DIR, "icon-192.png"), png(192, lens(1)));
-await writeFile(join(OUT_DIR, "icon-512.png"), png(512, lens(1)));
-await writeFile(join(OUT_DIR, "icon-maskable-512.png"), png(512, lens(0.8)));
+await writeFile(join(OUT_DIR, "icon-192.png"), png(192, duet(1.25)));
+await writeFile(join(OUT_DIR, "icon-512.png"), png(512, duet(1.25)));
+await writeFile(join(OUT_DIR, "icon-maskable-512.png"), png(512, duet(1)));
 console.log(`icons written to ${OUT_DIR}`);
