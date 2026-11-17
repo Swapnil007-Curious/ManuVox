@@ -1,0 +1,306 @@
+% Every entry is checked by scripts/verify_references.py against the ACL Anthology, the arXiv API,
+% Crossref (DOI) or the official proceedings page; the result is paper/data/reference_verification.json.
+% Each entry names its identifier in doi, eprint (arXiv), anthology or url.
+
+% ---------------------------------------------------------------- data and trackers
+@misc{kaggle2023islr,
+  author = {{Google}},
+  title = {Google - Isolated Sign Language Recognition},
+  howpublished = {Kaggle competition},
+  year = {2023},
+  url = {https://www.kaggle.com/competitions/asl-signs},
+  note = {Data licensed CC BY 4.0, provided by the Deaf Professional Arts Network and the Georgia Institute of Technology}
+}
+
+@inproceedings{starner2023popsign,
+  author = {Starner, Thad and Forbes, Sean and So, Matthew and Martin, David and Sridhar, Rohit and Deshpande, Gururaj and Sepah, Sam and Shahryar, Sahir and Bhardwaj, Khushi and Kwok, Tyler and Sehyr, Zed and Lewis, Kaitlyn and Fong, Chenyu and Burnett, Rachel and Shah, Raj and Patel, Ruchir and others},
+  title = {{PopSign ASL} v1.0: An Isolated {American Sign Language} Dataset Collected via Smartphones},
+  booktitle = {Advances in Neural Information Processing Systems 36 (Datasets and Benchmarks Track)},
+  year = {2023},
+  url = {https://proceedings.neurips.cc/paper_files/paper/2023/hash/00dada608b8db212ea7d9d92b24c68de-Abstract-Datasets_and_Benchmarks.html}
+}
+
+@article{lugaresi2019mediapipe,
+  author = {Lugaresi, Camillo and Tang, Jiuqiang and Nash, Hadon and McClanahan, Chris and Uboweja, Esha and Hays, Michael and Zhang, Fan and Chang, Chuo-Ling and Yong, Ming Guang and Lee, Juhyun and Chang, Wan-Teh and Hua, Wei and Georg, Manfred and Grundmann, Matthias},
+  title = {{MediaPipe}: A Framework for Building Perception Pipelines},
+  journal = {arXiv preprint arXiv:1906.08172},
+  year = {2019},
+  eprint = {1906.08172}
+}
+
+@article{zhang2020mediapipehands,
+  author = {Zhang, Fan and Bazarevsky, Valentin and Vakunov, Andrey and Tkachenka, Andrei and Sung, George and Chang, Chuo-Ling and Grundmann, Matthias},
+  title = {{MediaPipe Hands}: On-device Real-time Hand Tracking},
+  journal = {arXiv preprint arXiv:2006.10214},
+  year = {2020},
+  eprint = {2006.10214}
+}
+
+@article{bazarevsky2020blazepose,
+  author = {Bazarevsky, Valentin and Grishchenko, Ivan and Raveendran, Karthik and Zhu, Tyler and Zhang, Fan and Grundmann, Matthias},
+  title = {{BlazePose}: On-device Real-time Body Pose Tracking},
+  journal = {arXiv preprint arXiv:2006.10204},
+  year = {2020},
+  eprint = {2006.10204}
+}
+
+% ---------------------------------------------------------------- sign language recognition
+@inproceedings{li2020wlasl,
+  author = {Li, Dongxu and Rodriguez, Cristian and Yu, Xin and Li, Hongdong},
+  title = {Word-level Deep Sign Language Recognition from Video: A New Large-scale Dataset and Methods Comparison},
+  booktitle = {Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+  year = {2020},
+  eprint = {1910.11006}
+}
+
+@inproceedings{desai2023aslcitizen,
+  author = {Desai, Aashaka and Berger, Lauren and Minakov, Fyodor O. and Milan, Vanessa and Singh, Chinmay and Pumphrey, Kriston and Ladner, Richard E. and Daum{\'e} III, Hal and Lu, Alex X. and Caselli, Naomi and Bragg, Danielle},
+  title = {{ASL Citizen}: A Community-Sourced Dataset for Advancing Isolated Sign Language Recognition},
+  booktitle = {Advances in Neural Information Processing Systems 36 (Datasets and Benchmarks Track)},
+  year = {2023},
+  eprint = {2304.05934}
+}
+
+@inproceedings{sridhar2020include,
+  author = {Sridhar, Advaith and Ganesan, Rohith Gandhi and Kumar, Pratyush and Khapra, Mitesh},
+  title = {{INCLUDE}: A Large Scale Dataset for {Indian} Sign Language Recognition},
+  booktitle = {Proceedings of the 28th ACM International Conference on Multimedia},
+  pages = {1366--1375},
+  year = {2020},
+  doi = {10.1145/3394171.3413528}
+}
+
+@inproceedings{selvaraj2022openhands,
+  author = {Selvaraj, Prem and Nc, Gokul and Kumar, Pratyush and Khapra, Mitesh},
+  title = {{OpenHands}: Making Sign Language Recognition Accessible with Pose-based Pretrained Models across Languages},
+  booktitle = {Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
+  pages = {2114--2133},
+  year = {2022},
+  anthology = {2022.acl-long.150}
+}
+
+@inproceedings{bohacek2022spoter,
+  author = {Boh{\'a}{\v{c}}ek, Maty{\'a}{\v{s}} and Hr{\'u}z, Marek},
+  title = {Sign Pose-based Transformer for Word-level Sign Language Recognition},
+  booktitle = {Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision Workshops (WACVW)},
+  pages = {182--191},
+  year = {2022},
+  doi = {10.1109/WACVW54805.2022.00024}
+}
+
+@inproceedings{moryossef2021pose,
+  author = {Moryossef, Amit and Tsochantaridis, Ioannis and Dinn, Joe and Camgoz, Necati Cihan and Bowden, Richard and Jiang, Tao and Rios, Annette and Muller, Mathias and Ebling, Sarah},
+  title = {Evaluating the Immediate Applicability of Pose Estimation for Sign Language Recognition},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW)},
+  year = {2021},
+  eprint = {2104.10166}
+}
+
+% ---------------------------------------------------------------- architectures and training
+@inproceedings{cho2014gru,
+  author = {Cho, Kyunghyun and van Merri{\"e}nboer, Bart and Gulcehre, Caglar and Bahdanau, Dzmitry and Bougares, Fethi and Schwenk, Holger and Bengio, Yoshua},
+  title = {Learning Phrase Representations using {RNN} Encoder--Decoder for Statistical Machine Translation},
+  booktitle = {Proceedings of the 2014 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  pages = {1724--1734},
+  year = {2014},
+  anthology = {D14-1179}
+}
+
+@inproceedings{vaswani2017attention,
+  author = {Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N. and Kaiser, {\L}ukasz and Polosukhin, Illia},
+  title = {Attention Is All You Need},
+  booktitle = {Advances in Neural Information Processing Systems 30},
+  year = {2017},
+  eprint = {1706.03762}
+}
+
+@article{bai2018tcn,
+  author = {Bai, Shaojie and Kolter, J. Zico and Koltun, Vladlen},
+  title = {An Empirical Evaluation of Generic Convolutional and Recurrent Networks for Sequence Modeling},
+  journal = {arXiv preprint arXiv:1803.01271},
+  year = {2018},
+  eprint = {1803.01271}
+}
+
+@article{howard2017mobilenets,
+  author = {Howard, Andrew G. and Zhu, Menglong and Chen, Bo and Kalenichenko, Dmitry and Wang, Weijun and Weyand, Tobias and Andreetto, Marco and Adam, Hartwig},
+  title = {{MobileNets}: Efficient Convolutional Neural Networks for Mobile Vision Applications},
+  journal = {arXiv preprint arXiv:1704.04861},
+  year = {2017},
+  eprint = {1704.04861}
+}
+
+@inproceedings{gulati2020conformer,
+  author = {Gulati, Anmol and Qin, James and Chiu, Chung-Cheng and Parmar, Niki and Zhang, Yu and Yu, Jiahui and Han, Wei and Wang, Shibo and Zhang, Zhengdong and Wu, Yonghui and Pang, Ruoming},
+  title = {Conformer: Convolution-augmented Transformer for Speech Recognition},
+  booktitle = {Proceedings of Interspeech 2020},
+  year = {2020},
+  eprint = {2005.08100}
+}
+
+@article{polyak1992averaging,
+  author = {Polyak, B. T. and Juditsky, A. B.},
+  title = {Acceleration of Stochastic Approximation by Averaging},
+  journal = {SIAM Journal on Control and Optimization},
+  volume = {30},
+  number = {4},
+  pages = {838--855},
+  year = {1992},
+  doi = {10.1137/0330046}
+}
+
+% ---------------------------------------------------------------- efficient inference
+@inproceedings{jacob2018quantization,
+  author = {Jacob, Benoit and Kligys, Skirmantas and Chen, Bo and Zhu, Menglong and Tang, Matthew and Howard, Andrew and Adam, Hartwig and Kalenichenko, Dmitry},
+  title = {Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year = {2018},
+  eprint = {1712.05877}
+}
+
+@article{nagel2021whitepaper,
+  author = {Nagel, Markus and Fournarakis, Marios and Amjad, Rana Ali and Bondarenko, Yelysei and van Baalen, Mart and Blankevoort, Tijmen},
+  title = {A White Paper on Neural Network Quantization},
+  journal = {arXiv preprint arXiv:2106.08295},
+  year = {2021},
+  eprint = {2106.08295}
+}
+
+@inproceedings{sculley2015debt,
+  author = {Sculley, D. and Holt, Gary and Golovin, Daniel and Davydov, Eugene and Phillips, Todd and Ebner, Dietmar and Chaudhary, Vinay and Young, Michael and Crespo, Jean-Fran{\c{c}}ois and Dennison, Dan},
+  title = {Hidden Technical Debt in Machine Learning Systems},
+  booktitle = {Advances in Neural Information Processing Systems 28},
+  year = {2015},
+  url = {https://proceedings.neurips.cc/paper/2015/hash/86df7dcfd896fcaf2674f757a2463eba-Abstract.html}
+}
+
+@inproceedings{breck2017mltestscore,
+  author = {Breck, Eric and Cai, Shanqing and Nielsen, Eric and Salib, Michael and Sculley, D.},
+  title = {The {ML} Test Score: A Rubric for {ML} Production Readiness and Technical Debt Reduction},
+  booktitle = {2017 IEEE International Conference on Big Data (Big Data)},
+  pages = {1123--1132},
+  year = {2017},
+  doi = {10.1109/BigData.2017.8258038}
+}
+
+@inproceedings{guo2017calibration,
+  author = {Guo, Chuan and Pleiss, Geoff and Sun, Yu and Weinberger, Kilian Q.},
+  title = {On Calibration of Modern Neural Networks},
+  booktitle = {Proceedings of the 34th International Conference on Machine Learning (ICML)},
+  year = {2017},
+  eprint = {1706.04599}
+}
+
+@inproceedings{naeini2015ece,
+  author = {Pakdaman Naeini, Mahdi and Cooper, Gregory F. and Hauskrecht, Milos},
+  title = {Obtaining Well Calibrated Probabilities Using {Bayesian} Binning},
+  booktitle = {Proceedings of the Twenty-Ninth AAAI Conference on Artificial Intelligence},
+  year = {2015},
+  doi = {10.1609/aaai.v29i1.9602}
+}
+
+@inproceedings{geifman2017selective,
+  author = {Geifman, Yonatan and El-Yaniv, Ran},
+  title = {Selective Classification for Deep Neural Networks},
+  booktitle = {Advances in Neural Information Processing Systems 30},
+  year = {2017},
+  eprint = {1705.08500}
+}
+
+% ---------------------------------------------------------------- statistics
+@article{dror2017replicability,
+  author = {Dror, Rotem and Baumer, Gili and Bogomolov, Marina and Reichart, Roi},
+  title = {Replicability Analysis for Natural Language Processing: Testing Significance with Multiple Datasets},
+  journal = {Transactions of the Association for Computational Linguistics},
+  volume = {5},
+  pages = {471--486},
+  year = {2017},
+  anthology = {Q17-1033}
+}
+
+@book{efron1994bootstrap,
+  author = {Efron, Bradley and Tibshirani, Robert J.},
+  title = {An Introduction to the Bootstrap},
+  publisher = {Chapman and Hall/CRC},
+  year = {1994},
+  doi = {10.1201/9780429246593}
+}
+
+@inproceedings{dror2018hitchhiker,
+  author = {Dror, Rotem and Baumer, Gili and Shlomov, Segev and Reichart, Roi},
+  title = {The Hitchhiker's Guide to Testing Statistical Significance in Natural Language Processing},
+  booktitle = {Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
+  pages = {1383--1392},
+  year = {2018},
+  anthology = {P18-1128}
+}
+
+% ---------------------------------------------------------------- accessibility and ethics
+@inproceedings{bragg2019interdisciplinary,
+  author = {Bragg, Danielle and Koller, Oscar and Bellard, Mary and Berke, Larwan and Boudreault, Patrick and Braffort, Annelies and Caselli, Naomi and Huenerfauth, Matt and Kacorri, Hernisa and Verhoef, Tessa and Vogler, Christian and Ringel Morris, Meredith},
+  title = {Sign Language Recognition, Generation, and Translation: An Interdisciplinary Perspective},
+  booktitle = {Proceedings of the 21st International ACM SIGACCESS Conference on Computers and Accessibility (ASSETS)},
+  pages = {16--31},
+  year = {2019},
+  doi = {10.1145/3308561.3353774}
+}
+
+@inproceedings{yin2021including,
+  author = {Yin, Kayo and Moryossef, Amit and Hochgesang, Julie and Goldberg, Yoav and Alikhani, Malihe},
+  title = {Including Signed Languages in Natural Language Processing},
+  booktitle = {Proceedings of the 59th Annual Meeting of the Association for Computational Linguistics and the 11th International Joint Conference on Natural Language Processing (Volume 1: Long Papers)},
+  pages = {7347--7360},
+  year = {2021},
+  anthology = {2021.acl-long.570}
+}
+
+@article{fox2023bestpractices,
+  author = {Fox, Neil and Woll, Bencie and Cormier, Kearsy},
+  title = {Best Practices for Sign Language Technology Research},
+  journal = {Universal Access in the Information Society},
+  year = {2023},
+  doi = {10.1007/s10209-023-01039-1}
+}
+
+@article{humphries2012deprivation,
+  author = {Humphries, Tom and Kushalnagar, Poorna and Mathur, Gaurav and Napoli, Donna Jo and Padden, Carol and Rathmann, Christian and Smith, Scott R.},
+  title = {Language Acquisition for Deaf Children: Reducing the Harms of Zero Tolerance to the Use of Alternative Approaches},
+  journal = {Harm Reduction Journal},
+  volume = {9},
+  pages = {16},
+  year = {2012},
+  doi = {10.1186/1477-7517-9-16}
+}
+
+@inproceedings{card2020power,
+  author = {Card, Dallas and Henderson, Peter and Khandelwal, Urvashi and Jia, Robin and Mahowald, Kyle and Jurafsky, Dan},
+  title = {With Little Power Comes Great Responsibility},
+  booktitle = {Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  pages = {9263--9274},
+  year = {2020},
+  anthology = {2020.emnlp-main.745}
+}
+
+@inproceedings{ovadia2019shift,
+  author = {Ovadia, Yaniv and Fertig, Emily and Ren, Jie and Nado, Zachary and Sculley, D. and Nowozin, Sebastian and Dillon, Joshua V. and Lakshminarayanan, Balaji and Snoek, Jasper},
+  title = {Can You Trust Your Model's Uncertainty? Evaluating Predictive Uncertainty Under Dataset Shift},
+  booktitle = {Advances in Neural Information Processing Systems 32},
+  year = {2019},
+  eprint = {1906.02530}
+}
+
+@inproceedings{renz2021segmentation,
+  author = {Renz, Katrin and Stache, Nicolaj C. and Albanie, Samuel and Varol, G{\"u}l},
+  title = {Sign Language Segmentation with Temporal Convolutional Networks},
+  booktitle = {Proceedings of the IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+  year = {2021},
+  eprint = {2011.12986}
+}
+
+@article{desai2024systemic,
+  author = {Desai, Aashaka and De Meulder, Maartje and Hochgesang, Julie A. and Kocab, Annemarie and Lu, Alex X.},
+  title = {Systemic Biases in Sign Language {AI} Research: A Deaf-Led Call to Reevaluate Research Agendas},
+  journal = {arXiv preprint arXiv:2403.02563},
+  year = {2024},
+  eprint = {2403.02563}
+}

@@ -1,0 +1,31 @@
+\section*{Ethics Statement}
+
+\paragraph{No evaluation with Deaf users.} We did not evaluate the system with Deaf or
+hard-of-hearing users, and no Deaf signer took part in its design. Sign language technology
+should be built with, and ideally led by, Deaf communities \citep{bragg2019interdisciplinary,
+yin2021including,fox2023bestpractices}, and Deaf researchers have criticized how often the field
+sets its agenda without them \citep{desai2024systemic}. This paper is an engineering study of one
+failure mode, the train--serve gap, and not a claim of usefulness to the people the technology is
+meant for.
+
+\paragraph{Practice mode can mislead learners.} Deaf children of hearing parents are at risk of
+language deprivation when no one around them signs \citep{humphries2012deprivation}, and practice
+tools are one motivation for this work. At the live accuracy we measured, however, the Practice
+mode would tell a learner that many correctly produced signs are wrong, and for some signs it fails
+every time; it could discourage learners or teach them to distort signs to please the model. It
+should report low-confidence results as ``not sure'' rather than ``try again'', state per-sign
+reliability, and be evaluated with learners and Deaf teachers before anyone relies on it.
+
+\paragraph{Overstating translation.} Calling a gloss classifier a translator misleads users about
+what it understands, and the app's main mode is still named \emph{Translate}. The app states that it
+recognizes a fixed set of isolated signs and is not a full ASL translator, shows ``not sure'' below
+its threshold, and labels rule-based sentences as basic, but a fluent generated sentence can lend
+false authority to wrong glosses. A tool that misrecognizes signs could cause harm if relied on in
+important conversations; it must not replace interpreters, and a name such as ``Recognize'' would
+describe the mode better.
+
+\paragraph{Data and consent.} The training data is the public Google ISLR release (CC BY 4.0) of
+landmarks, not video. The live clips show the author of this paper, who recorded them and consents
+to their use here; they are not released, and every figure in the paper shows landmarks only,
+never camera pixels. The app processes video on the device; when the user asks for a sentence, the
+recognized glosses, and nothing else, are sent to a third-party language model provider.

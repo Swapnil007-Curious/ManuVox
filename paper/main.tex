@@ -1,0 +1,71 @@
+% Edge-Vision research paper (preprint). Build: see paper/README.md (tectonic main.tex).
+% Every number in the text is a macro \V{key} from tables/numbers.tex, written by
+% scripts/paper_tables.py from the result files; do not type numbers by hand.
+\documentclass[11pt]{article}
+\usepackage[preprint]{acl}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{inconsolata}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
+\usepackage{enumitem}
+
+% ---------------------------------------------------------------- numbers
+\makeatletter
+\newcommand{\V}[1]{\ifcsname v@#1\endcsname\csname v@#1\endcsname\else
+  \PackageError{numbers}{Undefined number key #1 (rerun scripts/paper_tables.py)}{}\textbf{??#1??}\fi}
+\makeatother
+\input{tables/numbers.tex}
+
+% ---------------------------------------------------------------- author block helpers
+\newcommand{\surname}[1]{#1}
+\newcommand{\email}[1]{\texttt{#1}}
+
+% ---------------------------------------------------------------- misc
+\newcommand{\cfg}[1]{\texttt{#1}}
+% Facts only the author can supply; listed in paper/README.md (Author TODOs).
+\newcommand{\authortodo}[1]{\textcolor{red}{[TODO-AUTHOR: #1]}}
+\setlist{nosep,leftmargin=*}
+
+\title{Where Live Sign Recognition Breaks: Auditing the Train--Serve Gap of a Landmark-Based ASL Recognizer on a Low-Power Laptop}
+
+\author{Swapnil \surname{TODO} \\
+  Independent Researcher, India \\
+  \email{TODO}}
+
+\begin{document}
+\maketitle
+
+\input{sections/abstract}
+\input{sections/introduction}
+\input{sections/related}
+\input{sections/data}
+\input{sections/models}
+\input{sections/efficiency}
+\input{sections/livegap}
+\input{sections/system}
+\input{sections/conclusion}
+% ACL convention: Limitations and the ethics statement follow the conclusion and do not count
+% toward the page limit.
+\input{sections/limitations}
+\input{sections/ethics}
+
+\section*{Acknowledgments}
+\textbf{AI assistance disclosure:} TODO-AUTHOR-WRITES-THIS
+
+\bibliography{references}
+
+\appendix
+\input{sections/appendix}
+
+\end{document}

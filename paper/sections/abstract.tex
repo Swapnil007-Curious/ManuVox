@@ -1,0 +1,18 @@
+\begin{abstract}
+Landmark-based sign recognizers can score well on a benchmark split and still fail on a live
+webcam, because the serving pipeline does not reproduce the training features. We audit this
+train--serve gap for isolated American Sign Language recognition in the browser on a low-power
+laptop. On our signer-independent split of the Google ISLR data, a convolution--transformer hybrid
+reaches \V{m.d.top1}\% top-1, \V{cmp.ship.diff} points above a CNN baseline and better for each of
+the \V{data.testsigners} test signers, and classifies a sign in \V{b.wasm1.p50} ms in Chrome. The
+first deployment, with the CNN, recognized \V{lg.web.c0headbuild.top1}\% of \V{lg.clips} new webcam
+clips (\V{lg.signs} signs, one signer). We audit six candidate discrepancies and share one feature
+specification, checked by golden-fixture tests, between Python and the browser. With the hybrid
+and all fixes, clip top-1 reaches \V{lg.web.c6final.top1}\% in the browser and
+\V{lg.py.c6final.top1}\% with the training tracker, recovering \V{lg.web.recover}\% and
+\V{lg.py.recover}\% of the hybrid's drop from its test accuracy. Assigning hands to slots as the training tracker did has by far the
+largest effect; removing the aspect correction and switching to a motion-based segmenter each cost
+ten to twenty points, inconclusive with fifty clips. Temperature scaling lowers the test
+calibration error from \V{cal.test.ece0} to \V{cal.test.ece1}, but live it is
+\V{lg.cal.web.ece}.
+\end{abstract}

@@ -17,9 +17,17 @@ resolution crop. The masked fraction is recorded per clip in clips.json; --keep-
 the step. Byte-identical input clips are reported, since a duplicated file cannot carry two
 different sign labels.
 
+--camera handles direct webcam recordings instead (test_clips_v2/<label>_<take>.mp4): nothing
+is cropped, inpainted or flipped (the files are already in the unmirrored camera orientation),
+each frame is scaled to 640 px wide with its aspect ratio kept (1280 x 720 becomes 640 x 360) at
+the recording's own frame rate, and the label is the file name without "_<take>", matched to the
+model's vocabulary with underscores removed (thank_you -> thankyou).
+
 Needs opencv-python and imageio-ffmpeg (requirements-live.txt); run with the live tools venv:
 
     .venv-live/Scripts/python scripts/prepare_live_clips.py --clips test_clips --out data/live_clips
+    .venv-live/Scripts/python scripts/prepare_live_clips.py --camera --clips test_clips_v2 \\
+        --out data/live_clips_v2
 """
 
 import argparse
@@ -34,6 +42,8 @@ import imageio_ffmpeg
 import numpy as np
 
 OUT_WIDTH, OUT_HEIGHT = 640, 480
+CAMERA_WIDTH = 640  # --camera: width of the written frames; the height keeps the aspect ratio
+VOCABULARY = Path("web/public/model/meta.json")  # labels of the shipped model
 SAMPLES = 24
 BRIGHT = 40
 TARGET_ASPECT = 4 / 3
@@ -102,6 +112,67 @@ def overlay_mask(bgr: np.ndarray) -> np.ndarray:
     return cv2.dilate(mask.astype(np.uint8), np.ones((5, 5), np.uint8))
 
 
+def y4m_encoder(target: Path, width: int, height: int, fps: float) -> subprocess.Popen[bytes]:
+    """ffmpeg reading BGR frames on stdin and writing a 4:2:0 .y4m at `fps`."""
+    command = [
+        imageio_ffmpeg.get_ffmpeg_exe(),
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "bgr24",
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        f"{fps:g}",
+        "-i",
+        "-",
+        "-pix_fmt",
+        "yuv420p",
+        "-f",
+        "yuv4mpegpipe",
+        str(target),
+    ]
+    return subprocess.Popen(command, stdin=subprocess.PIPE)
+
+
+def convert_camera(source: Path, target: Path) -> tuple[int, int]:
+    """A direct camera recording: scale to CAMERA_WIDTH wide (aspect kept), same orientation."""
+    capture = cv2.VideoCapture(str(source))
+    fps = float(capture.get(cv2.CAP_PROP_FPS))
+    width = CAMERA_WIDTH
+    source_w = capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+    source_h = capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    height = 2 * round(CAMERA_WIDTH * source_h / source_w / 2)  # even, for 4:2:0
+    encoder = y4m_encoder(target, width, height, fps)
+    assert encoder.stdin is not None
+    while True:
+        ok, frame = capture.read()
+        if not ok:
+            break
+        resized = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+        encoder.stdin.write(np.ascontiguousarray(resized).tobytes())
+    capture.release()
+    encoder.stdin.close()
+    if encoder.wait() != 0:
+        raise RuntimeError(f"ffmpeg failed for {source}")
+    return width, height
+
+
+def camera_label(stem: str, labels: list[str]) -> tuple[str, int]:
+    """("thankyou", 2) for "thank_you_2": the vocabulary label and the take number."""
+    name, _, take = stem.rpartition("_")
+    if not name or not take.isdigit():
+        raise ValueError(f"{stem}: expected <label>_<take>")
+    label = name.replace("_", "")
+    if label not in labels:
+        raise ValueError(f"{stem}: {label!r} is not one of the model's labels")
+    return label, int(take)
+
+
 def convert(source: Path, target: Path, rect: tuple[int, int, int, int], inpaint: bool) -> float:
     """Write the unmirrored 640 x 480 .y4m; returns the mean masked fraction of the frames."""
     x, y, w, h = rect
@@ -161,6 +232,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--keep-overlay", action="store_true", help="do not inpaint the recorded landmark overlay"
     )
+    parser.add_argument(
+        "--camera",
+        action="store_true",
+        help="direct camera recordings named <label>_<take>.mp4 (no crop, inpainting or flip)",
+    )
     args = parser.parse_args(argv)
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -170,7 +246,44 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     hashes: dict[str, list[str]] = {}
     entries = []
-    for clip in clips:
+    if args.camera:
+        labels = json.loads(VOCABULARY.read_text(encoding="utf-8"))["labels"]
+        for clip in clips:
+            label, take = camera_label(clip.stem, labels)
+            digest = sha256(clip)
+            hashes.setdefault(digest, []).append(clip.stem)
+            target = args.out / f"{clip.stem}.y4m"
+            capture = cv2.VideoCapture(str(clip))
+            fps = float(capture.get(cv2.CAP_PROP_FPS))
+            count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+            size = [
+                int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+            ]
+            capture.release()
+            if args.overwrite or not target.exists():
+                out_size = convert_camera(clip, target)
+            else:
+                out_size = (CAMERA_WIDTH, 2 * round(CAMERA_WIDTH * size[1] / size[0] / 2))
+            entries.append(
+                {
+                    "clip": clip.name,
+                    "label": label,
+                    "take": take,
+                    "sha256": digest,
+                    "source_fps": fps,
+                    "source_frames": count,
+                    "source_size": size,
+                    "y4m": target.name,
+                    "y4m_size": list(out_size),
+                    "source_kind": "camera recording (unmirrored), scaled with aspect kept",
+                }
+            )
+            print(
+                f"{clip.name}: {label} take {take}, {size[0]}x{size[1]} at {fps:.2f} fps, "
+                f"{count} frames -> {target}"
+            )
+    for clip in [] if args.camera else clips:
         digest = sha256(clip)
         hashes.setdefault(digest, []).append(clip.stem)
         target = args.out / f"{clip.stem}.y4m"
@@ -195,19 +308,18 @@ def main(argv: list[str] | None = None) -> int:
             }
         )
         print(f"{clip.name}: preview {rect} at {fps:.0f} fps, {count} frames -> {target}")
+    # Duplicates are named by clip id (the file stem; equal to the label for test_clips).
     duplicates = [names for names in hashes.values() if len(names) > 1]
     for entry in entries:
+        name = Path(entry["y4m"]).stem
         entry["duplicate_of"] = next(
-            (
-                sorted(set(names) - {entry["label"]})
-                for names in duplicates
-                if entry["label"] in names
-            ),
+            (sorted(set(names) - {name}) for names in duplicates if name in names),
             [],
         )
     manifest = {
         "description": (
-            "test_clips converted for the live-gap evaluation (scripts/prepare_live_clips.py)"
+            f"{args.clips.name} converted for the live-gap evaluation "
+            f"(scripts/prepare_live_clips.py{' --camera' if args.camera else ''})"
         ),
         "clips": entries,
         "duplicate_groups": duplicates,

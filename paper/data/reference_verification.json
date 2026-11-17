@@ -1,0 +1,352 @@
+{
+ "kaggle2023islr": {
+  "status": "ok",
+  "verified_with": "https://www.kaggle.com/competitions/asl-signs",
+  "source": "official page",
+  "title_similarity": 1.0,
+  "source_title": "Google - Isolated Sign Language Recognition",
+  "source_year": "2023",
+  "source_first_author": "google",
+  "notes": ""
+ },
+ "starner2023popsign": {
+  "status": "ok",
+  "verified_with": "https://proceedings.neurips.cc/paper_files/paper/2023/hash/00dada608b8db212ea7d9d92b24c68de-Abstract-Datasets_and_Benchmarks.html",
+  "source": "official page",
+  "title_similarity": 1.0,
+  "source_title": "{PopSign ASL} v1.0: An Isolated {American Sign Language} Dataset Collected via Smartphones",
+  "source_year": "2023",
+  "source_first_author": "starner",
+  "notes": ""
+ },
+ "lugaresi2019mediapipe": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/1906.08172",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "MediaPipe: A Framework for Building Perception Pipelines",
+  "source_year": "2019",
+  "source_first_author": "lugaresi",
+  "notes": ""
+ },
+ "zhang2020mediapipehands": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/2006.10214",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "MediaPipe Hands: On-device Real-time Hand Tracking",
+  "source_year": "2020",
+  "source_first_author": "zhang",
+  "notes": ""
+ },
+ "bazarevsky2020blazepose": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/2006.10204",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "BlazePose: On-device Real-time Body Pose tracking",
+  "source_year": "2020",
+  "source_first_author": "bazarevsky",
+  "notes": ""
+ },
+ "li2020wlasl": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/1910.11006",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "Word-level Deep Sign Language Recognition from Video: A New Large-scale Dataset and Methods Comparison",
+  "source_year": "2019",
+  "source_first_author": "li",
+  "notes": "arXiv preprint 2019, venue year 2020"
+ },
+ "desai2023aslcitizen": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/2304.05934",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "ASL Citizen: A Community-Sourced Dataset for Advancing Isolated Sign Language Recognition",
+  "source_year": "2023",
+  "source_first_author": "desai",
+  "notes": ""
+ },
+ "sridhar2020include": {
+  "status": "ok",
+  "verified_with": "https://doi.org/10.1145/3394171.3413528",
+  "source": "Crossref",
+  "title_similarity": 0.192,
+  "source_title": "INCLUDE",
+  "source_year": "2020",
+  "source_first_author": "sridhar",
+  "notes": ""
+ },
+ "selvaraj2022openhands": {
+  "status": "ok",
+  "verified_with": "https://aclanthology.org/2022.acl-long.150.bib",
+  "source": "ACL Anthology",
+  "title_similarity": 1.0,
+  "source_title": "{O}pen{H}ands: Making Sign Language Recognition Accessible with Pose-based Pretrained Models across Languages",
+  "source_year": "2022",
+  "source_first_author": "selvaraj",
+  "notes": ""
+ },
+ "bohacek2022spoter": {
+  "status": "ok",
+  "verified_with": "https://doi.org/10.1109/WACVW54805.2022.00024",
+  "source": "Crossref",
+  "title_similarity": 1.0,
+  "source_title": "Sign Pose-based Transformer for Word-level Sign Language Recognition",
+  "source_year": "2022",
+  "source_first_author": "bohacek",
+  "notes": ""
+ },
+ "moryossef2021pose": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/2104.10166",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "Evaluating the Immediate Applicability of Pose Estimation for Sign Language Recognition",
+  "source_year": "2021",
+  "source_first_author": "moryossef",
+  "notes": ""
+ },
+ "cho2014gru": {
+  "status": "ok",
+  "verified_with": "https://aclanthology.org/D14-1179.bib",
+  "source": "ACL Anthology",
+  "title_similarity": 1.0,
+  "source_title": "Learning Phrase Representations using {RNN} Encoder{--}Decoder for Statistical Machine Translation",
+  "source_year": "2014",
+  "source_first_author": "cho",
+  "notes": ""
+ },
+ "vaswani2017attention": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/1706.03762",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "Attention Is All You Need",
+  "source_year": "2017",
+  "source_first_author": "vaswani",
+  "notes": ""
+ },
+ "bai2018tcn": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/1803.01271",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "An Empirical Evaluation of Generic Convolutional and Recurrent Networks for Sequence Modeling",
+  "source_year": "2018",
+  "source_first_author": "bai",
+  "notes": ""
+ },
+ "howard2017mobilenets": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/1704.04861",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications",
+  "source_year": "2017",
+  "source_first_author": "howard",
+  "notes": ""
+ },
+ "gulati2020conformer": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/2005.08100",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "Conformer: Convolution-augmented Transformer for Speech Recognition",
+  "source_year": "2020",
+  "source_first_author": "gulati",
+  "notes": ""
+ },
+ "polyak1992averaging": {
+  "status": "ok",
+  "verified_with": "https://doi.org/10.1137/0330046",
+  "source": "Crossref",
+  "title_similarity": 1.0,
+  "source_title": "Acceleration of Stochastic Approximation by Averaging",
+  "source_year": "1992",
+  "source_first_author": "polyak",
+  "notes": ""
+ },
+ "jacob2018quantization": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/1712.05877",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "Quantization and Training of Neural Networks for Efficient Integer-Arithmetic-Only Inference",
+  "source_year": "2017",
+  "source_first_author": "jacob",
+  "notes": "arXiv preprint 2017, venue year 2018"
+ },
+ "nagel2021whitepaper": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/2106.08295",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "A White Paper on Neural Network Quantization",
+  "source_year": "2021",
+  "source_first_author": "nagel",
+  "notes": ""
+ },
+ "sculley2015debt": {
+  "status": "ok",
+  "verified_with": "https://proceedings.neurips.cc/paper/2015/hash/86df7dcfd896fcaf2674f757a2463eba-Abstract.html",
+  "source": "official page",
+  "title_similarity": 1.0,
+  "source_title": "Hidden Technical Debt in Machine Learning Systems",
+  "source_year": "2015",
+  "source_first_author": "sculley",
+  "notes": ""
+ },
+ "breck2017mltestscore": {
+  "status": "ok",
+  "verified_with": "https://doi.org/10.1109/BigData.2017.8258038",
+  "source": "Crossref",
+  "title_similarity": 1.0,
+  "source_title": "The ML test score: A rubric for ML production readiness and technical debt reduction",
+  "source_year": "2017",
+  "source_first_author": "breck",
+  "notes": ""
+ },
+ "guo2017calibration": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/1706.04599",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "On Calibration of Modern Neural Networks",
+  "source_year": "2017",
+  "source_first_author": "guo",
+  "notes": ""
+ },
+ "naeini2015ece": {
+  "status": "ok",
+  "verified_with": "https://doi.org/10.1609/aaai.v29i1.9602",
+  "source": "Crossref",
+  "title_similarity": 1.0,
+  "source_title": "Obtaining Well Calibrated Probabilities Using Bayesian Binning",
+  "source_year": "2015",
+  "source_first_author": "pakdaman naeini",
+  "notes": ""
+ },
+ "geifman2017selective": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/1705.08500",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "Selective Classification for Deep Neural Networks",
+  "source_year": "2017",
+  "source_first_author": "geifman",
+  "notes": ""
+ },
+ "dror2017replicability": {
+  "status": "ok",
+  "verified_with": "https://aclanthology.org/Q17-1033.bib",
+  "source": "ACL Anthology",
+  "title_similarity": 1.0,
+  "source_title": "Replicability Analysis for Natural Language Processing: Testing Significance with Multiple Datasets",
+  "source_year": "2017",
+  "source_first_author": "dror",
+  "notes": ""
+ },
+ "efron1994bootstrap": {
+  "status": "ok",
+  "verified_with": "https://doi.org/10.1201/9780429246593",
+  "source": "Crossref",
+  "title_similarity": 1.0,
+  "source_title": "An Introduction to the Bootstrap",
+  "source_year": "1994",
+  "source_first_author": "efron",
+  "notes": ""
+ },
+ "dror2018hitchhiker": {
+  "status": "ok",
+  "verified_with": "https://aclanthology.org/P18-1128.bib",
+  "source": "ACL Anthology",
+  "title_similarity": 1.0,
+  "source_title": "The Hitchhiker{'}s Guide to Testing Statistical Significance in Natural Language Processing",
+  "source_year": "2018",
+  "source_first_author": "dror",
+  "notes": ""
+ },
+ "bragg2019interdisciplinary": {
+  "status": "ok",
+  "verified_with": "https://doi.org/10.1145/3308561.3353774",
+  "source": "Crossref",
+  "title_similarity": 0.759,
+  "source_title": "Sign Language Recognition, Generation, and Translation",
+  "source_year": "2019",
+  "source_first_author": "bragg",
+  "notes": ""
+ },
+ "yin2021including": {
+  "status": "ok",
+  "verified_with": "https://aclanthology.org/2021.acl-long.570.bib",
+  "source": "ACL Anthology",
+  "title_similarity": 1.0,
+  "source_title": "Including Signed Languages in Natural Language Processing",
+  "source_year": "2021",
+  "source_first_author": "yin",
+  "notes": ""
+ },
+ "fox2023bestpractices": {
+  "status": "ok",
+  "verified_with": "https://doi.org/10.1007/s10209-023-01039-1",
+  "source": "Crossref",
+  "title_similarity": 1.0,
+  "source_title": "Best practices for sign language technology research",
+  "source_year": "2023",
+  "source_first_author": "fox",
+  "notes": ""
+ },
+ "humphries2012deprivation": {
+  "status": "ok",
+  "verified_with": "https://doi.org/10.1186/1477-7517-9-16",
+  "source": "Crossref",
+  "title_similarity": 1.0,
+  "source_title": "Language acquisition for deaf children: Reducing the harms of zero tolerance to the use of alternative approaches",
+  "source_year": "2012",
+  "source_first_author": "humphries",
+  "notes": ""
+ },
+ "card2020power": {
+  "status": "ok",
+  "verified_with": "https://aclanthology.org/2020.emnlp-main.745.bib",
+  "source": "ACL Anthology",
+  "title_similarity": 1.0,
+  "source_title": "With Little Power Comes Great Responsibility",
+  "source_year": "2020",
+  "source_first_author": "card",
+  "notes": ""
+ },
+ "ovadia2019shift": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/1906.02530",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "Can You Trust Your Model's Uncertainty? Evaluating Predictive Uncertainty Under Dataset Shift",
+  "source_year": "2019",
+  "source_first_author": "ovadia",
+  "notes": ""
+ },
+ "renz2021segmentation": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/2011.12986",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "Sign language segmentation with temporal convolutional networks",
+  "source_year": "2020",
+  "source_first_author": "renz",
+  "notes": "arXiv preprint 2020, venue year 2021"
+ },
+ "desai2024systemic": {
+  "status": "ok",
+  "verified_with": "https://arxiv.org/abs/2403.02563",
+  "source": "arXiv API",
+  "title_similarity": 1.0,
+  "source_title": "Systemic Biases in Sign Language AI Research: A Deaf-Led Call to Reevaluate Research Agendas",
+  "source_year": "2024",
+  "source_first_author": "desai",
+  "notes": ""
+ }
+}

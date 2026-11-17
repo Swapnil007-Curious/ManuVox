@@ -1,0 +1,38 @@
+\section*{Limitations}
+
+\paragraph{One signer in the live test.} The live evaluation uses \V{lg.clips} clips recorded by a
+single signer, the author (\authortodo{state your ASL experience}), in one room with one laptop
+camera. If the signer's productions differ from the dataset's signers, some live errors are
+production differences rather than pipeline or camera effects, and nothing in this design
+separates them; a rating of each clip by a fluent, ideally Deaf, signer would. The results show
+which pipeline discrepancies matter for this signer and camera; they do not estimate accuracy for
+Deaf signers in general. With fifty clips most effects below the detection limit stated in
+Section~\ref{sec:livegap} are inconclusive. The ten-clip pilot was recorded by the same person.
+
+\paragraph{Controls we did not run.} Two controls would locate the remaining gap: running the live
+pipeline on test-split landmark sequences, which measures what the live code costs in
+distribution, and an oracle segmentation of the live clips, which separates segmentation from
+recognition. The segmenter's thresholds rest on an assumed dataset frame rate. We also did not
+disentangle architecture from model size or recipe in the v2 ablation.
+
+\paragraph{Isolated signs from a closed vocabulary.} The model recognizes \V{data.signs} isolated
+signs. It does not handle continuous signing, fingerspelling, or signs outside the vocabulary,
+which it maps to the nearest known sign unless the confidence threshold rejects them. It is not a
+translator: the gloss row and the generated sentence drop the grammar that ASL carries in space,
+movement and facial expression.
+
+\paragraph{Language and population.} The data is American Sign Language. The author is based in
+India, where Indian Sign Language is the relevant language; nothing here transfers to it without
+new data, such as INCLUDE \citep{sridhar2020include}. We know only the number of signers in the
+dataset (\V{data.signers}), not their demographics, hearing status or fluency, so we cannot say
+for whom the model works less well.
+
+\paragraph{Test-set statistics and reuse.} With \V{data.testsigners} test signers, sequence-level
+tests treat thousands of sequences from the same person as independent; the per-signer results
+(Table~\ref{tab:persigner}) are the more conservative evidence, and a four-of-four split can never
+be significant on its own. The test split was evaluated several times during development
+(Table~\ref{tab:testaccess}), so its numbers are less clean than a single final evaluation.
+
+\paragraph{Hardware and trackers.} Browser timings come from one laptop and one browser version;
+the CPU fallback of MediaPipe reaches only \V{t.cpu.fps} frames per second there
+(Section~\ref{sec:efficiency}).

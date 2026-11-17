@@ -672,7 +672,16 @@ experiments together are in `results/tables/selection/`. For the web demo:
 
 - `results/model_selection.md` (`scripts/model_selection.py`): test accuracy against classifier
   latency in Chrome on the target laptop, and the shipped model.
-- `results/live_gap.md` and `.csv` (`scripts/live_gap.py report`): the live-gap ablation on the
-  recorded clips, for the Python + Holistic and the browser + Tasks pipelines.
-- `results/perf/`: the tracking and classifier benchmarks (`web/scripts/benchmark-tracking.mjs`,
-  `web/scripts/benchmark.mjs`).
+- `results/live_gap.md` and `.csv` (`scripts/live_gap.py report`): the live-gap pilot on the ten
+  screen-recorded clips, for the Python + Holistic and the browser + Tasks pipelines.
+- `results/live_gap_v2.md` and `.csv` (`scripts/live_gap.py report --configs
+  experiments/live_gap_v2.json`): the main live-gap evaluation on 50 webcam clips (25 signs x 2
+  takes), with bootstrap intervals, Holm-corrected comparisons, a sign-level sensitivity analysis,
+  per-sign results and confusions.
+- `results/test_analysis/` (`scripts/test_analysis.py`): paired model comparisons and the shipped
+  model's calibration on the test split, from logits saved by `scripts/final_eval.py --predictions-out`.
+- `results/perf/`, `results/tables/bench_summary.csv`, `results/bench_v2/`: the tracking,
+  browser-classifier and Python CPU benchmarks.
+
+The research paper built from these files is in [`paper/`](paper/README.md): every number in it is
+generated from the result files and audited by `scripts/paper_claims.py`.

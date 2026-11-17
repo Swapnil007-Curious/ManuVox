@@ -1,0 +1,103 @@
+{
+  "run_info": {
+    "git_commit": "36219eaea7db0a18aaa0e0d0bd3debb7bbf1ec07",
+    "git_dirty": true,
+    "python_version": "3.11.9",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "cpu_model": "11th Gen Intel(R) Core(TM) i3-1115G4 @ 3.00GHz",
+    "cpu_logical_cores": 4,
+    "cpu_physical_cores": 2,
+    "ram_total_bytes": 21205123072,
+    "packages": {
+      "numpy": "2.4.6",
+      "pandas": "3.1.0",
+      "pyarrow": "26.0.0"
+    },
+    "timestamp_utc": "2026-11-17T00:50:43.565732+00:00"
+  },
+  "cpu_flags": {
+    "avx2": true,
+    "avx512f": true,
+    "avx512_vnni": true
+  },
+  "torch_cpu_capability": "AVX512",
+  "versions": {
+    "torch": "2.15.0+cpu",
+    "onnx": "1.23.2",
+    "onnxruntime": "1.31.1"
+  },
+  "onnxruntime_providers": [
+    "AzureExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "cpu_freq_start": {
+    "current_mhz": 2189.0,
+    "min_mhz": 0.0,
+    "max_mhz": 2189.0
+  },
+  "cpu_freq_end": {
+    "current_mhz": 2189.0,
+    "min_mhz": 0.0,
+    "max_mhz": 2189.0
+  },
+  "power": {
+    "on_ac_power": true,
+    "battery_percent": 100.0
+  },
+  "windows_power_scheme": "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
+  "windows_power_mode": {
+    "ac_overlay": "ded574b5-45a0-4f42-8737-46345c09c238",
+    "ac_mode": "best_performance",
+    "battery_overlay": "ded574b5-45a0-4f42-8737-46345c09c238",
+    "battery_mode": "best_performance"
+  },
+  "perf_counter_resolution_s": 1e-07,
+  "protocol": {
+    "inputs": "val sequences cycled in order",
+    "timer": "time.perf_counter_ns around each call; garbage collector paused while timing",
+    "models": [
+      "gru",
+      "cnn",
+      "transformer"
+    ],
+    "experiments": [
+      "d_hybrid_v2feat_v2recipe"
+    ],
+    "variants": [
+      "torch_fp32",
+      "onnx_fp32",
+      "fp16",
+      "int8_dynamic"
+    ],
+    "seeds": [
+      0
+    ],
+    "threads": [
+      1,
+      4
+    ],
+    "batch": 1,
+    "rounds": 3,
+    "warmup": 100,
+    "iters": 2000,
+    "sleep_s": 3.0,
+    "shuffle_seed": 0,
+    "onnxruntime_session": {
+      "providers": [
+        "CPUExecutionProvider"
+      ],
+      "graph_optimization_level": "ORT_ENABLE_ALL",
+      "execution_mode": "ORT_SEQUENTIAL",
+      "intra_op_num_threads": null,
+      "inter_op_num_threads": 1
+    },
+    "torch": "eager, torch.inference_mode, torch.set_num_threads(threads)",
+    "rss_increase": "approximate: process RSS after minus before session creation",
+    "frame_ms": 33.333333333333336
+  },
+  "warnings": [],
+  "power_end": {
+    "on_ac_power": true,
+    "battery_percent": 100.0
+  }
+}

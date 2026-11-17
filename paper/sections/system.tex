@@ -1,0 +1,15 @@
+\section{System Demonstration}
+\label{sec:system}
+
+The recognizer ships as an installable web app that runs entirely in the browser. \emph{Translate},
+despite its name, turns a sequence of isolated signs into a row of glosses; below the calibrated
+threshold it shows ``not sure'' with the top three candidates and adds nothing until the user picks
+one. \emph{Practice} shows a target sign and scores the next segment as correct (top-1), close
+(top-3) or wrong. \emph{Signs} lists the vocabulary with a link to a dictionary video per sign. On
+request, a serverless proxy sends only the recognized glosses to a hosted language model
+(\cfg{llama-3.1-8b-instant} on Groq) with a fixed instruction to write one short sentence without
+adding facts, and the browser speaks it; offline, a rule-based joiner produces a sentence marked as
+basic. \textbf{Sentence generation is not evaluated}; a fluent sentence can lend false authority to
+wrong glosses and omits the grammar ASL carries in space, movement and the face. Video never leaves
+the device, and a service worker caches the model for offline use and adds the cross-origin
+isolation headers that WebAssembly threads need on static hosting.

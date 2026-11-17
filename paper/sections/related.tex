@@ -1,0 +1,64 @@
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Isolated sign language recognition.}
+Isolated sign recognition assigns one gloss to a clip that contains a single sign. Large video
+benchmarks such as WLASL \citep{li2020wlasl} and ASL Citizen \citep{desai2023aslcitizen} made the
+task measurable at the scale of a few thousand signs.
+Signer independence matters
+because a model that has seen the test signer can rely on that person's style: ASL Citizen
+evaluates only on signers unseen in training and targets webcam-based dictionary lookup, the
+setting closest to ours, and we follow the same signer-disjoint protocol.
+Work on other sign languages, such as the INCLUDE dataset for Indian Sign Language
+\citep{sridhar2020include}, shows how much of the field is still tied to one language.
+
+\paragraph{Landmark and pose-based models.}
+Pose-based models replace pixels with body and hand keypoints, which shrinks the input, removes
+appearance and background, and makes on-device inference cheaper. SPOTER classifies signs from
+pose sequences with a small transformer \citep{bohacek2022spoter}; OpenHands trains and releases
+pose-based models across several sign languages \citep{selvaraj2022openhands}. Finding where signs
+start and end in a stream is a task of its own; \citet{renz2021segmentation} segment sign language
+video with temporal convolutional networks, while our segmenter is a simple rule on hand motion.
+\citet{moryossef2021pose} study
+the failure cases of recognition models built on two pose estimators to characterize what the
+skeletal representation loses. Our live analysis starts from the same observation: a model is
+only as good as the landmarks it is given at serving time.
+
+\paragraph{The Google ISLR data.}
+The Google Isolated Sign Language Recognition competition \citep{kaggle2023islr} released
+MediaPipe Holistic landmarks rather than video for isolated signs. The data was collected with
+the partners behind the PopSign smartphone game, whose companion corpus, PopSign ASL, is described
+by \citet{starner2023popsign}. We found no peer-reviewed description of the top
+competition entries, and the leaderboard scored a hidden test set rather than our split, so we
+compare only against baselines trained under our own protocol.
+
+\paragraph{Temporal architectures.}
+Our sequence models are standard: a bidirectional GRU \citep{cho2014gru}, a temporal convolutional
+network \citep{bai2018tcn} built from depthwise-separable convolutions \citep{howard2017mobilenets},
+a small transformer encoder \citep{vaswani2017attention}, and a convolution--transformer hybrid in
+the spirit of the Conformer \citep{gulati2020conformer}. We average weights with an exponential
+moving average \citep{polyak1992averaging}.
+
+\paragraph{On-device and in-browser inference.}
+Post-training quantization reduces model size and can reduce latency on integer hardware
+\citep{jacob2018quantization,nagel2021whitepaper}. Our landmarks come from the MediaPipe
+framework \citep{lugaresi2019mediapipe}: legacy Holistic, which produced the training data, and
+the newer Tasks hand \citep{zhang2020mediapipehands} and pose \citep{bazarevsky2020blazepose}
+landmarkers, which run in the browser.
+
+\paragraph{Train--serve skew and dataset shift.}
+A model can fail in deployment even when its offline evaluation is sound: most of a deployed
+system is code around the model, where faults accumulate unnoticed \citep{sculley2015debt}, and
+production checklists include testing that training and serving compute the same features
+\citep{breck2017mltestscore}. More broadly, the live input differs in distribution from the dataset.
+Our live gap is a mixture of both: some of it is skew that code fixes remove, and the rest we cannot
+attribute with one signer.
+
+\paragraph{Calibration and selective prediction.}
+Modern networks are often overconfident; temperature scaling on a held-out set is a simple and
+effective correction \citep{guo2017calibration}, and the expected calibration error summarizes the
+gap between confidence and accuracy \citep{naeini2015ece}. Selective prediction lets a classifier
+abstain below a confidence threshold to trade coverage for accuracy
+\citep{geifman2017selective}; our demo uses it to say ``not sure'' rather than guess. Calibration
+measured in distribution degrades under dataset shift \citep{ovadia2019shift}, which is what we
+observe live.

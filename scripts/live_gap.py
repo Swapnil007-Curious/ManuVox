@@ -12,13 +12,18 @@ are derived from the train and val splits.
 """
 
 import argparse
+import csv
 import json
 import math
 import sys
 from pathlib import Path
 from typing import Any
 
-from edgevision.live.gap import load_configs, run_python, score_run
+import numpy as np
+
+from edgevision.evaluation import stats
+from edgevision.live.gap import TOP_K, load_configs, run_python, score_run
+from edgevision.web_export import expected_calibration_error
 
 REPO = Path(__file__).resolve().parents[1]
 PIPELINES = {"python": "Python + Holistic", "web": "Browser + Tasks"}
@@ -233,6 +238,420 @@ def report(args: argparse.Namespace) -> int:
     return 0
 
 
+def clip_outcomes(run: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Per clip of one run: top-1 / top-3 hit (0/1), predicted label index and the top 3."""
+    out = {}
+    for clip in run["clips"]:
+        label = int(clip["label_index"])
+        classified = [
+            s["probabilities"] for s in clip["segments"] if s["probabilities"] is not None
+        ]
+        if classified:
+            mean = np.mean(np.asarray(classified, dtype=np.float64), axis=0)
+            top = [int(i) for i in np.argsort(-mean, kind="stable")[:TOP_K]]
+            out[clip["clip"]] = {
+                "top1": float(top[0] == label),
+                "top3": float(label in top),
+                "prediction": top[0],
+                "top3_labels": top,
+            }
+        else:
+            out[clip["clip"]] = {"top1": 0.0, "top3": 0.0, "prediction": None, "top3_labels": []}
+    return out
+
+
+def wrong_rejected(run: dict[str, Any]) -> float:
+    """Share of wrong classified segments (top-1 not the clip's label) below the run's threshold."""
+    threshold = float(run["threshold"])
+    wrong = rejected = 0
+    for clip in run["clips"]:
+        label = int(clip["label_index"])
+        for s in clip["segments"]:
+            p = s["probabilities"]
+            if p is None or int(np.argmax(p)) == label:
+                continue
+            wrong += 1
+            rejected += max(p) < threshold
+    return rejected / wrong if wrong else float("nan")
+
+
+def report_v2(args: argparse.Namespace, configs: dict[str, Any]) -> int:
+    """The v2 report: CIs over clips, Holm-corrected comparisons, per-sign and confusion tables."""
+    analysis = configs["analysis"]
+    manifest = json.loads((REPO / configs["clips_dir"] / "clips.json").read_text(encoding="utf-8"))
+    clips = [Path(entry["y4m"]).stem for entry in manifest["clips"]]
+    label_of = {Path(entry["y4m"]).stem: entry["label"] for entry in manifest["clips"]}
+    meta = json.loads((REPO / configs["models"]["v2"] / "meta.json").read_text(encoding="utf-8"))
+    labels: list[str] = meta["labels"]
+    per_class_path = REPO / "results" / "test_analysis" / "per_class.csv"
+    test_acc: dict[str, float] = {}
+    if per_class_path.exists():
+        with per_class_path.open(encoding="utf-8") as handle:
+            test_acc = {r["label"]: float(r["top1"]) for r in csv.DictReader(handle)}
+    rows: list[dict[str, Any]] = []
+    scores: dict[tuple[str, str], dict[str, np.ndarray]] = {}
+    outcomes: dict[tuple[str, str], list[dict[str, dict[str, Any]]]] = {}
+    run_files: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    # Sensitivity analysis (not the pre-specified one): the two takes of a sign are one cluster.
+    signs = sorted({label_of[c] for c in clips})
+    groups = [[i for i, c in enumerate(clips) if label_of[c] == s] for s in signs]
+
+    def by_sign(values: np.ndarray) -> np.ndarray:
+        return np.array([values[g].mean() for g in groups])
+
+    for pipeline in PIPELINES:
+        for config in configs["configs"]:
+            runs = [
+                r
+                for r in runs_for(args.results, pipeline, config["name"])
+                if r.get("complete", True)
+            ]
+            if not runs:
+                continue
+            per_run = [clip_outcomes(run) for run in runs]
+            missing = [c for c in clips if any(c not in o for o in per_run)]
+            if missing:
+                print(
+                    f"{pipeline} {config['name']}: missing clips {missing}; skipped",
+                    file=sys.stderr,
+                )
+                continue
+            top1 = np.array([np.mean([o[c]["top1"] for o in per_run]) for c in clips])
+            top3 = np.array([np.mean([o[c]["top3"] for o in per_run]) for c in clips])
+            scores[(pipeline, config["name"])] = {"top1": top1, "top3": top3}
+            outcomes[(pipeline, config["name"])] = per_run
+            run_files[(pipeline, config["name"])] = runs
+            seg = [score_run(run) for run in runs]
+            ci1, ci3 = stats.bootstrap_ci(top1), stats.bootstrap_ci(top3)
+            ci1s = stats.bootstrap_ci(by_sign(top1))
+            run_top1 = [float(np.mean([o[c]["top1"] for c in clips])) for o in per_run]
+            no_segment = [sum(o[c]["prediction"] is None for c in clips) for o in per_run]
+            rows.append(
+                {
+                    "pipeline": pipeline,
+                    "config": config["name"],
+                    "group": config["group"],
+                    "title": config["title"],
+                    "base": config.get("base", ""),
+                    "clips": len(clips),
+                    "runs": len(runs),
+                    "clip_top1": float(top1.mean()),
+                    "clip_top1_ci_low": ci1[0],
+                    "clip_top1_ci_high": ci1[1],
+                    "clip_top3": float(top3.mean()),
+                    "clip_top3_ci_low": ci3[0],
+                    "clip_top3_ci_high": ci3[1],
+                    "clip_top1_ci_low_sign": ci1s[0],
+                    "clip_top1_ci_high_sign": ci1s[1],
+                    "run_top1": run_top1,
+                    "run_top1_sd": float(np.std(run_top1, ddof=1)) if len(run_top1) > 1 else 0.0,
+                    "no_segment_clips": float(np.mean(no_segment)),
+                    "segments_per_run": float(np.mean([s["segments"] for s in seg])),
+                    "segment_top1": float(np.mean([s["segment_top1"] for s in seg])),
+                    "segment_top3": float(np.mean([s["segment_top3"] for s in seg])),
+                    "coverage": float(np.mean([s["coverage"] for s in seg])),
+                    "selective_accuracy": float(np.nanmean([s["selective_accuracy"] for s in seg])),
+                    "fps": float(np.mean([segment_fps(run) for run in runs])),
+                    "wrong_rejected": float(np.nanmean([wrong_rejected(run) for run in runs])),
+                    "segment_ms_median": float(
+                        np.median(
+                            [
+                                s["end_ms"] - s["start_ms"]
+                                for run in runs
+                                for clip in run["clips"]
+                                for s in clip["segments"]
+                                if s["probabilities"] is not None
+                            ]
+                            or [float("nan")]
+                        )
+                    ),
+                }
+            )
+    if not rows:
+        print(f"no complete runs under {args.results}", file=sys.stderr)
+        return 1
+    comparisons: list[dict[str, Any]] = []
+    for pipeline in PIPELINES:
+        for metric in ("top1", "top3"):
+            family = []
+            for config in configs["configs"]:
+                base = config.get("base")
+                a, b = (pipeline, config["name"]), (pipeline, base)
+                if not base or a not in scores or b not in scores:
+                    continue
+                d = scores[a][metric] - scores[b][metric]
+                low, high = stats.paired_bootstrap_ci(scores[a][metric], scores[b][metric])
+                ds = by_sign(d)
+                low_s, high_s = stats.bootstrap_ci(ds)
+                family.append(
+                    {
+                        "pipeline": pipeline,
+                        "metric": metric,
+                        "config": config["name"],
+                        "base": base,
+                        "group": config["group"],
+                        "title": config["title"],
+                        "diff": float(d.mean()),
+                        "ci_low": low,
+                        "ci_high": high,
+                        "clips_better": int((d > 0).sum()),
+                        "clips_worse": int((d < 0).sum()),
+                        "p": stats.sign_flip_p(d),
+                        "ci_low_sign": low_s,
+                        "ci_high_sign": high_s,
+                        "p_sign": stats.sign_flip_p(ds),
+                    }
+                )
+            for row, adjusted in zip(family, stats.holm([r["p"] for r in family]), strict=True):
+                row["p_holm"] = adjusted
+                row["significant"] = adjusted < 0.05
+            for row, adjusted in zip(
+                family, stats.holm([r["p_sign"] for r in family]), strict=True
+            ):
+                row["p_holm_sign"] = adjusted
+                row["significant_sign"] = adjusted < 0.05
+            comparisons += family
+    # Browser records in which the tracker processed fewer than half of the clip's frames (a stall
+    # of the real-time pipeline). They are kept as measured, as the pre-specified scoring says; the
+    # count is reported. The shipped build does not record its frame count.
+    source_frames = {Path(e["y4m"]).stem: e["source_frames"] for e in manifest["clips"]}
+    stalled = total_records = 0
+    for (pipeline, name), runs in run_files.items():
+        if pipeline != "web" or name == "c0_head_build":
+            continue
+        for run in runs:
+            for clip in run["clips"]:
+                total_records += 1
+                stalled += (clip["status"].get("frames") or 0) < 0.5 * source_frames[clip["clip"]]
+    # Python against browser on the same clips (descriptive; not part of the pre-specified family).
+    pipeline_diffs = []
+    for name in ("c4_time", "c6_final", "x_presence"):
+        a, b = ("web", name), ("python", name)
+        if a in scores and b in scores:
+            d = scores[a]["top1"] - scores[b]["top1"]
+            low_s, high_s = stats.bootstrap_ci(by_sign(d))
+            pipeline_diffs.append(
+                {
+                    "config": name,
+                    "diff": float(d.mean()),
+                    "ci_low_sign": low_s,
+                    "ci_high_sign": high_s,
+                    "clips_web_better": int((d > 0).sum()),
+                    "clips_web_worse": int((d < 0).sum()),
+                }
+            )
+    # Calibration and abstention on the live segments (pooled over runs).
+    live_calibration = []
+    for (pipeline, name), runs in run_files.items():
+        if name not in ("c6_final", "x_presence"):
+            continue
+        conf, right = [], []
+        for run in runs:
+            for clip in run["clips"]:
+                label = int(clip["label_index"])
+                for s in clip["segments"]:
+                    if s["probabilities"] is not None:
+                        conf.append(max(s["probabilities"]))
+                        right.append(int(np.argmax(s["probabilities"])) == label)
+        c, r = np.asarray(conf), np.asarray(right)
+        accepted = c >= float(runs[0]["threshold"])
+        live_calibration.append(
+            {
+                "pipeline": pipeline,
+                "config": name,
+                "segments": int(c.size),
+                "ece": expected_calibration_error(c, r),
+                "mean_confidence": float(c.mean()),
+                "accuracy": float(r.mean()),
+                "coverage": float(accepted.mean()),
+                "selective_accuracy": float(r[accepted].mean()),
+                "net_score": float((2 * (r & accepted).sum() - accepted.sum()) / c.size),
+                "correct_rejected": float((r & ~accepted).sum() / max(1, r.sum())),
+                "wrong_rejected": float((~r & ~accepted).sum() / max(1, (~r).sum())),
+            }
+        )
+    per_sign: list[dict[str, Any]] = []
+    confusions: list[dict[str, Any]] = []
+    for pipeline in PIPELINES:
+        key = (pipeline, "c6_final")
+        if key not in outcomes:
+            continue
+        for sign in signs:
+            takes = [c for c in clips if label_of[c] == sign]
+            preds = [
+                labels[o[c]["prediction"]] if o[c]["prediction"] is not None else "(none)"
+                for c in takes
+                for o in outcomes[key]
+            ]
+            per_sign.append(
+                {
+                    "pipeline": pipeline,
+                    "sign": sign,
+                    "top1": float(np.mean([scores[key]["top1"][clips.index(c)] for c in takes])),
+                    "top3": float(np.mean([scores[key]["top3"][clips.index(c)] for c in takes])),
+                    "predictions": ", ".join(
+                        f"{p} x{preds.count(p)}"
+                        for p in sorted(set(preds), key=lambda p: -preds.count(p))
+                    ),
+                    "test_top1": test_acc.get(sign, float("nan")),
+                }
+            )
+        pairs: dict[tuple[str, str], int] = {}
+        for o in outcomes[key]:
+            for c in clips:
+                p = o[c]["prediction"]
+                guess = labels[p] if p is not None else "(no segment)"
+                if guess != label_of[c]:
+                    pairs[(label_of[c], guess)] = pairs.get((label_of[c], guess), 0) + 1
+        runs_n = len(outcomes[key])
+        for (true, guess), count in sorted(pairs.items(), key=lambda kv: (-kv[1], kv[0])):
+            confusions.append(
+                {
+                    "pipeline": pipeline,
+                    "sign": true,
+                    "predicted": guess,
+                    "count": count,
+                    "out_of": 2 * runs_n,
+                }
+            )
+    columns = [k for k in rows[0] if not isinstance(rows[0][k], list)]  # lists: summary.json only
+    lines_csv = [",".join(columns)]
+    for row in rows:
+        lines_csv.append(
+            ",".join(
+                json.dumps(row[c]) if isinstance(row[c], str) else fmt(row[c], 4) for c in columns
+            )
+        )
+    args.csv.write_text("\n".join(lines_csv) + "\n", encoding="utf-8")
+    summary = {
+        "analysis": analysis,
+        "clips": len(clips),
+        "signs": len(signs),
+        "rows": rows,
+        "comparisons": comparisons,
+        "stalled_records": stalled,
+        "browser_records": total_records,
+        "pipeline_diffs": pipeline_diffs,
+        "live_calibration": live_calibration,
+        "per_sign": per_sign,
+        "confusions": confusions,
+    }
+    (args.results / "summary.json").write_text(
+        json.dumps(summary, indent=1) + "\n", encoding="utf-8"
+    )
+
+    def ci(row: dict[str, Any], m: str) -> str:
+        return f"{fmt(row[m])} [{fmt(row[m + '_ci_low'])}, {fmt(row[m + '_ci_high'])}]"
+
+    md = [
+        "# Live-gap evaluation v2",
+        "",
+        "Generated by `scripts/live_gap.py report --configs experiments/live_gap_v2.json`"
+        " from the runs",
+        "under `results/live_gap_v2/`. The 10-clip pilot is in `results/live_gap.md`.",
+        "",
+        "## Setup",
+        "",
+        f"- Clips: {len(clips)} webcam recordings in `test_clips_v2/` "
+        f"({len(signs)} signs x 2 takes, one",
+        "  signer, the author), recorded unmirrored at 1280 x 720 and about 15 fps; converted with",
+        "  `scripts/prepare_live_clips.py --camera` to 640 x 360 .y4m at the recording's"
+        " frame rate.",
+        "  Both pipelines read the same frames. No clip is a duplicate of another (SHA-256).",
+        "- Python + Holistic and Browser + Tasks: as in the pilot (`results/live_gap.md`);"
+        " the browser",
+        "  runs in the installed Chrome on the target laptop with the GPU delegate,"
+        " one browser per clip",
+        "  running every config in a seeded random order (`web/scripts/live-gap.mjs --per-clip`).",
+        f"- Scoring: {configs['scoring']['clip']}.",
+        "- Nothing was tuned on these clips (thresholds and temperature from val). Analysis, fixed",
+        "  before any run (`experiments/live_gap_v2.json`, `analysis`):",
+        *[f"  - {k.replace('_', ' ')}: {v}" for k, v in analysis.items()],
+        "",
+        "## Results",
+        "",
+        "Clip top-1 and top-3 with 95% bootstrap intervals over clips; browser rows are means over",
+        "runs (a clip's score is its mean over the runs). Segment metrics are means over runs.",
+        "",
+    ]
+    for pipeline, title in PIPELINES.items():
+        subset = [r for r in rows if r["pipeline"] == pipeline]
+        if not subset:
+            continue
+        md += [
+            f"### {title}",
+            "",
+            "| Config | Change | Clip top-1 [95% CI] | Clip top-3 [95% CI] | Segments/run"
+            " | Seg top-1 | Coverage | Selective acc. | fps | Runs |",
+            "|" + " --- |" * 10,
+        ]
+        for r in subset:
+            md.append(
+                f"| `{r['config']}` | {r['title']} | {ci(r, 'clip_top1')} | {ci(r, 'clip_top3')} | "
+                f"{fmt(r['segments_per_run'], 1)} | {fmt(r['segment_top1'])} | "
+                f"{fmt(r['coverage'])} | "
+                f"{fmt(r['selective_accuracy'])} | {fmt(r['fps'], 1)} | {r['runs']} |"
+            )
+        md.append("")
+    md += [
+        "## Comparisons",
+        "",
+        "Each config against the config it changes (`base`); difference in clip score"
+        " with a paired",
+        "bootstrap interval, the clips that got better / worse, the sign-flip p-value and its Holm",
+        "adjustment within the pipeline and metric (the pre-specified analysis; intervals are not",
+        "adjusted for multiplicity). The last two columns are a sensitivity analysis added after",
+        "review: the same test and interval with the two takes of a sign as one unit (25 signs).",
+        "",
+        "| Pipeline | Metric | Config | vs | Diff [95% CI] | Better / worse | p | p (Holm)"
+        " | Significant | Diff CI, sign as unit | p (Holm), sign as unit |",
+        "|" + " --- |" * 11,
+    ]
+    for c in comparisons:
+        md.append(
+            f"| {PIPELINES[c['pipeline']]} | {c['metric']} | `{c['config']}` | `{c['base']}` | "
+            f"{c['diff']:+.2f} [{c['ci_low']:+.2f}, {c['ci_high']:+.2f}] | {c['clips_better']} / "
+            f"{c['clips_worse']} | {c['p']:.3g} | {c['p_holm']:.3g} | "
+            f"{'yes' if c['significant'] else 'no'} | "
+            f"[{c['ci_low_sign']:+.2f}, {c['ci_high_sign']:+.2f}] | {c['p_holm_sign']:.3g} |"
+        )
+    md += [
+        "",
+        "## Per sign (`c6_final`)",
+        "",
+        "Top-1 / top-3 over the two takes (and runs); predictions with counts; the shipped model's",
+        "top-1 on the same sign in the signer-independent test split"
+        " (`results/test_analysis/per_class.csv`).",
+        "",
+        "| Pipeline | Sign | Live top-1 | Live top-3 | Predictions | Test-split top-1 |",
+        "|" + " --- |" * 6,
+    ]
+    for s in per_sign:
+        md.append(
+            f"| {PIPELINES[s['pipeline']]} | {s['sign']} | {fmt(s['top1'])} | {fmt(s['top3'])} | "
+            f"{s['predictions']} | {fmt(s['test_top1'])} |"
+        )
+    md += [
+        "",
+        "## Confusions (`c6_final`)",
+        "",
+        "Wrong clip-level predictions, counted over takes and runs.",
+        "",
+        "| Pipeline | Sign | Predicted as | Count |",
+        "|" + " --- |" * 4,
+    ]
+    for c in confusions:
+        md.append(
+            f"| {PIPELINES[c['pipeline']]} | {c['sign']} | {c['predicted']} | "
+            f"{c['count']} / {c['out_of']} |"
+        )
+    args.markdown.write_text("\n".join(md) + "\n", encoding="utf-8")
+    print(
+        f"wrote {args.csv}, {args.markdown} and {args.results / 'summary.json'} ({len(rows)} rows)"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
@@ -244,7 +663,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--markdown", type=Path, default=REPO / "results" / "live_gap.md")
     parser.add_argument("--only", nargs="*", help="run only these configs")
     args = parser.parse_args(argv)
-    return run_all(args) if args.command == "python" else report(args)
+    if args.command == "python":
+        return run_all(args)
+    configs = load_configs(args.configs)
+    return report_v2(args, configs) if "analysis" in configs else report(args)
 
 
 if __name__ == "__main__":

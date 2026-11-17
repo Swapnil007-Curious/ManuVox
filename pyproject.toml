@@ -27,6 +27,11 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "PTH", "NPY", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# The paper generators hold LaTeX table templates and regex allowlists as single string literals;
+# splitting them would make the generated text harder to check against the paper.
+"scripts/paper_*.py" = ["E501"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true

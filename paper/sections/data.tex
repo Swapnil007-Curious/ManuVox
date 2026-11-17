@@ -1,0 +1,42 @@
+\section{Data and Splits}
+\label{sec:data}
+
+\paragraph{Dataset.}
+We use the Google ISLR data \citep{kaggle2023islr} (licence CC BY 4.0): \V{data.total} sequences
+of MediaPipe Holistic landmarks for \V{data.signs} isolated ASL signs, recorded by
+\V{data.signers} signers. Each frame holds \V{data.lmtotal} landmarks (\V{data.lmface} face,
+\V{data.lmpose} pose, \V{data.lmhand} per hand) with x and y normalized by the image width and
+height. We drop sequences with fewer than
+\V{data.minhand} frames in which a hand is detected (\V{data.excluded} sequences), leaving
+\V{data.kept}; each sign keeps between \V{data.signmin} and \V{data.signmax} sequences.
+
+\paragraph{Signer-independent split.}
+Our split assigns signers whole, by a seeded random permutation, to training
+(\V{data.trainsigners} signers, \V{data.trainseq} sequences), validation (\V{data.valsigners},
+\V{data.valseq}) and test (\V{data.testsigners}, \V{data.testseq}); it is not an official split.
+Checkpoint selection, early stopping, temperature fitting and the abstention threshold use
+validation only. A single script reads the test split and logs every run
+(Table~\ref{tab:testaccess}). The test split was not untouched during development: the v2 features,
+recipe and architecture were designed after the v1 models had been evaluated on it, and the model
+to ship was chosen by test accuracy (Section~\ref{sec:models}). The paired comparisons and test
+calibration in this paper come from logits saved after those choices were final.
+
+\paragraph{Landmarks and features.}
+One JSON file, \cfg{features\_spec.json}, specifies the landmark subset, normalization,
+missing-value rules, dominant-hand mirroring and resampling, and both the Python training code and
+the browser read it. Face and lip points are not used, and z is dropped, which keeps the different
+depth scales of the Holistic and Tasks trackers out of the model. Frames without a hand are
+removed; coordinates are centered on the median shoulder midpoint and scaled by the median
+shoulder distance; a sequence whose left hand is present in more frames than its right is
+mirrored (x\,$\to$\,1$-$x with the hand blocks and left/right pose points swapped); and each
+sequence is linearly resampled to \V{data.frames} frames. Mirroring flips
+\V{data.mirroredpct}\% of sequences, but it is a property of signers rather than sequences:
+\V{mir.high} of the \V{data.signers} signers have more than 80\% of their sequences mirrored and
+\V{mir.low} have under 5\%, consistent with left-handed signers or mirrored (selfie) recordings,
+which the data cannot tell apart; every test signer is at most \V{mir.testmax}\%. The \emph{v1} input keeps both hands and \V{data.v1pose} pose points
+(nose, shoulders, elbows, wrists), \V{data.v1points} landmarks in all. The \emph{v2} input keeps
+\V{data.v2pose} pose points (adding eyes, ears and mouth corners), \V{data.v2points} landmarks,
+and computes \V{data.v2feat} features inside the model graph: coordinates, velocity and
+acceleration, the \V{data.pairdist} pairwise distances of the dominant hand, and
+\V{data.facedist} distances from its wrist and fingertips to the nose, mouth and shoulders, all
+standardized with training statistics.

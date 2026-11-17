@@ -1,0 +1,805 @@
+{
+ "source": "data/live_clips_v2/clips.json",
+ "clips": [
+  {
+   "label": "bed",
+   "take": 1,
+   "sha256": "80186f352b96226b36ce12c992b9dc048be96eb68db3378069a774260812c5ef",
+   "source_fps": 15.038106269284302,
+   "source_frames": 103,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "bed",
+   "take": 2,
+   "sha256": "4d3c534f848dae6f0ddf41623fd6eb341e697464d8a6358715f22684c01e21c0",
+   "source_fps": 15.03974790517797,
+   "source_frames": 84,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "bird",
+   "take": 1,
+   "sha256": "ecf14794130f649b75ce4d6cafea3154754a64551607cc218331a272b2ea0529",
+   "source_fps": 15.052069659578192,
+   "source_frames": 86,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "bird",
+   "take": 2,
+   "sha256": "b855a68f9d4053253e4b5c4a2f6301294819d3fd8d33c2f0d96002890808c72f",
+   "source_fps": 15.06965119270776,
+   "source_frames": 82,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "book",
+   "take": 1,
+   "sha256": "6c58dd735ebe05307e9fbdf0dfd1c4b653ab385bc9d8cade3d0fa659ad00a66c",
+   "source_fps": 15.059039880653591,
+   "source_frames": 107,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "book",
+   "take": 2,
+   "sha256": "1b99903218ba83152255787daa4f1864c1798554f8ac9b4dc55b8995ee1f6839",
+   "source_fps": 15.041226634821808,
+   "source_frames": 110,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "car",
+   "take": 1,
+   "sha256": "1d18ba8b274593f3e80c7473fd811fdd29ed36a7efa90948fedff2aa0b1f4485",
+   "source_fps": 15.030821628620485,
+   "source_frames": 89,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "car",
+   "take": 2,
+   "sha256": "cc6623387741a446915c9f4b79b1bf45363df15f25332acdefda6c68272833c5",
+   "source_fps": 15.023987161320061,
+   "source_frames": 88,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "cat",
+   "take": 1,
+   "sha256": "f27f9cbd550fd16585b2585d8b73061be349fbd59a3f4827943f82720704c71d",
+   "source_fps": 15.036840258633653,
+   "source_frames": 90,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "cat",
+   "take": 2,
+   "sha256": "18962c39265c33b41a0fa7268589775a0cf2823fab77d24a5a16d9144a0d0ccc",
+   "source_fps": 15.035734277568768,
+   "source_frames": 77,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "dad",
+   "take": 1,
+   "sha256": "7fbee339428913d44b8e605b25266c4066b7e7c9dca059b80f231ad25648aa52",
+   "source_fps": 15.065053640721297,
+   "source_frames": 88,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "dad",
+   "take": 2,
+   "sha256": "54b097bae91d61c7d0e35fdf988b8e76bdfd00bb9f4ea95920c226591165a4d9",
+   "source_fps": 15.064709776083632,
+   "source_frames": 88,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "dog",
+   "take": 1,
+   "sha256": "a6f6183ccdb67f55948bb77cba4e1eb77351261684a147b8f6173cdc0446a8dc",
+   "source_fps": 14.901531358127826,
+   "source_frames": 88,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "dog",
+   "take": 2,
+   "sha256": "c73c6cbc5a19294258eb47e9460c016f013b853f444e1596029b2bd88c411399",
+   "source_fps": 15.066803548084522,
+   "source_frames": 68,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "drink",
+   "take": 1,
+   "sha256": "177eb76c91a22269e318065109843e4d2b609628283d3da393a6c1b21a693977",
+   "source_fps": 15.06790602984115,
+   "source_frames": 75,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "drink",
+   "take": 2,
+   "sha256": "9daf74ead3991a9d9fc07a44c014f5266ebb8e117c9c179a46b0a389f2ce11db",
+   "source_fps": 15.068309670506295,
+   "source_frames": 75,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "finish",
+   "take": 1,
+   "sha256": "39ba6004ca32302cbc69e2c9cd740df8964869b8beb9e589bf161e51ef648375",
+   "source_fps": 14.885783770207604,
+   "source_frames": 81,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "finish",
+   "take": 2,
+   "sha256": "363dac5563f87ee81915347fe677063ce3d51159fe65a0d60e2329fd062a9af9",
+   "source_fps": 15.081873024992818,
+   "source_frames": 70,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "food",
+   "take": 1,
+   "sha256": "75f84530d326a60afe9f7f707b601d0f7682ab811e57f685ef552ef3fc14c1e8",
+   "source_fps": 15.053201726650354,
+   "source_frames": 73,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "food",
+   "take": 2,
+   "sha256": "1a78cdabd896149abdf059794b865c18af5007b45093004b891ecbf2c6c27d59",
+   "source_fps": 15.088619072581217,
+   "source_frames": 71,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "go",
+   "take": 1,
+   "sha256": "4b9f53afdd0a00df9dd67361ad66cba4abfde2e874fcf674728bacd4c3e4d9ee",
+   "source_fps": 15.01437089785938,
+   "source_frames": 105,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "go",
+   "take": 2,
+   "sha256": "6d1ece5ffba85d388720ffa8912615004cea412c5b52168bceac2a87df17c410",
+   "source_fps": 15.008803240362136,
+   "source_frames": 104,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "happy",
+   "take": 1,
+   "sha256": "84e3b26822c25ac419e55d0fee1cd380796426de6440f7d987dbd666344635f6",
+   "source_fps": 15.060562688257034,
+   "source_frames": 94,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "happy",
+   "take": 2,
+   "sha256": "648960e5195eae71bbcf9e424125b64dd73400dfabcb2d9d042a074ab065832b",
+   "source_fps": 15.06965119270776,
+   "source_frames": 82,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "hello",
+   "take": 1,
+   "sha256": "78224f79ddc8f21acdb164f3c07dc9ca7943dae911f05d7d3c20eeaf7c40142e",
+   "source_fps": 15.071826673993248,
+   "source_frames": 96,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "hello",
+   "take": 2,
+   "sha256": "2f9c142cf0893ad0d17bb973dbd42970d25c6423d526fa298056c02bd4a465e7",
+   "source_fps": 15.102719179074114,
+   "source_frames": 73,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "home",
+   "take": 1,
+   "sha256": "8791048f31ae32f9f5b42a755e81f34c994f5e60228c6f6adebf828894e607b0",
+   "source_fps": 15.045828364968807,
+   "source_frames": 98,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "home",
+   "take": 2,
+   "sha256": "5c3290140be5b7a956b0f71fd3b24b93c24c96c55303a4bc7229a5feafa748a3",
+   "source_fps": 15.05215747590488,
+   "source_frames": 86,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "hungry",
+   "take": 1,
+   "sha256": "6959052d6acfd722621f7c365bff46438570a67649749daea0c119f9cb10bbde",
+   "source_fps": 15.089367309204514,
+   "source_frames": 71,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "hungry",
+   "take": 2,
+   "sha256": "099d36774735b910ef28e59ba8215fb6e39064f71f8ff8989a294c93d8cf86da",
+   "source_fps": 15.07583325765144,
+   "source_frames": 83,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "milk",
+   "take": 1,
+   "sha256": "c6643ec0576d3743977b76d26ed02728e35844a16ed6d27d401a6f2afec2b935",
+   "source_fps": 15.020192239567344,
+   "source_frames": 106,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "milk",
+   "take": 2,
+   "sha256": "87a729d204910400725725eb613843420ee3149cd9eeaf3be4102b2b98e9a4d2",
+   "source_fps": 15.063601874581567,
+   "source_frames": 108,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "mom",
+   "take": 1,
+   "sha256": "a31c04ea3d5bd38dad4aeec78e6bd76a02cd3b49171b47da752908baf4aaf542",
+   "source_fps": 15.058155635558018,
+   "source_frames": 87,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "mom",
+   "take": 2,
+   "sha256": "5b62a8296905239c257a7148b66efab2468e4b8a952e47bd9d3f6a0c21e0899d",
+   "source_fps": 15.069835824552806,
+   "source_frames": 82,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "no",
+   "take": 1,
+   "sha256": "81ec862a1ab20c807d92340a091e149d7cbedd25cc27e51456c737702cc04299",
+   "source_fps": 15.025135507063219,
+   "source_frames": 107,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "no",
+   "take": 2,
+   "sha256": "5234c71e456f9782ace548a874148008665d919b07b64b5dd3e70bacf2c56473",
+   "source_fps": 15.054796220652591,
+   "source_frames": 93,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "please",
+   "take": 1,
+   "sha256": "d75cb459f2b3bb5e9b521e32fd82cd8e6c4ac94c939ab9a9e31356c235781dd6",
+   "source_fps": 15.060562688257034,
+   "source_frames": 94,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "please",
+   "take": 2,
+   "sha256": "b0b3cd7299f03d4ec997b5bff3d7fad60e9902fbe53d9f0e0ae502efb1c179de",
+   "source_fps": 15.07617435463394,
+   "source_frames": 76,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "read",
+   "take": 1,
+   "sha256": "f7c0f48beb80d31e0444c377e8d1f1c3760b0ca6151752d0efcfe3ff3718e5ca",
+   "source_fps": 15.06765673317445,
+   "source_frames": 102,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "read",
+   "take": 2,
+   "sha256": "499ff5a89de10271980a8f273c7148728569e7ef0011a138432be58327384540",
+   "source_fps": 15.040625193822489,
+   "source_frames": 97,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "sad",
+   "take": 1,
+   "sha256": "227c3e25c5e3a32af036c8c134bf4860d9dc3b24ebff7984afb02fb94f02c550",
+   "source_fps": 15.040469717487259,
+   "source_frames": 97,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "sad",
+   "take": 2,
+   "sha256": "63b80bd234565363332bdb0a6e0eda74c9f89d912076e06a3c4ae0e529b2a95c",
+   "source_fps": 15.032691576259214,
+   "source_frames": 83,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "sleep",
+   "take": 1,
+   "sha256": "7b2db5f7a1187571b850e4d74f2a898d382ef4da2b4bbbc3e1cc096a642d8bc7",
+   "source_fps": 15.06064312150521,
+   "source_frames": 94,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "sleep",
+   "take": 2,
+   "sha256": "021dc65c92a9f59634d1609e552a45168f478a280fb16934385d619e1308f6a1",
+   "source_fps": 15.082053553259998,
+   "source_frames": 84,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "thankyou",
+   "take": 1,
+   "sha256": "2a049ce9e04224eecdd5a9565efebc8495e452c5f2d53da9385d7a541ee77c34",
+   "source_fps": 15.053408669113704,
+   "source_frames": 73,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "thankyou",
+   "take": 2,
+   "sha256": "6d3c0b80327755c272408e1052e3f583feb84a0f1b96cb7afde96376dc99649b",
+   "source_fps": 15.073949738936667,
+   "source_frames": 69,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "water",
+   "take": 1,
+   "sha256": "766e4dbe27f67c700a5a5a4b50c832a945b3a4bdde625f7ea7286485a4e15c64",
+   "source_fps": 15.052333111632302,
+   "source_frames": 86,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "water",
+   "take": 2,
+   "sha256": "33e9f3a15677c817ea93b4a1254388b0bca3ea1ca53e790c6820295f9baf1feb",
+   "source_fps": 15.069281942589711,
+   "source_frames": 82,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "yes",
+   "take": 1,
+   "sha256": "531954008bd22233b193dd5858074cf420d5c076e98194d59a0db21cc24e39e5",
+   "source_fps": 15.072656055646881,
+   "source_frames": 103,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  },
+  {
+   "label": "yes",
+   "take": 2,
+   "sha256": "e48e819733e7c6ebface442181d4ffd3d3b0490479794842a88507cb020dd5e6",
+   "source_fps": 15.052508751458577,
+   "source_frames": 86,
+   "source_size": [
+    1280,
+    720
+   ],
+   "y4m_size": [
+    640,
+    360
+   ],
+   "duplicate_of": []
+  }
+ ]
+}

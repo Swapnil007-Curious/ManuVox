@@ -1,0 +1,16 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+A signer-independent test accuracy of \V{m.d.top1}\% did not make a usable live recognizer: the
+first deployment recognized \V{lg.web.c0headbuild.top1}\% of new webcam clips. Of six candidate
+train--serve discrepancies, one had a large and consistent effect: putting each hand in a different
+slot from the one the training tracker used. A shared feature specification and a golden parity
+test, which covers hand assignment, now keep the Python and browser pipelines identical and fail
+when they diverge. With the fixes, clip top-1 reaches \V{lg.web.c6final.top1}\% in the browser and
+\V{lg.py.c6final.top1}\% with the training tracker, about \V{lg.web.recover}--\V{lg.py.recover}\%
+of the way back to test accuracy. The rest of the gap is shared by both live pipelines. Part of it
+is a segmenter, tuned on dataset sequences, that missed whole signs; the rest may be the signer,
+the camera or the signer's productions, which one signer cannot separate. Thresholds chosen on
+dataset sequences need live validation data of their own, and the next steps are an oracle
+segmentation of these clips and live recordings from many Deaf signers, gathered with their
+involvement.

@@ -17,7 +17,13 @@ venv/
 # Kaggle training outputs and the recorded webcam clips (personal video): local inputs only.
 /artifacts/
 /test_clips/
+/test_clips_v2/
 results/live_gap/*.log
+results/live_gap_v2/*.log
+# LaTeX build logs (paper/main.pdf itself is committed)
+paper/*.log
+paper/*.blg
+paper/*.aux
 results/**/artifacts
 # Quantised models; their quant_report.json files and the result CSVs stay tracked.
 results/quant/**/*.onnx

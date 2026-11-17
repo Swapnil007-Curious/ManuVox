@@ -1,0 +1,74 @@
+\section{Hyperparameters}
+\label{app:hparams}
+
+\input{tables/hparams}
+
+\section{Test Signers and Test-Split Access}
+\label{app:testsplit}
+
+Table~\ref{tab:persigner} gives every signer-independent model's top-1 per test signer;
+Table~\ref{tab:testaccess} lists every run of the script that reads the test split.
+
+\input{tables/persigner}
+\input{tables/testaccess}
+
+\section{Quantization}
+\label{app:quant}
+
+\input{tables/quant}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/quant}
+\caption{Post-training quantization of the v1 models. Left: test top-1 against file size (each
+line runs through fp32, fp16, dynamic int8, static int8 and static int8 with the input quantized).
+Right: one call in Python onnxruntime on the i3-1115G4 (1 thread, p50). Numbers are in
+Table~\ref{tab:quant}.}
+\label{fig:quant}
+\end{figure*}
+
+\section{Live-Gap Details}
+\label{app:livegap}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.6\columnwidth]{figures/skeleton}
+\caption{One frame of a live clip (``hello''), drawn from its Holistic landmarks only: pose in
+grey, the signer's right hand in orange. No camera image appears in this paper.}
+\label{fig:skeleton}
+\end{figure}
+
+Figure~\ref{fig:skeleton} shows one frame of a live clip as the pipelines see it.
+Table~\ref{tab:livegapci} gives every live-gap configuration with its interval and its comparison
+against the configuration it changes; Table~\ref{tab:persign} gives the final pipeline per sign,
+next to the shipped model's accuracy on the same sign in the test split. The most frequent
+confusions of the final pipeline were, for Python + Holistic: \V{lg.py.confusions}; and for the
+browser: \V{lg.web.confusions} (counts over takes and runs).
+
+\input{tables/livegap_ci}
+\input{tables/persign}
+
+\section{Pilot: Ten Screen-Recorded Clips}
+\label{app:pilot}
+
+Before the main live test, a pilot used ten clips, one per sign with several repetitions each,
+recorded as screen captures of the first version of the demo. Two pairs of these files turned out
+to be byte-identical (``yes'' = ``no'', ``dad'' = ``mom''), so one clip of each pair necessarily
+carries a wrong label. We exclude all four from every statistic and report only the six
+unambiguous clips (Table~\ref{tab:pilot}), without intervals: with six clips, one clip moves
+accuracy by about seventeen points. The pilot motivated the fixes and their order; nothing was
+tuned on it, and the main evaluation uses new recordings.
+
+\input{tables/pilot}
+
+\section{Reproducibility}
+\label{app:repro}
+
+Code, configurations and every result file read by the paper's generators are in the project
+repository; \cfg{paper/README.md} lists the commands. The paper's tables, numbers and figures are
+written by \cfg{scripts/paper\_tables.py} and \cfg{scripts/paper\_figures.py} from those files, and
+\cfg{scripts/paper\_claims.py} re-reads every number from its source (\cfg{paper/CLAIMS.md}).
+Training ran on Kaggle (\V{m.gpu}, code at commit \V{repro.train}); the test predictions, CPU
+benchmark and live evaluations ran on the i3-1115G4 laptop from commit \V{repro.base} with the
+evaluation scripts that are committed together with this paper. The live clips and the dataset
+are not redistributed.

@@ -13,6 +13,13 @@ layout matches its checkpoint, so v1 and v2 runs can be evaluated together.
 
 With --quant-root, the ONNX variants that scripts/quantize.py wrote for each signer-independent
 run with v1 features are evaluated instead of the checkpoints.
+
+With --predictions-out DIR, nothing is re-scored and no table is rewritten: the per-sequence test
+logits of every signer-independent run with a checkpoint (and, with --onnx-model, of that ONNX
+file, e.g. the shipped web model, on the test split of --onnx-run) are saved to
+DIR/<experiment>/seed_<s>.npz (sequence_id, participant_id, y, logits), for the paired model
+comparisons and the test-set calibration of scripts/test_analysis.py. Model selection is already
+done on val; these files are only read for reporting. The access is logged like every other.
 """
 
 import argparse
@@ -53,6 +60,7 @@ from edgevision.runs import (
     find_completed_runs,
     variant_file,
 )
+from edgevision.runtime import OrtModel
 from edgevision.train.data import SplitArrays, load_split_arrays, matching_processed_dir
 from edgevision.train.loop import resolve_device
 
@@ -83,7 +91,83 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         help="evaluate the ONNX variants under this directory (scripts/quantize.py output)",
     )
+    parser.add_argument(
+        "--predictions-out",
+        type=Path,
+        help="save per-sequence test logits of every signer-independent run here (no tables)",
+    )
+    parser.add_argument(
+        "--onnx-model",
+        type=Path,
+        help="with --predictions-out: also save this ONNX file's test logits "
+        "(e.g. web/public/model/model.onnx)",
+    )
+    parser.add_argument(
+        "--onnx-run",
+        help="with --onnx-model: the run (<experiment>/seed_<s>) whose split file and "
+        "processed dir it uses",
+    )
+    parser.add_argument(
+        "--skip-runs",
+        action="store_true",
+        help="with --onnx-model: save only the ONNX file's logits, not the checkpoints'",
+    )
     return parser.parse_args(argv)
+
+
+def save_predictions(args: argparse.Namespace, runs: Sequence[CompletedRun]) -> int:
+    """Per-sequence test logits for reporting (paired comparisons, calibration); no tables."""
+    runs = [
+        run
+        for run in runs
+        if run.split_mode == PRIMARY_SPLIT_MODE and (run.directory / CHECKPOINT_FILE).is_file()
+    ]
+    onnx_run = None
+    if args.onnx_model is not None:
+        onnx_run = next((run for run in runs if run.key == args.onnx_run), None)
+        if onnx_run is None:
+            print(f"error: --onnx-run {args.onnx_run!r} is not a completed run", file=sys.stderr)
+            return 1
+    keys = [] if args.skip_runs else [run.key for run in runs]
+    if args.onnx_model is not None:
+        digest = hashlib.sha256(args.onnx_model.read_bytes()).hexdigest()
+        keys.append(f"onnx:{args.onnx_model.as_posix()}@{digest[:12]} (split of {args.onnx_run})")
+    append_access_log(args.final_dir / ACCESS_LOG, keys)
+    device = resolve_device(args.device)
+    loaded: dict[tuple[str, str], SplitArrays] = {}
+
+    def write(target: Path, test: SplitArrays, logits: npt.NDArray[np.float32], name: str) -> None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(
+            target,
+            sequence_id=test.sequence_id,
+            participant_id=test.participant_id,
+            y=test.y,
+            logits=logits.astype(np.float32),
+        )
+        top1 = top_k_accuracy(logits, test.y, 1)
+        print(f"{name}: test top-1 {top1:.4f} (n={len(test.y)}) -> {target}", flush=True)
+
+    for run in [] if args.skip_runs else runs:
+        test = load_test_split(args, run, loaded)
+        evaluator = TorchCheckpointEvaluator(
+            run.directory / CHECKPOINT_FILE, device, args.batch_size
+        )
+        # run.key is <experiment>/seed_<s>, so this writes DIR/<experiment>/seed_<s>.npz.
+        write(args.predictions_out / f"{run.key}.npz", test, evaluator.predict(test.X), run.key)
+    if args.onnx_model is not None and onnx_run is not None:
+        test = load_test_split(args, onnx_run, loaded)
+        # OrtModel, not OnnxEvaluator: the web model carries the v2 layout in its metadata, and
+        # its input is the processed arrays as they are (scripts/export_web.py scores val so).
+        model = OrtModel(args.onnx_model, intra_op_threads=4)
+        logits = np.concatenate(
+            [
+                model.run(np.ascontiguousarray(test.X[i : i + args.batch_size], dtype=np.float32))
+                for i in range(0, len(test.X), args.batch_size)
+            ]
+        )
+        write(args.predictions_out / "web_model.npz", test, logits, f"onnx {args.onnx_model}")
+    return 0
 
 
 def run_processed_dir(args: argparse.Namespace, run: CompletedRun) -> Path:
@@ -136,6 +220,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     if args.quant_root is not None:
         return evaluate_variants(args, runs)
+    if args.predictions_out is not None:
+        return save_predictions(args, runs)
 
     without_checkpoint = [run for run in runs if not (run.directory / CHECKPOINT_FILE).is_file()]
     for run in without_checkpoint:

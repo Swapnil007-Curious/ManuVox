@@ -1,0 +1,131 @@
+{
+ "source": "data/processed_v2/manifest.csv",
+ "signers": [
+  {
+   "participant_id": "16069",
+   "split": "train",
+   "mirrored_fraction": 0.9993214204931011,
+   "sequences": 4421
+  },
+  {
+   "participant_id": "18796",
+   "split": "train",
+   "mirrored_fraction": 0.0,
+   "sequences": 2921
+  },
+  {
+   "participant_id": "2044",
+   "split": "train",
+   "mirrored_fraction": 0.0,
+   "sequences": 4431
+  },
+  {
+   "participant_id": "22343",
+   "split": "train",
+   "mirrored_fraction": 0.9773345421577516,
+   "sequences": 4412
+  },
+  {
+   "participant_id": "25571",
+   "split": "train",
+   "mirrored_fraction": 0.006534006534006534,
+   "sequences": 3367
+  },
+  {
+   "participant_id": "26734",
+   "split": "train",
+   "mirrored_fraction": 0.0006476683937823834,
+   "sequences": 4632
+  },
+  {
+   "participant_id": "27610",
+   "split": "val",
+   "mirrored_fraction": 0.8260549558390579,
+   "sequences": 4076
+  },
+  {
+   "participant_id": "28656",
+   "split": "train",
+   "mirrored_fraction": 0.048264384213029005,
+   "sequences": 4206
+  },
+  {
+   "participant_id": "29302",
+   "split": "train",
+   "mirrored_fraction": 0.14820558263181213,
+   "sequences": 4514
+  },
+  {
+   "participant_id": "30680",
+   "split": "test",
+   "mirrored_fraction": 0.0007407407407407407,
+   "sequences": 2700
+  },
+  {
+   "participant_id": "32319",
+   "split": "train",
+   "mirrored_fraction": 0.9980211081794196,
+   "sequences": 4548
+  },
+  {
+   "participant_id": "34503",
+   "split": "val",
+   "mirrored_fraction": 0.9931442080378251,
+   "sequences": 4230
+  },
+  {
+   "participant_id": "36257",
+   "split": "train",
+   "mirrored_fraction": 1.0,
+   "sequences": 4587
+  },
+  {
+   "participant_id": "37055",
+   "split": "val",
+   "mirrored_fraction": 0.5512069369580501,
+   "sequences": 4267
+  },
+  {
+   "participant_id": "37779",
+   "split": "test",
+   "mirrored_fraction": 0.0,
+   "sequences": 4322
+  },
+  {
+   "participant_id": "4718",
+   "split": "train",
+   "mirrored_fraction": 0.015146526177148501,
+   "sequences": 3037
+  },
+  {
+   "participant_id": "49445",
+   "split": "test",
+   "mirrored_fraction": 0.004595780238144976,
+   "sequences": 4787
+  },
+  {
+   "participant_id": "53618",
+   "split": "train",
+   "mirrored_fraction": 0.12106768350810296,
+   "sequences": 4196
+  },
+  {
+   "participant_id": "55372",
+   "split": "train",
+   "mirrored_fraction": 0.9995741962955078,
+   "sequences": 4697
+  },
+  {
+   "participant_id": "61333",
+   "split": "train",
+   "mirrored_fraction": 0.8127632687447346,
+   "sequences": 4748
+  },
+  {
+   "participant_id": "62590",
+   "split": "test",
+   "mirrored_fraction": 0.0022558087074216106,
+   "sequences": 4433
+  }
+ ]
+}

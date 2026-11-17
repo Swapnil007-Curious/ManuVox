@@ -1,0 +1,45 @@
+\section{Efficiency on a Low-Power Laptop}
+\label{sec:efficiency}
+
+All timings in this section were measured on the deployment target, a laptop with an Intel Core
+i3-1115G4 (\V{hw.cores} cores, \V{hw.threads} threads), integrated graphics and \V{hw.ramgib}\,GiB
+of memory, in Chrome \V{b.chrome} and in Python onnxruntime.
+
+\paragraph{Quantization.}
+Table~\ref{tab:quant} (Appendix~\ref{app:quant}) applies post-training quantization to the v1 models
+\citep{jacob2018quantization,nagel2021whitepaper}. fp16 halves every file at no measurable cost
+in accuracy, though on this CPU it is slightly slower than fp32 (hybrid: \V{q.hybrid.fp16.p50}
+vs.\ \V{q.hybrid.onnxfp32.p50} ms). int8 always costs accuracy: dynamic quantization \V{q.cnn.int8dynamic.delta} to
+\V{q.gru.int8dynamic.delta} points, static quantization \V{q.transformer.int8static.delta} to
+\V{q.gru.int8static.delta} points, with the GRU hurt most. Its effect on latency depends on the
+model. Dynamic int8 speeds up the transformer (p50 \V{q.transformer.int8dynamic.p50} vs.\
+\V{q.transformer.fp32.p50} ms) but slows the CNN (\V{q.cnn.int8dynamic.p50} vs.\
+\V{q.cnn.fp32.p50} ms) and the hybrid (\V{q.hybrid.int8dynamic.p50} vs.\
+\V{q.hybrid.onnxfp32.p50} ms); both slowed models are built from depthwise convolutions, which
+the transformer lacks, but we did not profile the cause. Every model is already fast enough in fp32
+on this CPU, so the accuracy loss buys nothing; we ship the hybrid in fp16 (\V{m.ship.mb}\,MB).
+
+\paragraph{Python vs.\ browser.}
+One hybrid call takes \V{q.hybrid.fp16.p50} ms (p50) in Python onnxruntime with one thread and
+\V{b.wasm1.p50} ms (p95 \V{b.wasm1.p95}) in onnxruntime-web with WebAssembly SIMD and one thread.
+More threads do not help in the browser (two threads: p50 \V{b.wasm2.p50} ms; four:
+\V{b.wasm4.p50} ms), and the WebGPU backend on the integrated GPU is slower still (p50
+\V{b.webgpu1.p50} ms) while agreeing with WebAssembly on the top-1 class, so the app uses one
+WebAssembly thread and keeps WebGPU as an option it adopts only if it measures faster. These are
+the shipped file's numbers; Table~\ref{tab:models} and Figure~\ref{fig:acclat} come from the earlier
+selection benchmark of every candidate (fp32, p50 \V{m.d.p50} ms for the hybrid), and the
+per-segment times below are measured inside the running app, so the three differ by a few
+milliseconds.
+
+\paragraph{Live throughput.}
+In the full app, MediaPipe runs in one worker on the GPU delegate and the classifier in another, so
+a classification never blocks tracking. With the recorded clip as camera, tracking ran at
+\V{t.hudon.fps} frames per second with the hand skeleton drawn (two \V{t.duration}-second runs:
+\V{t.hudon.fps1} and \V{t.hudon.fps2}) and \V{t.hudoff.fps} without it (\V{t.hudoff.fps1},
+\V{t.hudoff.fps2}); the order of the runs moved fps more than the overlay did. The classifier took
+\V{t.hudon.cls1} and \V{t.hudon.cls2} ms per segment (p50), well inside the \V{budget.ms} ms
+budget, and a word appeared \V{t.hudon.e2e1} ms (p50) after the segmenter decided that the sign
+had ended; that decision itself comes \V{seg.lostms}--\V{seg.stillms} ms after the hands leave or
+stop, so a user waits about \V{t.userlo}--\V{t.userhi} ms. Without a working GPU delegate the hand
+landmarker alone takes \V{t.cpu.hand} ms per frame on the CPU and tracking drops to \V{t.cpu.fps}
+fps, below our \V{budget.fps} fps target and below the frame rate of our own recordings.
