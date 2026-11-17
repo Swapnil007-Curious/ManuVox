@@ -5,7 +5,9 @@
   "name": "edge-vision-translate",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-15",
-  "observability": { "enabled": false },
+  "observability": {
+    "enabled": false
+  },
   "vars": {
     // The OpenAI-compatible endpoint and model (the API key is a secret, never a var).
     "LLM_BASE_URL": "https://api.groq.com/openai/v1",
@@ -20,7 +22,19 @@
   // Rate limits live in one Durable Object per client address plus one global object (SQLite
   // backend: the only kind on the Workers Free plan). See src/limits.ts for why.
   "durable_objects": {
-    "bindings": [{ "name": "LIMITS", "class_name": "RateLimiter" }]
+    "bindings": [
+      {
+        "name": "LIMITS",
+        "class_name": "RateLimiter"
+      }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RateLimiter"] }]
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "RateLimiter"
+      ]
+    }
+  ]
 }
