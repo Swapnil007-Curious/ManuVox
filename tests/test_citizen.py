@@ -28,7 +28,7 @@ def parquet_layout(blocks):
 
 
 def write_landmarks(root: Path, rng: np.random.Generator):
-    """A miniature kaggle/asl_citizen_extract.ipynb output: manifest.csv and two shards."""
+    """A miniature kaggle/asl_citizen_merge.ipynb output: manifest.csv and two shards."""
     rows, arrays, by_file = [], {0: [], 1: []}, {}
     ordinal = 0
     for participant, split in PARTICIPANTS.items():

@@ -1,5 +1,5 @@
 # ASL Citizen -> MediaPipe Holistic landmarks for the edge-vision vocabulary (body of the Kaggle
-# notebook kaggle/asl_citizen_extract.ipynb; scripts/build_kaggle_notebooks.py puts
+# notebooks kaggle/asl_citizen_*.ipynb; scripts/build_kaggle_notebooks.py --script-out puts
 # src/edgevision/data/citizen_labels.py and the 250 labels above this file).
 #
 # The archive (about 46 GB) is never downloaded whole: its central directory is read with HTTP
@@ -449,7 +449,7 @@ def smoke_report(shards: Path, wall_seconds: float, total_planned: int) -> bool:
 README = """# asl-citizen-landmarks-private
 
 MediaPipe Holistic landmarks for the ASL Citizen videos whose glosses map onto the 250-sign
-edge-vision vocabulary, plus the glosses kept for review. Made by kaggle/asl_citizen_extract.ipynb.
+edge-vision vocabulary, plus the glosses kept for review. Made by kaggle/asl_citizen_merge.ipynb.
 
 PRIVATE. ASL Citizen is licensed by Microsoft for non-commercial research only. These landmarks
 are derived from it and must not be shared, published or redistributed; keep this dataset and

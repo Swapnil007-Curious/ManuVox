@@ -1,4 +1,4 @@
-"""ASL Citizen landmarks (kaggle/asl_citizen_extract.ipynb output) as edge-vision processed data.
+"""ASL Citizen landmarks (kaggle/asl_citizen_merge.ipynb output) as edge-vision processed data.
 
 The landmarks are stored in the asl-signs parquet layout, so ``coords_from_holistic`` selects the
 same slots ``pivot_sequence`` does and preprocessing continues with the shared steps

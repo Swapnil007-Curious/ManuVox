@@ -122,13 +122,3 @@ def test_the_kaggle_notebooks_are_up_to_date():
         check=False,
     )
     assert completed.returncode == 0, completed.stderr
-
-
-def test_the_extraction_notebook_holds_the_mapping_and_labels():
-    notebook = json.loads((ROOT / "kaggle/asl_citizen_extract.ipynb").read_text("utf-8"))
-    (cell,) = notebook["cells"]
-    source = "".join(cell["source"])
-    assert source.startswith("%%bash")
-    assert "def build_mapping(" in source and json.dumps(LABELS) in source
-    assert "exit 0" in source.splitlines()[-1]
-    assert notebook["metadata"]["kaggle"]["isInternetEnabled"] is True

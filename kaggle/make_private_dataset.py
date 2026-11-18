@@ -1,7 +1,6 @@
 # Create, or add a version to, the PRIVATE Kaggle dataset asl-citizen-landmarks-private from a
-# finished extraction (the merge run of kaggle/asl_citizen_extract.ipynb, which embeds this file;
-# scripts/build_kaggle_notebooks.py puts it there). Runs with Kaggle's own Python, where
-# kaggle_secrets lives:
+# finished extraction (kaggle/asl_citizen_merge.ipynb runs it from the edge-vision-src code
+# archive). Runs with Kaggle's own Python, where kaggle_secrets lives:
 #
 #     python make_private_dataset.py /kaggle/working/asl-citizen-landmarks
 #
@@ -116,7 +115,7 @@ def make_dataset(
     print(text)
     if not succeeded(code, text) and re.search(r"already (in use|exists)", text, re.IGNORECASE):
         version = [*command, "datasets", "version", "-p", str(out), "--dir-mode", "zip", "-m",
-                   "asl_citizen_extract merge run"]  # fmt: skip
+                   "asl_citizen_merge run"]  # fmt: skip
         print(f"{dataset_id} exists; adding a version")
         code, text = runner(version, env)
         print(text)

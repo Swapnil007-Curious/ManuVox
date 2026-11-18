@@ -1,50 +1,111 @@
-"""Build the single-cell Kaggle notebooks in kaggle/ from the repository sources.
+"""Build the single-cell Kaggle notebooks in kaggle/ and the code archive they run.
 
-kaggle/asl_citizen_extract.ipynb runs without the repository: its one cell holds
-src/edgevision/data/citizen_labels.py, the 250 labels of web/public/model/meta.json,
-kaggle/asl_citizen_extract.py and kaggle/make_private_dataset.py. kaggle/asl_citizen_smoke.ipynb
-is the same cell with the smoke-test switch on (20 videos into a separate -smoke folder, no
-dataset). kaggle/train_v3.ipynb unpacks a source archive (or clones the repository) and runs the
-v3 recipe. Every cell tees everything to a log and always exits 0.
+Every notebook takes the repository code from the private Kaggle dataset edge-vision-src only,
+never from a git clone. That dataset holds edge-vision-src.tar.gz, the git archive of one commit
+(--source-archive) with a SOURCE_COMMIT file. Each cell finds it under /kaggle/input, prints the
+commit, checks that the archive holds the notebook sources the cell was built from (the
+fingerprint of SOURCE_FILES) and stops with a clear message when it is missing or different.
 
-Kaggle's image runs Python 3.13 and mediapipe 0.10.21 (the last release with the legacy Holistic
-solution the training data was made with) has wheels only up to Python 3.12, so the extraction
-cells install Python 3.11 with uv into /tmp/mpenv and run the extraction there, with Kaggle's
-PYTHONPATH (its sitecustomize imports wrapt) kept out.
+    kaggle/asl_citizen_smoke.ipynb    extraction of the first 20 videos into a separate -smoke
+                                      folder (never a dataset); a few minutes
+    kaggle/asl_citizen_part{1,2,3}.ipynb  extraction, every third shard each (EV_PART 0/3, 1/3,
+                                      2/3), run side by side
+    kaggle/asl_citizen_merge.ipynb    EV_PART 0/1 with the three part outputs as inputs: copies
+                                      their shards, writes manifest.csv and COMPLETE, and makes
+                                      the private dataset asl-citizen-landmarks-private
+    kaggle/train_v3.ipynb             the v3 recipe, kaggle/train_v3.sh
 
-    python scripts/build_kaggle_notebooks.py           # write the notebooks
-    python scripts/build_kaggle_notebooks.py --check   # exit 1 when a notebook is stale
-    python scripts/build_kaggle_notebooks.py --script-out extract.py  # the extraction program
+The extraction program is built in the cell, from the archive, by --script-out:
+src/edgevision/data/citizen_labels.py, the 250 labels of web/public/model/meta.json and
+kaggle/asl_citizen_extract.py. Kaggle's image runs Python 3.13 and mediapipe 0.10.21 (the last
+release with the legacy Holistic solution the training data was made with) has wheels only up to
+Python 3.12, so the extraction runs in a Python 3.11 venv made with uv, with Kaggle's PYTHONPATH
+(its sitecustomize imports wrapt) kept out. Training uses Kaggle's Python when the training
+dependencies import there and the same kind of venv otherwise. Every cell tees everything to a
+log and always exits 0.
+
+    python scripts/build_kaggle_notebooks.py               # write the notebooks
+    python scripts/build_kaggle_notebooks.py --check       # exit 1 when a notebook is stale
+    python scripts/build_kaggle_notebooks.py --source-archive artifacts/v3/upload/edge-vision-src.tar.gz
+    python scripts/build_kaggle_notebooks.py --script-out extract.py   # the extraction program
+    python scripts/build_kaggle_notebooks.py --fingerprint # this tree's notebook sources
+
+This file uses only the standard library: the cells run it with Kaggle's Python.
 """
 
 import argparse
+import hashlib
 import json
+import re
+import subprocess
 import sys
+import tarfile
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LABELS_SOURCE = ROOT / "src" / "edgevision" / "data" / "citizen_labels.py"
 EXTRACT_BODY = ROOT / "kaggle" / "asl_citizen_extract.py"
-DATASET_BODY = ROOT / "kaggle" / "make_private_dataset.py"
 TRAIN_BODY = ROOT / "kaggle" / "train_v3.sh"
 META = ROOT / "web" / "public" / "model" / "meta.json"
-NOTEBOOKS = {
-    "asl_citizen_extract": ROOT / "kaggle" / "asl_citizen_extract.ipynb",
-    "asl_citizen_smoke": ROOT / "kaggle" / "asl_citizen_smoke.ipynb",
-    "train_v3": ROOT / "kaggle" / "train_v3.ipynb",
-}
+KAGGLE = ROOT / "kaggle"
+# What the cells run from the archive, and the files they are generated from: the archive and a
+# notebook agree when these hash the same (line endings normalized).
+SOURCE_FILES = (
+    "scripts/build_kaggle_notebooks.py",
+    "scripts/v3_kaggle.py",
+    "kaggle/asl_citizen_extract.py",
+    "kaggle/make_private_dataset.py",
+    "kaggle/train_v3.sh",
+    "src/edgevision/data/citizen_labels.py",
+    "web/public/model/meta.json",
+)
+COMMIT_FILE = "SOURCE_COMMIT"
+COMMON_MARKER = "# @common\n"
 SMOKE_VIDEOS = 20
-# The extraction environment: Python 3.11 (mediapipe 0.10.21 has no wheel for Kaggle's 3.13).
-MPENV_PYTHON = "3.11"
+PARTS = 3
+VENV_PYTHON = "3.11"  # mediapipe 0.10.21 has no wheel for Kaggle's Python 3.13
 MPENV_PACKAGES = ("mediapipe==0.10.21", "opencv-python-headless", '"numpy<2"', "pandas", "pyarrow")
 EXTRACT_SETTINGS = {"accelerator": "none", "isGpuEnabled": False, "isInternetEnabled": True}
 TRAIN_SETTINGS = {"accelerator": "gpu", "isGpuEnabled": True, "isInternetEnabled": True}
+# Paths never allowed in the code archive: ASL Citizen data and anything derived from it,
+# videos, landmark arrays, local models and credentials (docs/DATA_LICENSES.md).
+FORBIDDEN = re.compile(
+    r"^(data|artifacts|test_clips[^/]*)/|^results/(asl_citizen/predictions|v3_eval)/"
+    r"|(^|/)web/models/|(^|/)(kaggle\.json|\.env[^/]*|credentials[^/]*|id_rsa[^/]*)$"
+    r"|\.(npz|npy|parquet|mp4|webm|mov|avi|mkv|pem|p12|pfx)$",
+    re.IGNORECASE,
+)
+FINGERPRINT_LINE = re.compile(r'^SOURCE_FINGERPRINT="([0-9a-f]*)"$', re.MULTILINE)
+
+
+def normalized(data: bytes) -> bytes:
+    return data.replace(b"\r\n", b"\n")
+
+
+def fingerprint_of(read: Callable[[str], bytes | None]) -> str:
+    """sha256 over SOURCE_FILES (path and normalized content), 16 hex digits."""
+    digest = hashlib.sha256()
+    for name in SOURCE_FILES:
+        data = read(name)
+        content = hashlib.sha256(normalized(data)).hexdigest() if data is not None else "missing"
+        digest.update(f"{name}\0{content}\n".encode())
+    return digest.hexdigest()[:16]
+
+
+def source_fingerprint(root: Path = ROOT) -> str:
+    def read(name: str) -> bytes | None:
+        path = root / name
+        return path.read_bytes() if path.is_file() else None
+
+    return fingerprint_of(read)
 
 
 def extraction_program() -> str:
     labels = json.loads(META.read_text(encoding="utf-8"))["labels"]
     return (
-        "# Generated by scripts/build_kaggle_notebooks.py; edit the sources, not this cell.\n"
+        "# Generated by scripts/build_kaggle_notebooks.py --script-out; edit the sources.\n"
         "# ---- src/edgevision/data/citizen_labels.py ----\n"
         + LABELS_SOURCE.read_text(encoding="utf-8")
         + "\n\n# The 250 labels of web/public/model/meta.json, in model order.\n"
@@ -54,128 +115,226 @@ def extraction_program() -> str:
     )
 
 
-HEADER = """%%bash
-# ASL Citizen -> MediaPipe Holistic landmarks for the 250-sign edge-vision vocabulary.
-# Settings: Accelerator None (CPU), Internet On. Run with Save Version > Save & Run All (Commit).
-# Licence: non-commercial research only, never redistribute, keep this notebook and its outputs
-# private, delete everything when the research is complete (docs/DATA_LICENSES.md).
-# Generated by scripts/build_kaggle_notebooks.py from the repository sources; edit those.
+# Shared by every cell: paths, helpers, the uv venv and the code source. Placeholders are
+# @NAME@ (no f-string, so the shell braces stay as they are).
+COMMON = r"""# ---- common to the edge-vision Kaggle notebooks (scripts/build_kaggle_notebooks.py) ----
+# EV_WORK, EV_INPUT and EV_TMP exist for local tests only (scripts/kaggle_local_test.py).
+WORK="${EV_WORK:-/kaggle/working}"
+export EV_INPUT="${EV_INPUT:-/kaggle/input}"
+TMPROOT="${EV_TMP:-/tmp}"
+SRC="$TMPROOT/edge-vision-src"
+# The fingerprint of the sources this notebook was built from; the code archive must match it.
+SOURCE_FINGERPRINT="@FINGERPRINT@"
+VENV_PYTHON="@VENV_PYTHON@"
+mkdir -p "$WORK" "$TMPROOT"
+# clean runs a venv's Python without Kaggle's site hooks: Kaggle's PYTHONPATH holds a
+# sitecustomize that imports wrapt, which a fresh venv lacks.
+clean() { env -u PYTHONPATH -u PYTHONSTARTUP -u PYTHONHOME PYTHONNOUSERSITE=1 "$@"; }
+uv() { python -m uv "$@"; }
+venv_python() { if [ -e "$1/bin/python" ]; then echo "$1/bin/python"; else echo "$1/Scripts/python.exe"; fi; }
+kaggle_python() { python -c 'import platform; print(platform.python_version())' 2>&1; }
+# find below the inputs without walking the asl-signs parquet tree or the landmark shards
+find_inputs() { find "$EV_INPUT" \( -name train_landmarks -o -name shards \) -prune -o "$@" -print 2>/dev/null | sort; }
+
+# make_venv DIR: an empty Python $VENV_PYTHON venv, made with uv (Kaggle's Python has no
+# ensurepip, and no mediapipe 0.10.21 wheel exists for it).
+make_venv() {
+  echo "--- pip install uv"
+  python -m uv --version 2>/dev/null || python -m pip install -q --disable-pip-version-check uv \
+    || { echo "STEP FAILED: pip install uv"; return 1; }
+  echo "--- uv python install $VENV_PYTHON"
+  uv python install "$VENV_PYTHON" || { echo "STEP FAILED: uv python install $VENV_PYTHON"; return 1; }
+  echo "--- uv venv --python $VENV_PYTHON $1"
+  uv venv --clear --python "$VENV_PYTHON" "$1" || { echo "STEP FAILED: uv venv $1"; return 1; }
+}
+
+# The code comes ONLY from the private dataset edge-vision-src: edge-vision-src.tar.gz, made by
+# "python scripts/build_kaggle_notebooks.py --source-archive", or that archive unpacked by Kaggle.
+get_source() {
+  local archives archive tree found
+  rm -rf "$SRC"
+  archives=$(find_inputs -type f -name 'edge-vision-src*.tar.gz')
+  archive=$(echo "$archives" | head -1)
+  tree=$(find_inputs -type f -name SOURCE_COMMIT | head -1)
+  if [ "$(echo "$archives" | grep -c .)" -gt 1 ]; then
+    echo "WARNING: several code archives are attached; using the first:"
+    echo "$archives"
+  fi
+  if [ -n "$archive" ]; then
+    echo "code: $archive"
+    python -c 'import sys, tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2], filter="data")' \
+      "$archive" "$SRC" || { echo "CODE SOURCE UNREADABLE: could not unpack $archive"; return 1; }
+  elif [ -n "$tree" ]; then
+    echo "code: $(dirname "$tree") (the archive, unpacked by Kaggle)"
+    cp -r "$(dirname "$tree")" "$SRC" \
+      || { echo "CODE SOURCE UNREADABLE: could not copy $(dirname "$tree")"; return 1; }
+  else
+    echo "CODE SOURCE MISSING: no edge-vision-src.tar.gz under $EV_INPUT."
+    echo "  These notebooks never clone the repository. Upload artifacts/v3/upload/edge-vision-src.tar.gz"
+    echo "  (python scripts/build_kaggle_notebooks.py --source-archive) as a new Private dataset named"
+    echo "  edge-vision-src, add it here with Add Input > Your Work > Datasets, and run again."
+    return 1
+  fi
+  if [ ! -f "$SRC/SOURCE_COMMIT" ]; then
+    echo "CODE SOURCE INVALID: no SOURCE_COMMIT in it; build the archive with --source-archive"
+    return 1
+  fi
+  echo "code commit: $(cat "$SRC/SOURCE_COMMIT")"
+  found=$(python "$SRC/scripts/build_kaggle_notebooks.py" --fingerprint 2>&1)
+  if [ "$found" != "$SOURCE_FINGERPRINT" ]; then
+    echo "CODE SOURCE MISMATCH: this notebook was built from notebook sources $SOURCE_FINGERPRINT,"
+    echo "  the edge-vision-src input holds '$found'. Use the archive and the notebooks of one commit:"
+    echo "  upload that commit's edge-vision-src.tar.gz as a new version of the dataset, or import"
+    echo "  the notebooks again from the commit the archive was made from."
+    return 1
+  fi
+  echo "code fingerprint: $found (matches this notebook)"
+}
+# ---- end of the common part ----
 """
 
-SMOKE_NOTE = f"""# SMOKE TEST: tracks only the first {SMOKE_VIDEOS} videos into asl-citizen-landmarks-smoke (never the
-# real shards, never a dataset) and prints the time per video and a landmark check. It takes a
-# few minutes; run it before the full extraction (kaggle/asl_citizen_extract.ipynb).
-"""
 
-FULL_NOTE = """# Resumable: add an earlier version's output as an input and run again; finished shards are
-# skipped. Parallel parts: three copies of this notebook with EV_PART 0/3, 1/3 and 2/3, then one
-# run with 0/1 and the three outputs added as inputs, which merges them and, with the
-# KAGGLE_USERNAME and KAGGLE_KEY secrets attached, creates the private dataset.
-"""
+def common() -> str:
+    return COMMON.replace("@FINGERPRINT@", source_fingerprint()).replace(
+        "@VENV_PYTHON@", VENV_PYTHON
+    )
 
-ENVIRONMENT = f"""WORK="${{EV_WORK:-/kaggle/working}}"    # EV_WORK and EV_INPUT exist for local tests only
-export EV_INPUT="${{EV_INPUT:-/kaggle/input}}"
-if [ "$EV_LIMIT_VIDEOS" -gt 0 ]; then
-  NAME=asl_citizen_smoke; OUT="$WORK/asl-citizen-landmarks-smoke"
+
+@dataclass(frozen=True)
+class Extraction:
+    name: str
+    title: str
+    note: str
+    limit: int = 0
+    part: str = "0/1"
+    inputs: str = "Your Work > Datasets > edge-vision-src"
+    dataset: bool = False
+
+
+SMOKE = Extraction(
+    name="asl_citizen_smoke",
+    title="SMOKE TEST of the ASL Citizen landmark extraction",
+    limit=SMOKE_VIDEOS,
+    note=f"""# Tracks only the first {SMOKE_VIDEOS} planned videos into asl-citizen-landmarks-smoke (never the
+# real shards, never a dataset) and prints the seconds per video and whether pose and hand
+# landmarks were found (non-NaN) in most frames. A few minutes; the log ends with SMOKE PASS or
+# SMOKE FAIL. Run it before the three parts.
+""",
+)
+
+
+def part(number: int) -> Extraction:
+    return Extraction(
+        name=f"asl_citizen_part{number}",
+        title=f"ASL Citizen landmark extraction, part {number} of {PARTS}",
+        part=f"{number - 1}/{PARTS}",
+        note=f"""# Tracks every {PARTS}rd shard (EV_PART {number - 1}/{PARTS}); run the {PARTS} part notebooks side by side, then
+# asl_citizen_merge. Up to 11 hours. If the log says INCOMPLETE, add this notebook's own output
+# as an input and run it again; finished shards are skipped.
+""",
+    )
+
+
+MERGE = Extraction(
+    name="asl_citizen_merge",
+    title="ASL Citizen landmark extraction: merge and private dataset",
+    inputs="Your Work > Datasets > edge-vision-src, and Your Work > Notebooks >\n"
+    "# asl_citizen_part1, asl_citizen_part2 and asl_citizen_part3 (their finished versions)",
+    dataset=True,
+    note="""# Copies the shards of the three part outputs, tracks any shard still missing, writes
+# manifest.csv and COMPLETE, then creates the PRIVATE dataset asl-citizen-landmarks-private
+# with the KAGGLE_USERNAME and KAGGLE_KEY secrets (Add-ons > Secrets; tick both for this
+# notebook), or prints the manual steps.
+""",
+)
+EXTRACTIONS = (SMOKE, part(1), part(2), part(3), MERGE)
+
+EXTRACTION_RUN = r"""if [ "$EV_LIMIT_VIDEOS" -gt 0 ]; then
+  OUT="$WORK/asl-citizen-landmarks-smoke"
 else
-  NAME=asl_citizen_extract; OUT="$WORK/asl-citizen-landmarks"
+  OUT="$WORK/asl-citizen-landmarks"
 fi
 export EV_OUT="$OUT"
 LOG="$WORK/$NAME.log"
-MPENV=/tmp/mpenv
-PY="$MPENV/bin/python"
-mkdir -p "$WORK"
+MPENV="$TMPROOT/mpenv"
+finish() {
+  [ -n "${1:-}" ] && echo "$1" | tee -a "$LOG"
+  echo "=== $(date -u '+%F %T') UTC: finished; this cell always exits 0, so read $LOG" | tee -a "$LOG"
+  exit 0
+}
+echo "=== $(date -u '+%F %T') UTC: start $NAME (EV_PART $EV_PART, EV_LIMIT_VIDEOS $EV_LIMIT_VIDEOS); Kaggle python $(kaggle_python)" | tee -a "$LOG"
+get_source 2>&1 | tee -a "$LOG"
+[ "${PIPESTATUS[0]}" -eq 0 ] || finish "STOPPED: no usable code source (see above); nothing was extracted."
 
-# Kaggle's Python is 3.13 and mediapipe 0.10.21 has wheels only up to 3.12, so the extraction runs
-# in a Python {MPENV_PYTHON} venv made with uv. clean runs that venv's Python without Kaggle's
-# site hooks: Kaggle's PYTHONPATH holds a sitecustomize that imports wrapt, which the venv lacks.
-clean() {{ env -u PYTHONPATH -u PYTHONSTARTUP -u PYTHONHOME PYTHONNOUSERSITE=1 "$@"; }}
-uv() {{ python -m uv "$@"; }}
-venv_versions() {{
-  clean "$PY" -c 'import platform, mediapipe, cv2, numpy; print(f"venv {{platform.python_version()}}: mediapipe {{mediapipe.__version__}}, cv2 {{cv2.__version__}}, numpy {{numpy.__version__}}")'
-}}
-setup_environment() {{
-  echo "=== $(date -u '+%F %T') UTC: start $NAME; Kaggle python $(python -c 'import platform; print(platform.python_version())' 2>&1)"
-  if [ -x "$PY" ] && venv_versions 2>/dev/null; then
+venv_versions() {
+  clean "$(venv_python "$MPENV")" -c 'import platform, mediapipe, cv2, numpy; print(f"venv python {platform.python_version()}: mediapipe {mediapipe.__version__}, cv2 {cv2.__version__}, numpy {numpy.__version__}")'
+}
+setup_environment() {
+  local py
+  if [ -e "$(venv_python "$MPENV")" ] && venv_versions 2>/dev/null; then
     echo "reusing $MPENV"
     return 0
   fi
-  echo "--- pip install uv"
-  python -m uv --version 2>/dev/null || python -m pip install --disable-pip-version-check uv \\
-    || {{ echo "STEP FAILED: pip install uv"; return 1; }}
-  echo "--- uv python install {MPENV_PYTHON}"
-  uv python install {MPENV_PYTHON} || {{ echo "STEP FAILED: uv python install {MPENV_PYTHON}"; return 1; }}
-  echo "--- uv venv --python {MPENV_PYTHON} $MPENV"
-  uv venv --clear --python {MPENV_PYTHON} "$MPENV" || {{ echo "STEP FAILED: uv venv"; return 1; }}
-  echo '--- uv pip install {" ".join(MPENV_PACKAGES)}'
-  uv pip install --python "$PY" {" ".join(MPENV_PACKAGES)} \\
-    || {{ echo "STEP FAILED: uv pip install"; return 1; }}
+  make_venv "$MPENV" || return 1
+  py=$(venv_python "$MPENV")
+  echo '--- uv pip install @PACKAGES@'
+  uv pip install --python "$py" @PACKAGES@ || { echo "STEP FAILED: uv pip install"; return 1; }
   # mediapipe also requires opencv-contrib-python, which writes the same cv2 package as the
   # headless build. Keep exactly one cv2: drop contrib, then restore the headless files it shared.
-  if uv pip show --python "$PY" opencv-contrib-python >/dev/null 2>&1; then
-    OPENCV=$(uv pip show --python "$PY" opencv-python-headless | sed -n 's/^Version: //p')
+  if uv pip show --python "$py" opencv-contrib-python >/dev/null 2>&1; then
+    OPENCV=$(uv pip show --python "$py" opencv-python-headless | sed -n 's/^Version: //p')
     echo "--- keeping only opencv-python-headless==$OPENCV"
-    uv pip uninstall --python "$PY" opencv-contrib-python \\
-      && uv pip install --python "$PY" --reinstall "opencv-python-headless==$OPENCV" "numpy<2" \\
-      || {{ echo "STEP FAILED: replacing opencv-contrib-python with the headless build"; return 1; }}
+    uv pip uninstall --python "$py" opencv-contrib-python \
+      && uv pip install --python "$py" --reinstall "opencv-python-headless==$OPENCV" "numpy<2" \
+      || { echo "STEP FAILED: replacing opencv-contrib-python with the headless build"; return 1; }
   fi
   echo "--- versions inside $MPENV"
-  venv_versions || {{ echo "STEP FAILED: importing mediapipe, cv2 and numpy in $MPENV"; return 1; }}
-}}
+  venv_versions || { echo "STEP FAILED: importing mediapipe, cv2 and numpy in $MPENV"; return 1; }
+}
 setup_environment 2>&1 | tee -a "$LOG"
-if [ "${{PIPESTATUS[0]}}" -ne 0 ]; then
-  echo "ENVIRONMENT FAILED: nothing was extracted. The full error is above and in $LOG." | tee -a "$LOG"
-  echo "=== $(date -u '+%F %T') UTC: finished; this cell always exits 0" | tee -a "$LOG"
-  exit 0
-fi
+[ "${PIPESTATUS[0]}" -eq 0 ] || finish "ENVIRONMENT FAILED: nothing was extracted. The full error is above and in $LOG."
+PY=$(venv_python "$MPENV")
+
+echo "--- the extraction program, built from the code source" | tee -a "$LOG"
+rm -f "$WORK/$NAME.py"
+python "$SRC/scripts/build_kaggle_notebooks.py" --script-out "$WORK/$NAME.py" 2>&1 | tee -a "$LOG"
+[ -f "$WORK/$NAME.py" ] || finish "STOPPED: the extraction program could not be built (see above)."
+clean "$PY" -u "$WORK/$NAME.py" 2>&1 | tee -a "$LOG"
+echo "=== extraction exit status ${PIPESTATUS[0]}" | tee -a "$LOG"
 """
 
-DATASET_STEP = """if [ -f "$OUT/COMPLETE" ]; then
+DATASET_STEP = r"""if [ -f "$OUT/COMPLETE" ]; then
   # Kaggle's own Python, where kaggle_secrets lives (not the extraction venv).
-  cat > /tmp/make_private_dataset.py <<'PYEOF'
-{dataset}PYEOF
-  python /tmp/make_private_dataset.py "$OUT" 2>&1 | tee -a "$LOG"
+  echo "--- the private dataset" | tee -a "$LOG"
+  python "$SRC/kaggle/make_private_dataset.py" "$OUT" 2>&1 | tee -a "$LOG"
+else
+  echo "no COMPLETE marker, so no dataset: the log above says what is missing" | tee -a "$LOG"
 fi
 """
 
 
-def extraction_cell(smoke: bool = False) -> str:
-    program = extraction_program()
-    dataset = DATASET_BODY.read_text(encoding="utf-8")
-    for text in (program, dataset):
-        if "PYEOF" in text:
-            raise ValueError("an embedded program must not contain the heredoc marker PYEOF")
-    switches = (
-        f"set -u\n"
-        f"export EV_LIMIT_VIDEOS={SMOKE_VIDEOS if smoke else 0}"
-        "    # SMOKE TEST switch: > 0 tracks only the first N videos, into a separate -smoke folder\n"
-        f'export EV_PART="0/1"'
-        "         # k/N: this copy's share of the shards (see above)\n"
-    )
-    run = (
-        f"cat > \"$WORK/$NAME.py\" <<'PYEOF'\n{program}PYEOF\n"
-        'clean "$PY" -u "$WORK/$NAME.py" 2>&1 | tee -a "$LOG"\n'
-        'echo "=== extraction exit status ${PIPESTATUS[0]}" | tee -a "$LOG"\n'
-    )
-    finish = (
-        "echo \"=== $(date -u '+%F %T') UTC: finished; this cell always exits 0, so read $LOG\""
-        ' | tee -a "$LOG"\nexit 0\n'
-    )
-    dataset_step = "" if smoke else DATASET_STEP.format(dataset=dataset)
-    return (
-        HEADER
-        + (SMOKE_NOTE if smoke else FULL_NOTE)
-        + switches
-        + ENVIRONMENT
-        + run
-        + dataset_step
-        + finish
-    )
+def extraction_cell(spec: Extraction) -> str:
+    header = f"""%%bash
+# {spec.title} (edge-vision).
+# Settings: Accelerator None (CPU), Internet On. Run with Save Version > Save & Run All (Commit).
+# Inputs: {spec.inputs}.
+{spec.note}# Licence: ASL Citizen is non-commercial research only; never redistribute it or the landmarks,
+# keep this notebook and its outputs private, delete everything when the research is complete
+# (docs/DATA_LICENSES.md). Generated by scripts/build_kaggle_notebooks.py; edit the sources.
+set -u
+export EV_LIMIT_VIDEOS={spec.limit}    # > 0: SMOKE TEST of the first N videos, into a separate -smoke folder
+export EV_PART="{spec.part}"         # k/N: this run's share of the shards
+NAME={spec.name}
+"""
+    run = EXTRACTION_RUN.replace("@PACKAGES@", " ".join(MPENV_PACKAGES))
+    return header + common() + run + (DATASET_STEP if spec.dataset else "") + "finish\n"
 
 
 def train_cell() -> str:
     body = TRAIN_BODY.read_text(encoding="utf-8")
-    return "%%bash\n" + body
+    if body.count(COMMON_MARKER) != 1:
+        raise ValueError(f"{TRAIN_BODY} must hold the line {COMMON_MARKER.strip()!r} once")
+    return "%%bash\n" + body.replace(COMMON_MARKER, common())
 
 
 def notebook(cell: str, settings: dict[str, object]) -> str:
@@ -202,12 +361,95 @@ def notebook(cell: str, settings: dict[str, object]) -> str:
     return json.dumps(payload, indent=1, ensure_ascii=False) + "\n"
 
 
+def notebook_paths() -> dict[str, Path]:
+    names = [spec.name for spec in EXTRACTIONS] + ["train_v3"]
+    return {name: KAGGLE / f"{name}.ipynb" for name in names}
+
+
 def built() -> dict[str, str]:
-    return {
-        "asl_citizen_extract": notebook(extraction_cell(), EXTRACT_SETTINGS),
-        "asl_citizen_smoke": notebook(extraction_cell(smoke=True), EXTRACT_SETTINGS),
-        "train_v3": notebook(train_cell(), TRAIN_SETTINGS),
+    notebooks = {
+        spec.name: notebook(extraction_cell(spec), EXTRACT_SETTINGS) for spec in EXTRACTIONS
     }
+    notebooks["train_v3"] = notebook(train_cell(), TRAIN_SETTINGS)
+    return notebooks
+
+
+def embedded_fingerprint(notebook_text: str) -> str | None:
+    source = "".join(json.loads(notebook_text)["cells"][0]["source"])
+    match = FINGERPRINT_LINE.search(source)
+    return match.group(1) if match else None
+
+
+def archive_problems(path: Path, commit: str | None = None) -> list[str]:
+    """What is wrong with a code archive: no or another SOURCE_COMMIT, a forbidden path, a
+    notebook missing or built from other sources than the archive holds."""
+    problems = []
+    with tarfile.open(path) as archive:
+        members = {member.name: member for member in archive.getmembers() if member.isfile()}
+
+        def read(name: str) -> bytes | None:
+            member = members.get(name)
+            handle = archive.extractfile(member) if member else None
+            return handle.read() if handle else None
+
+        found = read(COMMIT_FILE)
+        if found is None:
+            problems.append(f"no {COMMIT_FILE} file")
+        elif commit and found.decode().strip() != commit:
+            problems.append(f"{COMMIT_FILE} says {found.decode().strip()}, expected {commit}")
+        forbidden = sorted(name for name in members if FORBIDDEN.search(name))
+        if forbidden:
+            problems.append(f"forbidden files: {', '.join(forbidden[:5])}")
+        expected = fingerprint_of(read)
+        for name in notebook_paths():
+            relative = f"kaggle/{name}.ipynb"
+            text = read(relative)
+            if text is None:
+                problems.append(f"{relative} is missing")
+                continue
+            embedded = embedded_fingerprint(text.decode("utf-8"))
+            if embedded != expected:
+                problems.append(
+                    f"{relative} was built from sources {embedded}, the archive holds {expected}: "
+                    "run python scripts/build_kaggle_notebooks.py and commit"
+                )
+    return problems
+
+
+def git(*args: str) -> str:
+    done = subprocess.run(
+        ["git", "-C", str(ROOT), *args], capture_output=True, text=True, check=True
+    )
+    return done.stdout.strip()
+
+
+def source_archive(out: Path, ref: str = "HEAD", require_clean: bool = True) -> str:
+    """Write the git archive of ref (with SOURCE_COMMIT) to out and check it; the commit."""
+    if require_clean and ref == "HEAD":
+        changed = git("status", "--porcelain", "--untracked-files=no")
+        if changed:
+            raise SystemExit(f"tracked files differ from HEAD; commit them first:\n{changed}")
+    commit = git("rev-parse", "--verify", f"{ref}^{{commit}}")
+    forbidden = [
+        n for n in git("ls-tree", "-r", "--name-only", commit).splitlines() if FORBIDDEN.search(n)
+    ]
+    if forbidden:
+        raise SystemExit(f"refusing to archive {commit}: forbidden files {forbidden[:5]}")
+    out = out.resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    git(
+        "archive",
+        "--format=tar.gz",
+        f"--add-virtual-file={COMMIT_FILE}:{commit}",
+        "-o",
+        str(out),
+        commit,
+    )
+    problems = archive_problems(out, commit)
+    if problems:
+        out.unlink()
+        raise SystemExit("the archive was deleted:\n" + "\n".join(problems))
+    return commit
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -215,14 +457,29 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--check", action="store_true", help="fail when a notebook is stale")
-    parser.add_argument("--script-out", type=Path, help="also write the extraction program here")
+    parser.add_argument("--script-out", type=Path, help="write only the extraction program here")
+    parser.add_argument("--fingerprint", action="store_true", help="print the sources' fingerprint")
+    parser.add_argument("--source-archive", type=Path, help="write the code archive here")
+    parser.add_argument("--ref", default="HEAD", help="the commit to archive (default HEAD)")
     args = parser.parse_args(argv)
+    if args.fingerprint:
+        print(source_fingerprint())
+        return 0
     if args.script_out:
-        args.script_out.write_text(extraction_program(), encoding="utf-8")
+        args.script_out.write_text(extraction_program(), encoding="utf-8", newline="\n")
         print(f"wrote {args.script_out}")
+        return 0
+    if args.source_archive:
+        commit = source_archive(args.source_archive, args.ref)
+        size = args.source_archive.stat().st_size / 1e6
+        print(
+            f"wrote {args.source_archive} ({size:.1f} MB): commit {commit}, notebook sources "
+            f"{source_fingerprint()}; no forbidden files"
+        )
+        return 0
     stale = []
     for name, text in built().items():
-        path = NOTEBOOKS[name]
+        path = notebook_paths()[name]
         current = path.read_text(encoding="utf-8") if path.is_file() else None
         if args.check:
             if current != text:
@@ -231,6 +488,11 @@ def main(argv: list[str] | None = None) -> int:
         if current != text:
             path.write_text(text, encoding="utf-8", newline="\n")
             print(f"wrote {path.relative_to(ROOT).as_posix()}")
+    known = {path.name for path in notebook_paths().values()}
+    extra = sorted(p.name for p in KAGGLE.glob("*.ipynb") if p.name not in known)
+    if extra:
+        print(f"not built here (remove them): {', '.join(extra)}", file=sys.stderr)
+        stale.extend(extra)
     if stale:
         print(
             f"stale: {', '.join(stale)}; run python scripts/build_kaggle_notebooks.py",

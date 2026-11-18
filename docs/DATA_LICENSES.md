@@ -23,8 +23,9 @@ Rules for this repository:
 2. **Never redistribute.** No ASL Citizen video, frame, landmark, processed feature, manifest or
    per-video prediction is committed, uploaded or shared. `.gitignore` covers `/data/`, `*.npz`
    and `web/models/`; the Kaggle notebooks write only to their private outputs.
-3. **Keep Kaggle private.** The notebooks (`kaggle/asl_citizen_extract.ipynb`,
-   `kaggle/train_v3.ipynb`) and the dataset `asl-citizen-landmarks-private` stay Private. Never
+3. **Keep Kaggle private.** The notebooks (`kaggle/asl_citizen_*.ipynb`,
+   `kaggle/train_v3.ipynb`) and the datasets `asl-citizen-landmarks-private` and
+   `edge-vision-src` stay Private. Never
    pass `--public` to the Kaggle CLI or switch them to Public.
 4. **Minimise personal data.** The extraction keeps hands and pose and leaves the face points as
    NaN unless `EV_KEEP_FACE=1`; no edge-vision model uses the face.

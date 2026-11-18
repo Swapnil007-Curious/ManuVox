@@ -123,10 +123,12 @@ the public site (docs/DATA_LICENSES.md).
   them exactly, 35 through numbered variants and 30 through synonyms. The variant and synonym
   choices come from ASL-LEX 2.0's translations; they are AI-assisted and unconfirmed. 14 signs
   have no mapping, three of them (can, fall, glasswindow) awaiting a decision between senses.
-- **Extraction** (`kaggle/asl_citizen_extract.ipynb`, built by
-  `scripts/build_kaggle_notebooks.py`): range requests fetch only the needed videos from the
-  46 GB archive, and MediaPipe Holistic runs with the training settings. Shards are resumable,
-  with optional parallel parts.
+- **Extraction** (`kaggle/asl_citizen_smoke.ipynb`, `asl_citizen_part{1,2,3}.ipynb` and
+  `asl_citizen_merge.ipynb`, built by `scripts/build_kaggle_notebooks.py`): range requests fetch
+  only the needed videos from the 46 GB archive, and MediaPipe Holistic 0.10.21 runs with the
+  training settings in a uv Python 3.11 venv. Shards are resumable and split over three parallel
+  parts. Every notebook takes the code from the private dataset `edge-vision-src`, a checked
+  git archive, never from a clone.
 - **Cross-dataset test** (`scripts/citizen_eval.py`): the official test split is evaluated once
   per model and logged in `results/asl_citizen/test_access_log.json`.
 - **v3 training** (`kaggle/train_v3.ipynb`, `experiments/train_e_hybrid_v3citizen.yaml`): the v2

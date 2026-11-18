@@ -1,71 +1,101 @@
 # ASL Citizen: extraction, cross-dataset evaluation and v3 training
 
-Three steps, each run once. Read the licence rules first (docs/DATA_LICENSES.md): non-commercial
+Three steps, each run once, after the code archive (step 0). Read the licence rules first (docs/DATA_LICENSES.md): non-commercial
 research only, never redistribute the data or the landmarks, keep every notebook and dataset
 **Private**, delete everything when the research is complete.
 
-## 1. Extract landmarks (kaggle/asl_citizen_extract.ipynb)
+## 0. The code: the private dataset edge-vision-src
 
-The notebook downloads only the videos it needs. It reads the archive's file index over HTTP
-range requests, fetches each video of a mapped sign on its own, runs MediaPipe Holistic 0.10.21
-with the training settings (`scripts/extract_holistic.py`), and deletes the video. The 46 GB
+Every notebook takes the repository code only from a private Kaggle dataset, never from a git
+clone. Each cell finds the archive under its inputs, prints its commit and checks that it holds
+the sources the notebook was generated from. If the archive is missing it stops with
+`CODE SOURCE MISSING`; if it is from another commit it stops with `CODE SOURCE MISMATCH`.
+
+1. Locally, with everything committed:
+   `python scripts/build_kaggle_notebooks.py --source-archive artifacts/v3/upload/edge-vision-src.tar.gz`.
+   It refuses a dirty tree and any data, video, landmark, local model or credential path, and
+   writes `SOURCE_COMMIT` into the archive.
+2. kaggle.com > Datasets > New Dataset: upload that file, title it `edge-vision-src`, leave
+   Visibility on **Private**, Create. After a new commit, upload the new archive with New
+   Version and import the notebooks again from the same commit.
+3. Add it to every notebook below: Add Input > Your Work > Datasets > edge-vision-src.
+
+Import each notebook with kaggle.com > Create > Notebook > File > Import Notebook. A new notebook
+is Private; keep it that way.
+
+## 1. Extract landmarks (kaggle/asl_citizen_*.ipynb)
+
+The notebooks download only the videos they need. They read the archive's file index over HTTP
+range requests, fetch each video of a mapped sign on its own, run MediaPipe Holistic 0.10.21
+with the training settings (`scripts/extract_holistic.py`), and delete the video. The 46 GB
 archive is never stored, so Kaggle's disk limit is not an issue.
 
-- **What it processes:** 9,571 videos. That is the 8,866 videos of the 290 glosses mapped onto
+- **What they process:** 9,571 videos. That is the 8,866 videos of the 290 glosses mapped onto
   236 of the 250 signs, plus 705 videos of 23 glosses kept for review, so a later mapping
   decision needs no second extraction.
-- **What it writes:** shards of 200 videos in the asl-signs parquet layout, a manifest with
+- **What they write:** shards of 200 videos in the asl-signs parquet layout, a manifest with
   video, signer, official split, gloss, label and mapping rule, `label_mapping.csv`,
   `unmapped_labels.txt` and `coverage.json`. Face points are not kept.
+- **Environment:** Kaggle runs Python 3.13, and mediapipe 0.10.21 has no wheel for it. Each cell
+  installs uv, runs `uv python install 3.11` and `uv venv --python 3.11 /tmp/mpenv`, installs
+  `mediapipe==0.10.21 opencv-python-headless "numpy<2" pandas pyarrow` there, and runs the
+  extraction with Kaggle's PYTHONPATH and user site kept out. The log prints the venv's
+  python, mediapipe, cv2 and numpy versions. If any step fails, the log shows the full error
+  and `ENVIRONMENT FAILED`, and nothing is extracted.
 
-### Setup
+Settings for all of them: **Accelerator: None** (MediaPipe's Python solutions run on the CPU) and
+**Internet: On**. Run each with **Save Version > Save & Run All (Commit)**. A commit runs in the
+background (12 h limit), tees everything to `<notebook>.log` and always finishes with exit 0, so
+read the log in the version's Output.
 
-1. kaggle.com > Create > Notebook > File > Import Notebook. Upload
-   `kaggle/asl_citizen_extract.ipynb`. A new notebook is Private; keep it that way.
-2. Settings: **Accelerator: None** (MediaPipe's Python solutions run on the CPU, so a GPU only
-   costs quota) and **Internet: On**.
-3. Optional, so the notebook creates the private dataset itself:
-   - Create an API token at kaggle.com > Settings > API > Create New Token.
-   - In the notebook, open Add-ons > Secrets and add `KAGGLE_USERNAME` and `KAGGLE_KEY` from
-     `kaggle.json`.
-   - Tick both secrets for this notebook.
-4. **Save Version > Save & Run All (Commit).** The commit runs in the background (12 h limit),
-   tees everything to `asl_citizen_extract.log` and always finishes with exit 0. Read the log in
-   the version's Output.
+| Order | Notebook file | Inputs | Takes |
+|---|---|---|---|
+| 1 | `kaggle/asl_citizen_smoke.ipynb` | edge-vision-src | a few minutes |
+| 2 | `kaggle/asl_citizen_part1.ipynb`, `_part2`, `_part3` (side by side) | edge-vision-src | 3.5 to 5 h each |
+| 3 | `kaggle/asl_citizen_merge.ipynb` | edge-vision-src + the three part notebooks' outputs | about 10 min plus the upload |
 
-### Time
+- **Smoke test:** tracks the first 20 videos into `asl-citizen-landmarks-smoke` (never the real
+  shards, never a dataset). It prints the seconds per video and the share of frames with pose and
+  hand landmarks, and ends with `SMOKE PASS` or `SMOKE FAIL`. Do not start the parts before it
+  passes.
+- **Parts:** each tracks every third shard (`EV_PART` 0/3, 1/3, 2/3). If Kaggle won't start
+  three sessions at once, run them one after another. A finished part's log says
+  `part k/3 finished`.
+- **Merge:** add the three parts' finished versions as inputs (Add Input > Your Work >
+  Notebooks). It copies their shards, tracks any shard still missing, writes the manifest and
+  `COMPLETE`, then creates the dataset.
+- **Resume:** if a run stops early, its log says INCOMPLETE. Add that version's own output as an
+  input and commit again; finished shards are skipped.
 
-Measured here on a 4-thread laptop: **63 minutes per 1,000 videos**, about 10 hours for all
-9,571. A 4-CPU Kaggle session is probably no faster, so plan for 10 to 15 hours. That is more than
-one 12-hour session, so run it in parts.
+### The private dataset (made by the merge run)
 
-### Parts, recommended
+With the secrets, the merge run creates `asl-citizen-landmarks-private` itself (`kaggle datasets
+create --dir-mode zip`, never `--public`) and prints its URL:
 
-1. Make three copies of the notebook (File > Copy). In each, change the line
-   `export EV_PART="0/1"` to `0/3`, `1/3` and `2/3`.
-2. Commit all three. Each takes about 3.5 to 5 hours. If Kaggle won't start three sessions at
-   once, run them one after another.
-3. Commit the original once more with `EV_PART="0/1"`. Before committing, add the three part
-   versions as inputs: Add Input > Your Work > Notebooks.
-   - This run copies their shards, writes `COMPLETE` and the manifest, and creates the dataset
-     (if you added the secrets).
-   - It takes about 10 minutes plus the upload.
+- Create an API token at kaggle.com > Settings > API > Create New Token.
+- In the merge notebook, open Add-ons > Secrets and add `KAGGLE_USERNAME` and `KAGGLE_KEY` from
+  `kaggle.json`.
+- Tick both secrets for this notebook.
 
-### Resume
-
-If a run stops early, the log says INCOMPLETE. Add that version's output as an input and commit
-again; finished shards are skipped.
-
-### Make the private dataset
-
-Skip this if the secrets created it; the log prints its URL. Otherwise, from the completed
-version: Output > New Dataset, or Datasets > New Dataset > Notebook Output Files.
-
-- Choose the `asl-citizen-landmarks` folder.
-- Title it `asl-citizen-landmarks-private`.
-- Leave Visibility on **Private**.
+Without them, or if the upload fails, the log prints the manual steps. From the completed merge
+version: Output > New Dataset (or Datasets > New Dataset > Notebook Output Files), choose the
+`asl-citizen-landmarks` folder, title it `asl-citizen-landmarks-private` and leave Visibility on
+**Private**. Or skip the dataset and add the merge notebook's output to `train_v3` directly.
 
 The output is roughly 1 GB.
+
+### Local test
+
+`python scripts/kaggle_local_test.py --archive artifacts/v3/upload/edge-vision-src.tar.gz
+--kaggle-python <a Python 3.13> --work <scratch dir> --reference data/live_clips_v2
+test_clips_v2/<sign>_1.mp4 ...` runs the
+cells as written, in bash, on a few clips. A venv plays Kaggle's Python and a stand-in archive
+is served with range requests. It runs the missing and mismatched code source cases, the smoke
+test, the three parts, the merge and the training input detection, then reads the landmarks
+back and compares them with the local Holistic run of the same clips. Whether pose and hands are
+in most frames depends on the clips, so the harness reports it rather than checking it (the demo
+clips show a hand in only 21 to 38 percent of frames, in both runs alike). Delete the work folder
+afterwards.
 
 ## 2. Evaluate the shipped v2 model on the ASL Citizen test split (local)
 
@@ -87,12 +117,17 @@ refuses a second run on the same model, and writes `results/asl_citizen/v2_test.
 1. Import `kaggle/train_v3.ipynb` the same way.
 2. Settings: **Accelerator: GPU T4** and **Internet: On**.
 3. Inputs:
+   - Your Work > Datasets > edge-vision-src (the code).
    - Competitions > Google - Isolated Sign Language Recognition.
-   - Your Work > Datasets > asl-citizen-landmarks-private.
-   - The code, by one of two routes. Either push this branch, then set `BRANCH` in the cell.
-     Or, without pushing, run `git archive --format=tar.gz -o edge-vision-src.tar.gz HEAD`,
-     upload the file as a new private dataset `edge-vision-src`, and add it as an input.
+   - The landmarks: Your Work > Datasets > asl-citizen-landmarks-private, or Your Work >
+     Notebooks > asl_citizen_merge (the version whose log says COMPLETE). The cell finds the
+     manifest and the shards at any depth, in a folder or zipped, and lists every candidate
+     with the reason it was used or skipped.
 4. **Save Version > Save & Run All (Commit).**
+
+The cell checks that Kaggle's Python imports the training dependencies (after installing the
+pinned requirements). If it cannot, the cell builds a Python 3.11 venv with uv, using the torch
+build Kaggle ships and the same pins, and trains there.
 
 The notebook does the following:
 
