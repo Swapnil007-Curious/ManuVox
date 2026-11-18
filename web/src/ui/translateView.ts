@@ -1,7 +1,7 @@
 // The Translate panel: the transcript of glosses, the top-3 picker, the English sentence (with
 // Copy and Speak), the controls and the sentence history.
 
-import { byId, h } from "./dom";
+import { byId, h, icon } from "./dom";
 import type { HistoryItem } from "./history";
 import { glossOf } from "./signs";
 import { choiceButton } from "./stage";
@@ -15,6 +15,7 @@ export class TranslateView {
   private readonly candidates = byId<HTMLElement>("candidates");
   private readonly candidateList = byId<HTMLOListElement>("candidate-list");
   private readonly candidatesHint = byId<HTMLElement>("candidates-hint");
+  private readonly personalBadge = byId<HTMLElement>("personal-badge");
   private readonly card = byId<HTMLElement>("sentence-card");
   private readonly sentence = byId<HTMLElement>("sentence");
   private readonly source = byId<HTMLElement>("sentence-source");
@@ -34,7 +35,10 @@ export class TranslateView {
    */
   render(transcript: Transcript, onPick: (index: number) => void, arriving = false): HTMLElement | null {
     const items = transcript.words.map((word, index) => {
-      const item = h("li", { "data-picked": String(word.picked) }, glossOf(word.label));
+      const badge = word.personalized
+        ? h("span", { class: "for-you", title: "Personalized for you" }, icon("spark"), h("span", { class: "visually-hidden", text: "Personalized for you" }))
+        : null;
+      const item = h("li", { "data-picked": String(word.picked), "data-personalized": String(word.personalized) }, glossOf(word.label), badge);
       if (arriving && index === transcript.words.length - 1) item.dataset.arriving = "true";
       return item;
     });
@@ -46,6 +50,7 @@ export class TranslateView {
     const choices = transcript.choices;
     this.candidates.hidden = choices.length === 0;
     this.candidatesHint.textContent = transcript.pending ? "pick one to add it" : "tap to replace the last sign";
+    this.personalBadge.hidden = !transcript.choicesPersonalized;
     const last = transcript.last;
     this.candidateList.replaceChildren(
       ...choices.map((choice, index) =>

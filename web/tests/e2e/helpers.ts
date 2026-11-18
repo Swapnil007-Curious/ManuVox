@@ -12,6 +12,8 @@ export interface ModelCase {
   label: number;
   input: number[][];
   logits: number[];
+  /** The penultimate embedding (Teach Dex), for models exported with that output. */
+  embedding?: number[] | null;
 }
 
 export interface ModelGolden {

@@ -6,7 +6,8 @@ import "./styles.css";
 
 import { debugEnabled, installDebugHook } from "./debug";
 import { Engine, type SegmentResult } from "./engine";
-import { loadSettings, browserStorage } from "./settings";
+import { loadSettings, browserStorage, saveSettings } from "./settings";
+import { openTeachStore, type TeachStore } from "./teachStore";
 import { Diagnostics } from "./ui/diagnostics";
 import { byId, isControl, isTypingTarget } from "./ui/dom";
 import { loadHistory, pushHistory, saveHistory, type HistoryItem } from "./ui/history";
@@ -21,16 +22,19 @@ import { SIGNS, glossOf } from "./ui/signs";
 import { SignsView } from "./ui/signsView";
 import { Speech } from "./ui/speech";
 import { StageView } from "./ui/stage";
+import { TeachView } from "./ui/teachView";
 import { Transcript, type Choice } from "./ui/transcript";
 import { TranslateView } from "./ui/translateView";
 import { translate, type Translation } from "./ui/translate";
 
 declare const __WORKER_URL__: string;
+/** The shipped model's directory under BASE (web/model-variant.ts; "model" for v2-kaggle). */
+declare const __MODEL_DIR__: string;
 
 const BASE = import.meta.env.BASE_URL;
 const DEBUG = debugEnabled();
 // The model directory under BASE; a debug page may load another one (the live-gap harness).
-const MODEL_DIR = (DEBUG && new URLSearchParams(location.search).get("model")) || "model";
+const MODEL_DIR = (DEBUG && new URLSearchParams(location.search).get("model")) || __MODEL_DIR__;
 
 const storage = browserStorage();
 let prefs: Prefs = loadPrefs(storage);
@@ -86,6 +90,29 @@ const practice = new PracticeView(storage, {
   burst: () => stage.burst(),
   announce,
 });
+const teach = new TeachView({
+  ensureCamera: () => startCamera(),
+  countdown: () => stage.countdown(),
+  burst: () => stage.burst(),
+  announce,
+  model: () =>
+    engine.meta
+      ? { sha256: engine.meta.model_sha256, canTeach: engine.canTeach(), examplesPerSign: engine.meta.personalization?.examples_per_sign ?? 3 }
+      : null,
+  apply: (examples) => engine.setTaughtExamples(examples),
+  personalizationOn: () => engine.settings.personalization,
+  setPersonalization: (on) => {
+    const next = { ...engine.settings, personalization: on };
+    engine.applySettings(next);
+    saveSettings(storage, next);
+  },
+  confirm: (text) => window.confirm(text),
+});
+let teachStore: TeachStore | null = null;
+void openTeachStore().then((store) => {
+  teachStore = store;
+  return teach.attach(store);
+});
 const signsView = new SignsView((label) => {
   practice.setTarget(label);
   modes.select("practice");
@@ -95,10 +122,11 @@ const modes = new ModeTabs(document.querySelector(".modes") as HTMLElement, (mod
 
 function setMode(mode: Mode): void {
   app.dataset.mode = mode;
-  for (const name of ["translate", "practice", "signs"] as const) {
+  for (const name of ["translate", "practice", "teach", "signs"] as const) {
     byId(`view-${name}`).hidden = name !== mode;
   }
   if (mode !== "practice") practice.cancel();
+  if (mode !== "teach") teach.cancel();
   if (mode === "signs") signsView.show();
 }
 
@@ -250,31 +278,34 @@ function onResult(result: SegmentResult): void {
     const top = decision.top[0];
     stage.addSegment(hand, `${glossOf(top?.label ?? "")}${decision.accepted ? "" : "?"}`, duration, decision.accepted ? "word" : "unsure");
   }
+  if (teach.handleResult(result)) return;
   if (practice.handleResult(result)) return;
   if (result.kind !== "classified" || !decision) return;
   const choices = choicesOf(result);
   const gloss = glossOf(choices[0]?.label ?? "");
   const inTranslate = modes.current === "translate";
+  const personalized = decision.personalized === true;
+  const forYou = personalized ? ", personalized for you" : "";
   if (decision.accepted) {
     stage.hideUnsure();
     stage.flashPill(gloss, "word");
     onboarding.recognised(gloss);
     let target: HTMLElement | null = null;
     if (inTranslate) {
-      transcript.add(choices, true);
+      transcript.add(choices, true, personalized);
       target = renderTranscript(true);
       scheduleTranslate();
     }
-    announce(`${gloss}, ${Math.round(decision.probability * 100)} percent.`);
+    announce(`${gloss}, ${Math.round(decision.probability * 100)} percent${forYou}.`);
     void stage.land(gloss, decision.probability).then((token) => stage.fly(token, inTranslate ? target : null));
   } else {
     stage.flashPill("Not sure", "unsure");
     if (inTranslate) {
-      transcript.add(choices, false);
+      transcript.add(choices, false, personalized);
       renderTranscript();
       stage.showUnsure(choices, (index) => pick(index));
     }
-    announce(`Not sure. Candidates: ${choices.map((choice) => glossOf(choice.label)).join(", ")}.`);
+    announce(`Not sure${forYou}. Candidates: ${choices.map((choice) => glossOf(choice.label)).join(", ")}.`);
   }
 }
 
@@ -375,6 +406,7 @@ engine.on("ready", (meta) => {
     `${engine.threshold().toFixed(2)} at temperature ${engine.temperature().toFixed(2)}, both set on validation data.`;
   diagnostics.renderSettings();
   diagnostics.renderLabelOptions();
+  teach.modelReady();
   if (!prefs.onboarded) onboarding.show(1);
 });
 engine.on("state", (state) => {
@@ -581,6 +613,15 @@ if (DEBUG) {
     practiceTarget: (label: string) => practice.setTarget(label),
     expandSheet: (on: boolean) => sheet.setExpanded(on),
     labels: () => SIGNS.map((sign) => sign.label),
+    // Teach Dex, for the e2e tests and the record-then-test evaluation (tests/e2e/teach*.spec.ts).
+    teachSelect: (label: string) => teach.select(label),
+    teachRecord: () => teach.record(),
+    teachPhase: () => teach.phase,
+    teachListenMs: (ms: number) => {
+      teach.listenMs = ms;
+    },
+    teachExamples: () => teach.examples.map((example) => ({ label: example.label, embedding: Array.from(example.embedding), modelSha256: example.modelSha256 })),
+    teachStoreMode: () => teachStore?.mode ?? null,
   };
 }
 

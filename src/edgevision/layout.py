@@ -30,6 +30,8 @@ FRAME_DIM = NUM_COORDS + 2
 
 INPUT_NAME = spec.INPUT_NAME
 OUTPUT_NAME = spec.OUTPUT_NAME
+# The optional second output: the model's penultimate embedding (Teach Dex, web/src/teach).
+EMBEDDING_NAME = "embedding"
 
 
 @dataclass(frozen=True)

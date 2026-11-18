@@ -20,7 +20,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 from types import ModuleType
-from typing import Literal, cast
+from typing import cast
 
 from edgevision.web_export import (
     ASL_SIGNS_CLASSES,
@@ -28,6 +28,7 @@ from edgevision.web_export import (
     DEFAULT_TARGET_PRECISION,
     DEFAULT_WORK_DIR,
     WEB_VARIANTS,
+    DataSource,
     ExportResult,
     WasmCheck,
     WebVariant,
@@ -194,7 +195,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         long_frame=fixtures.long_frame,
         variant=variant,
         target_precision=args.target_precision,
-        data_source=cast(Literal["asl-signs", "synthetic"], args.data_source),
+        data_source=cast(DataSource, args.data_source),
         ensemble=args.ensemble,
         work_dir=args.work_dir,
         aspect_report=args.aspect_report,
@@ -215,7 +216,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("aspect: none (synthetic data without aspect_stats); the app keeps k = 1")
     else:
         print(f"aspect: r_train {meta.aspect.r_train:.4f} from {meta.aspect.source}")
-    if meta.data_source == "asl-signs" and meta.num_classes != ASL_SIGNS_CLASSES:
+    if meta.data_source != "synthetic" and meta.num_classes != ASL_SIGNS_CLASSES:
         print(
             f"warning: {meta.num_classes} classes, but asl-signs has {ASL_SIGNS_CLASSES}; "
             "pass --data-source synthetic for fixture data"

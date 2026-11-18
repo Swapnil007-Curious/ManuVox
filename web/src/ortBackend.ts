@@ -19,14 +19,24 @@ export type BackendPreference = Backend | "auto";
 export interface TensorLayout {
   inputName: string;
   outputName: string;
+  /** The penultimate-embedding output (meta.json "embedding"), or null when the model has none. */
+  embeddingName: string | null;
   frames: number;
   width: number;
+}
+
+export interface Classified {
+  logits: Float32Array;
+  embedding: Float32Array | null;
 }
 
 export interface Runner {
   backend: Backend;
   threads: number;
+  /** Logits only. */
   run(input: Float32Array): Promise<Float32Array>;
+  /** Logits and, when the model has it, the embedding, from one session run. */
+  classify(input: Float32Array): Promise<Classified>;
   release(): Promise<void>;
 }
 
@@ -76,19 +86,23 @@ export async function createRunner(bytes: Uint8Array, layout: TensorLayout, back
     graphOptimizationLevel: "all",
     logSeverityLevel: 3,
   });
-  const { inputName, outputName, frames, width } = layout;
+  const { inputName, outputName, embeddingName, frames, width } = layout;
+  const classify = async (input: Float32Array): Promise<Classified> => {
+    if (input.length !== frames * width) throw new Error(`classifier input has ${input.length} values, expected ${frames * width}`);
+    const outputs = await session.run({ [inputName]: new ort.Tensor("float32", input, [1, frames, width]) });
+    const logits = outputs[outputName];
+    if (!logits) throw new Error(`model output ${outputName} missing`);
+    const data = Float32Array.from(logits.data as Float32Array);
+    const embeddingTensor = embeddingName ? outputs[embeddingName] : undefined;
+    const embedding = embeddingTensor ? Float32Array.from(embeddingTensor.data as Float32Array) : null;
+    for (const tensor of Object.values(outputs)) tensor.dispose();
+    return { logits: data, embedding };
+  };
   return {
     backend,
     threads,
-    async run(input: Float32Array): Promise<Float32Array> {
-      if (input.length !== frames * width) throw new Error(`classifier input has ${input.length} values, expected ${frames * width}`);
-      const outputs = await session.run({ [inputName]: new ort.Tensor("float32", input, [1, frames, width]) });
-      const logits = outputs[outputName];
-      if (!logits) throw new Error(`model output ${outputName} missing`);
-      const data = Float32Array.from(logits.data as Float32Array);
-      logits.dispose();
-      return data;
-    },
+    classify,
+    run: async (input: Float32Array) => (await classify(input)).logits,
     release: () => session.release(),
   };
 }

@@ -22,8 +22,15 @@ export interface DebugSegment {
   hand_frames: number;
   k: number;
   excluded: string | null;
-  /** softmax(logits / temperature) of the decision rule in force; null when not classified. */
+  /** The distribution behind the decision shown (Teach Dex's blend when it applied); null when not classified. */
   probabilities: number[] | null;
+  /** softmax(logits / temperature) of the model alone. */
+  base_probabilities?: number[] | null;
+  /** True when the user's examples changed the decision shown ("Personalized for you"). */
+  personalized?: boolean;
+  logits?: number[] | null;
+  /** The model's penultimate embedding, when it has that output. */
+  embedding?: number[] | null;
 }
 
 export interface DebugStatus {
@@ -43,6 +50,8 @@ export interface DebugHook {
   ready: Promise<void>;
   meta(): WebMeta | null;
   classify(input: number[]): Promise<number[]>;
+  /** Logits and the embedding output (null for models without one). */
+  classifyWithEmbedding(input: number[]): Promise<{ logits: number[]; embedding: number[] | null }>;
   preprocess(rows: LongRows): DebugPreprocessResult;
   /** The "Download recordings" file for the recordings held now. */
   recordings(): RecordingsFile | null;

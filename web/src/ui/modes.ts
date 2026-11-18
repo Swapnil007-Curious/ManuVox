@@ -3,7 +3,7 @@
 
 import { place, spring, SPRINGS } from "./motion";
 
-export type Mode = "translate" | "practice" | "signs";
+export type Mode = "translate" | "practice" | "teach" | "signs";
 
 export class ModeTabs {
   private readonly tabs: HTMLButtonElement[];

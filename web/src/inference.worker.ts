@@ -48,7 +48,7 @@ export type WorkerResponse =
   | { id: number; ok: true; type: "init-tracker"; delegate: Delegate; fallbackReason: string | null; loadMs: number; warmupMs: number }
   | { id: number; ok: true; type: "init-classifier"; choice: BackendChoice; crossOriginIsolated: boolean }
   | { id: number; ok: true; type: "detect"; result: DetectResult }
-  | { id: number; ok: true; type: "classify"; logits: Float32Array; ms: number }
+  | { id: number; ok: true; type: "classify"; logits: Float32Array; embedding: Float32Array | null; ms: number }
   | { id: number; ok: true; type: "close-tracker" }
   | { id: number; ok: false; error: string; gpuFailure?: boolean };
 
@@ -255,8 +255,8 @@ async function handle(request: WorkerRequest): Promise<WorkerResponse> {
     case "classify": {
       if (!runner) throw new Error("classifier not loaded");
       const t0 = performance.now();
-      const logits = await runner.run(request.input);
-      return { id: request.id, ok: true, type: "classify", logits, ms: performance.now() - t0 };
+      const { logits, embedding } = await runner.classify(request.input);
+      return { id: request.id, ok: true, type: "classify", logits, embedding, ms: performance.now() - t0 };
     }
     case "close-tracker":
       closeTracker();
@@ -276,7 +276,8 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     } catch (error) {
       response = { id: request.id, ok: false, error: message(error) };
     }
-    const transfer = response.ok && response.type === "classify" ? [response.logits.buffer] : [];
+    const transfer =
+      response.ok && response.type === "classify" ? [response.logits.buffer, ...(response.embedding ? [response.embedding.buffer] : [])] : [];
     self.postMessage(response, transfer as Transferable[]);
   });
 };

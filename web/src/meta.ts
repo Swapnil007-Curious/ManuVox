@@ -70,11 +70,29 @@ export interface VariantCandidate {
   wasm: { status: "passed" | "failed" | "not_run"; detail: string | null };
 }
 
+/** The model's second output, the penultimate embedding Teach Dex compares. */
+export interface EmbeddingBlock {
+  output_name: string;
+  dim: number;
+  source: string;
+}
+
+/** Teach Dex's blend: logits / T + weight * (similarity - offset), fitted on val. */
+export interface PersonalizationBlock {
+  computed_on: "val";
+  method: string;
+  weight: number;
+  offset: number;
+  examples_per_sign: number;
+  influence_threshold: number;
+  simulation: Record<string, unknown>;
+}
+
 export interface WebMeta {
   schema_version: 2;
   model_name: string;
   variant: Variant;
-  data_source: "asl-signs" | "synthetic";
+  data_source: "asl-signs" | "synthetic" | "asl-signs+asl-citizen";
   run: string;
   seed: number | null;
   seeds: number[];
@@ -113,6 +131,9 @@ export interface WebMeta {
     candidates: VariantCandidate[];
     fallbacks: { variant: Variant; reason: string }[];
   };
+  /** Absent in exports made before Teach Dex. */
+  embedding?: EmbeddingBlock | null;
+  personalization?: PersonalizationBlock | null;
 }
 
 function fail(message: string): never {
@@ -147,6 +168,13 @@ export function validateMeta(raw: unknown): WebMeta {
   const calibration = meta.calibration;
   if (!calibration || !(calibration.temperature > 0) || !(calibration.threshold >= 0 && calibration.threshold <= 1)) {
     fail("calibration must hold a temperature > 0 and a threshold in [0, 1] (re-export with scripts/export_web.py)");
+  }
+  if (meta.embedding != null && (typeof meta.embedding.output_name !== "string" || !(meta.embedding.dim > 0))) {
+    fail("embedding needs an output_name and a dim > 0");
+  }
+  const blend = meta.personalization;
+  if (blend != null && (meta.embedding == null || !(blend.weight >= 0) || !Number.isFinite(blend.offset))) {
+    fail("personalization needs an embedding output, a weight >= 0 and a finite offset");
   }
   if (meta.features_spec_version !== SUPPORTED_SPEC_VERSION) {
     fail(`features_spec_version ${String(meta.features_spec_version)} differs from this build's features_spec.json (${SUPPORTED_SPEC_VERSION})`);

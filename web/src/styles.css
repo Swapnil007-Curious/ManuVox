@@ -733,10 +733,44 @@ body:has(.onboarding[data-step="1"]:not([hidden])) .stage-state .state-card { vi
 }
 
 @media (max-width: 420px) {
-  .modes button { padding: 0 10px; font-size: 13.5px; }
+  /* Four tabs: each as wide as its label, so the longest never overflows its share. */
+  .modes { grid-auto-columns: auto; }
+  .modes button { padding: 0 9px; font-size: 13px; }
   .hand-chip { font-size: 0; gap: 0; padding: 0 12px; }
   .hand-chip .swatch { width: 12px; height: 12px; }
 }
+
+/* ------------------------------------------------------------------------------------------ */
+/* Teach Dex */
+
+.teach-privacy { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 650; color: var(--success-ink); }
+.teach-privacy svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; flex: none; }
+.teach-intro { margin: 2px 0 6px; }
+.teach-note { margin: 0; padding: 10px 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); color: var(--warn-ink); font-size: 13.5px; }
+.teach-results { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 2px; padding: 0; list-style: none; }
+.teach-results button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-ink); }
+.teach-dots { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.teach-dots li { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line-strong); transition: background-color 200ms ease, border-color 200ms ease; }
+.teach-dots li[data-done="true"] { background: var(--success); border-color: var(--success); }
+.teach-status { min-height: 1.4em; margin: 0; color: var(--muted); font-weight: 600; }
+.teach-status[data-tone="done"] { color: var(--success-ink); }
+.teach-status[data-tone="miss"] { color: var(--warn-ink); }
+.teach-taught { display: grid; gap: 8px; }
+.teach-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.teach-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--raised); }
+.teach-list .teach-sign { font-weight: 700; }
+.teach-list .teach-meta { color: var(--muted); font-size: 13px; margin-left: 8px; font-weight: 500; }
+.teach-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.button.danger { color: var(--danger-ink); }
+.badge-personal {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 2px 8px; border-radius: 999px;
+  font: 700 11px/1.5 var(--font-ui); letter-spacing: 0.02em; text-transform: none;
+  color: var(--on-accent); background: var(--accent);
+}
+.badge-personal svg { width: 11px; height: 11px; fill: currentColor; stroke: none; }
+.badge-personal[hidden] { display: none; }
+.transcript li .for-you { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 4px; border-radius: 50%; background: var(--accent); color: var(--on-accent); vertical-align: middle; }
+.transcript li .for-you svg { width: 10px; height: 10px; fill: currentColor; }
 
 /* ------------------------------------------------------------------------------------------ */
 /* Preferences */

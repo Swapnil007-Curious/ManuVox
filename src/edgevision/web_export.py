@@ -28,8 +28,8 @@ from edgevision.data.landmarks import N_HAND, NOSE, SHOULDERS, pose_swap_pairs
 from edgevision.data.preprocess import MIN_SCALE, X_GRID, preprocess_sequence, snap_x
 from edgevision.evaluation.metrics import top_k_accuracy
 from edgevision.export.ensemble import export_ensemble_onnx
-from edgevision.export.onnx_export import export_onnx
-from edgevision.layout import NUM_FRAMES, POSE_INDICES, InputLayout, to_model_input
+from edgevision.export.onnx_export import export_onnx, supports_embedding
+from edgevision.layout import EMBEDDING_NAME, NUM_FRAMES, POSE_INDICES, InputLayout, to_model_input
 from edgevision.live.aspect import K_MAX, K_MIN, MIN_VISIBILITY
 from edgevision.live.golden import build_aspect_golden, example_recordings
 from edgevision.models.registry import checkpoint_layout, load_checkpoint
@@ -63,8 +63,9 @@ Float32Array = npt.NDArray[np.float32]
 
 WebVariant = Literal["fp32", "fp16", "int8_dynamic", "int8_static"]
 WEB_VARIANTS: tuple[WebVariant, ...] = ("fp32", "fp16", "int8_dynamic", "int8_static")
-DataSource = Literal["asl-signs", "synthetic"]
-DATA_SOURCES: tuple[DataSource, ...] = ("asl-signs", "synthetic")
+# asl-signs+asl-citizen: the v3 model, trained on both (kaggle/train_v3.ipynb).
+DataSource = Literal["asl-signs", "synthetic", "asl-signs+asl-citizen"]
+DATA_SOURCES: tuple[DataSource, ...] = ("asl-signs", "synthetic", "asl-signs+asl-citizen")
 ASL_SIGNS_CLASSES = 250
 
 FeatureSetName = Literal["v1", "v2"]
@@ -514,6 +515,28 @@ class SourceCheckpoint(_StrictModel):
     sha256: str = Field(pattern=SHA256_PATTERN)
 
 
+class EmbeddingBlock(_StrictModel):
+    """The model's second output, the penultimate embedding Teach Dex compares."""
+
+    output_name: str
+    dim: int = Field(ge=1)
+    source: str
+
+
+class PersonalizationBlock(_StrictModel):
+    """Teach Dex: logits / T + weight * (s - offset) for taught signs, s the highest cosine
+    similarity to the user's examples of that sign; weight and offset fitted on val
+    (scripts/calibrate_teach.py)."""
+
+    computed_on: Literal["val"]
+    method: str
+    weight: float = Field(ge=0.0)
+    offset: float
+    examples_per_sign: int = Field(ge=1)
+    influence_threshold: float = Field(ge=0.0, le=1.0)
+    simulation: dict[str, Any]
+
+
 class WebMeta(_StrictModel):
     schema_version: Literal[2]
     model_name: str
@@ -543,6 +566,9 @@ class WebMeta(_StrictModel):
     features_spec_sha256: str = Field(pattern=SHA256_PATTERN)
     variant_selection: VariantSelection
     tool_versions: dict[str, str]
+    # Optional, so meta.json files written before Teach Dex still validate.
+    embedding: EmbeddingBlock | None = None
+    personalization: PersonalizationBlock | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -831,6 +857,7 @@ class ModelCase(_StrictModel):
     label: int
     input: list[list[float]]
     logits: list[float]
+    embedding: list[float] | None = None
 
 
 class ModelGolden(_StrictModel):
@@ -1234,6 +1261,7 @@ def build_model_golden(
     source: DataSource,
     variant: WebVariant,
     model_sha256: str,
+    embeddings: Float32Array | None = None,
 ) -> ModelGolden:
     rows = model_case_rows(len(val.y))
     return ModelGolden(
@@ -1255,6 +1283,7 @@ def build_model_golden(
                 label=int(val.y[row]),
                 input=float32_lists(val.X[row]),
                 logits=float32_lists(logits[row]),
+                embedding=None if embeddings is None else float32_lists(embeddings[row]),
             )
             for row in rows
         ],
@@ -1375,7 +1404,8 @@ def build_fp32(
     scratch = path.with_name(f".{path.stem}.export.onnx")
     try:
         if len(members) == 1:
-            export_onnx(load_checkpoint(members[0].checkpoint).model, scratch, layout=layout)
+            model = load_checkpoint(members[0].checkpoint).model
+            export_onnx(model, scratch, layout=layout, embedding=supports_embedding(model))
         else:
             export_ensemble_onnx([member.checkpoint for member in members], scratch)
         save_with_metadata(
@@ -1672,6 +1702,19 @@ def _export_file(
     model_sha256 = sha256_file(model_path)
     model = OrtModel(model_path, intra_op_threads=1)
     logits = model.run(val.X)
+    embedding_dim = model.embedding_dim
+    embedding_block = None
+    golden_embeddings = None
+    if embedding_dim is not None:
+        embedding_block = EmbeddingBlock(
+            output_name=EMBEDDING_NAME,
+            dim=embedding_dim,
+            source="the stages' output averaged over time, the vector the classifier head reads",
+        )
+        rows = model_case_rows(len(val.y))
+        _, case_embeddings = model.run_with_embedding(val.X[rows])
+        golden_embeddings = np.zeros((len(val.y), embedding_dim), dtype=np.float32)
+        golden_embeddings[rows] = case_embeddings
 
     meta = WebMeta(
         schema_version=WEB_META_SCHEMA_VERSION,
@@ -1692,6 +1735,7 @@ def _export_file(
         features_spec_version=spec.SUPPORTED_VERSION,
         features_spec_sha256=sha256_file(spec.spec_path()),
         tool_versions=tool_versions(),
+        embedding=embedding_block,
         **fields,
     )
     meta_path = out_dir / META_FILE
@@ -1699,7 +1743,12 @@ def _export_file(
 
     paths = dict(golden_paths)
     model_golden = build_model_golden(
-        val, logits, source=meta.data_source, variant=variant, model_sha256=model_sha256
+        val,
+        logits,
+        source=meta.data_source,
+        variant=variant,
+        model_sha256=model_sha256,
+        embeddings=golden_embeddings,
     )
     write_golden(golden_dir / MODEL_CASES_FILE, model_golden)
     paths[MODEL_CASES_FILE] = golden_dir / MODEL_CASES_FILE

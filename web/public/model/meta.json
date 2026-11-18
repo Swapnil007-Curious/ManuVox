@@ -461,8 +461,8 @@
   },
   "opset": 17,
   "model_file": "model.onnx",
-  "model_bytes": 6928969,
-  "model_sha256": "92e3aea130734f2f5456ab309dcabfaac4e06a86e57ab2d13fc3f2534871372a",
+  "model_bytes": 6929778,
+  "model_sha256": "f7d79f6755498e4a935c38abc3c24b6636d54c5203c2881c2e37080d8296b1e2",
   "source_checkpoints": [
     {
       "run": "d_hybrid_v2feat_v2recipe/seed_0",
@@ -499,7 +499,7 @@
     "val_sequences": 12573
   },
   "features_spec_version": 1,
-  "features_spec_sha256": "818e08707498882db76ef1afe088d6a45d847c15edc7e6dcec9836f4b444736e",
+  "features_spec_sha256": "2b814abd59e04f2a2ea0f963c0effa3d729bfd5197ebe68ebef748b9ad65dd9d",
   "variant_selection": {
     "rule": "among fp32, fp16, int8_dynamic and int8_static, the smallest file whose val top-1 is within 0.5 percentage points of fp32 val top-1; a variant that onnxruntime-web (wasm) cannot run falls back to the next smallest such file",
     "max_drop_pp": 0.5,
@@ -509,7 +509,7 @@
       {
         "variant": "fp32",
         "available": true,
-        "file_bytes": 13701704,
+        "file_bytes": 13702425,
         "val_top1": 0.6761313926668258,
         "drop_pp": 0.0,
         "eligible": true,
@@ -522,7 +522,7 @@
       {
         "variant": "fp16",
         "available": true,
-        "file_bytes": 6928969,
+        "file_bytes": 6929778,
         "val_top1": 0.6761313926668258,
         "drop_pp": 0.0,
         "eligible": true,
@@ -535,7 +535,7 @@
       {
         "variant": "int8_dynamic",
         "available": true,
-        "file_bytes": 3664909,
+        "file_bytes": 3665814,
         "val_top1": 0.41342559452795674,
         "drop_pp": 26.2705798138869,
         "eligible": false,
@@ -574,5 +574,42 @@
     "numpy": "2.4.6",
     "onnx": "1.23.2",
     "onnxruntime": "1.31.1"
+  },
+  "embedding": {
+    "output_name": "embedding",
+    "dim": 256,
+    "source": "the stages' output averaged over time, the vector the classifier head reads"
+  },
+  "personalization": {
+    "computed_on": "val",
+    "method": "logits / T + weight * (max cosine similarity to the sign's examples - offset), taught signs only",
+    "weight": 6.25,
+    "offset": 0.35,
+    "examples_per_sign": 3,
+    "influence_threshold": 0.05,
+    "simulation": {
+      "split": "val",
+      "val_sequences": 12573,
+      "signers": 3,
+      "draws": 120,
+      "examples_per_sign": 3,
+      "taught_signs_per_draw": "uniform 1-25",
+      "queries": 495676,
+      "seed": 0,
+      "nll_before": 1.639403313842172,
+      "nll_after": 1.6284051703305997,
+      "top1_taught_before": 0.66450287208705,
+      "top1_taught_after": 0.7134918040442721,
+      "top1_untaught_before": 0.6770757997145044,
+      "top1_untaught_after": 0.6762935333348796,
+      "grid": {
+        "coarse": [
+          6.0,
+          0.35000000000000003
+        ],
+        "weights": "0-20 step 1, then step 0.25",
+        "offsets": "0-1 step 0.05, then step 0.01"
+      }
+    }
   }
 }

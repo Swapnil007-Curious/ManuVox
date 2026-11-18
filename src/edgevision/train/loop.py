@@ -19,6 +19,7 @@ import pandas as pd
 import torch
 from torch import nn
 
+from edgevision.data.citizen import SOURCES, source_of
 from edgevision.data.io import write_json
 from edgevision.evaluation.metrics import macro_f1, top_k_accuracy
 from edgevision.models.config import MODEL_NAMES, ModelName
@@ -56,6 +57,17 @@ METRICS_COLUMNS = (
     "lr",
     "epoch_seconds",
 )
+SOURCE_COLUMNS = ("val_select", *(f"val_top1_{name}" for name in SOURCES))
+
+
+def source_top1(
+    logits: npt.NDArray[np.float32], y: npt.NDArray[np.int64], sources: npt.NDArray[np.int8]
+) -> dict[str, float]:
+    """Val top-1 of each data source present in the split (edgevision.data.citizen.SOURCES)."""
+    return {
+        SOURCES[code]: top_k_accuracy(logits[sources == code], y[sources == code], 1)
+        for code in sorted(set(sources.tolist()))
+    }
 
 
 class RunExistsError(FileExistsError):
@@ -213,6 +225,9 @@ def run_training(
     )
 
     train, val = arrays["train"], arrays["val"]
+    val_sources = source_of(val.sequence_id)
+    if cfg.val_selection == "source_mean" and len(set(val_sources.tolist())) < len(SOURCES):
+        raise ValueError("val_selection source_mean needs val sequences from every source")
     x_train = torch.from_numpy(train.X).to(torch_device)
     y_train = torch.from_numpy(train.y).to(torch_device)
     x_val = torch.from_numpy(val.X).to(torch_device)
@@ -265,6 +280,10 @@ def run_training(
     evaluated: SignClassifier = model if ema is None else ema.module
 
     rows: list[dict[str, float]] = []
+    columns = list(METRICS_COLUMNS)
+    if cfg.val_selection == "source_mean":
+        columns += list(SOURCE_COLUMNS)
+    best_select, best_by_source = -1.0, {}
     best_top1, best_top5, best_epoch, stale = -1.0, 0.0, 0, 0
     best_predictions = np.empty(0, dtype=np.int64)
     started = time.perf_counter()
@@ -285,17 +304,23 @@ def run_training(
             "lr": lr,  # Used by the epoch's last step.
             "epoch_seconds": time.perf_counter() - epoch_started,
         }
+        select, by_source, detail = val_top1, {}, ""
+        if cfg.val_selection == "source_mean":
+            by_source = source_top1(val_logits, val.y, val_sources)
+            select = float(np.mean(list(by_source.values())))
+            row["val_select"] = select
+            row.update({f"val_top1_{name}": value for name, value in by_source.items()})
+            detail = " (" + ", ".join(f"{n} {v:.4f}" for n, v in by_source.items()) + ")"
         rows.append(row)
-        pd.DataFrame(rows, columns=list(METRICS_COLUMNS)).to_csv(
-            directory / "metrics.csv", index=False
-        )
+        pd.DataFrame(rows, columns=columns).to_csv(directory / "metrics.csv", index=False)
         log(
             f"epoch {epoch:3d}/{cfg.epochs} train_loss {train_loss:.4f} "
             f"train_top1 {train_top1:.4f} val_loss {val_loss:.4f} "
-            f"val_top1 {val_top1:.4f} val_top5 {val_top5:.4f} "
+            f"val_top1 {val_top1:.4f}{detail} val_top5 {val_top5:.4f} "
             f"lr {row['lr']:.2e} {row['epoch_seconds']:.1f}s"
         )
-        if val_top1 > best_top1:
+        if select > best_select:
+            best_select, best_by_source = select, by_source
             best_top1, best_top5, best_epoch, stale = val_top1, val_top5, epoch, 0
             best_predictions = val_logits.argmax(axis=1)
             save_checkpoint(
@@ -308,7 +333,7 @@ def run_training(
         else:
             stale += 1
             if stale >= cfg.patience:
-                log(f"early stop: no val top-1 gain for {cfg.patience} epochs")
+                log(f"early stop: no val selection gain for {cfg.patience} epochs")
                 break
 
     run_info = collect_run_info()
@@ -338,6 +363,10 @@ def run_training(
         "splits_file": splits_path.name,
         "run_info": run_info,
     }
+    if cfg.val_selection != "pooled":
+        summary["val_selection"] = cfg.val_selection
+        summary["best_val_select"] = best_select
+        summary["best_val_top1_by_source"] = best_by_source
     write_json(directory / SUMMARY_FILE, summary)
     return summary
 

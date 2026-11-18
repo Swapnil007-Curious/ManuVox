@@ -26,6 +26,8 @@
       <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11" /></symbol>
       <symbol id="i-external" viewBox="0 0 24 24"><path d="M13.5 4.5h6v6M19.5 4.5 11 13" /><path d="M17.5 13.5v4.5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18V8A1.5 1.5 0 0 1 6 6.5h4.5" /></symbol>
       <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3.5 12h4l2-5 4.5 10 2-5h4.5" /></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="9" rx="2.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 4.5 13.6 10.4 19.5 12l-5.9 1.6L12 19.5l-1.6-5.9L4.5 12l5.9-1.6z" /></symbol>
       <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M4 7h3.5c4.5 0 4.5 10 9 10H20M4 17h3.5c1.4 0 2.3-.9 3-2.1M14 9.1c.7-1.2 1.6-2.1 3-2.1H20" /><path d="m17.5 4.5 2.5 2.5-2.5 2.5M17.5 14.5l2.5 2.5-2.5 2.5" /></symbol>
     </svg>
 
@@ -46,6 +48,7 @@
           <span class="modes-indicator" aria-hidden="true"></span>
           <button type="button" role="tab" id="tab-translate" data-mode="translate" aria-controls="view-translate" aria-selected="true">Translate</button>
           <button type="button" role="tab" id="tab-practice" data-mode="practice" aria-controls="view-practice" aria-selected="false" tabindex="-1">Practice</button>
+          <button type="button" role="tab" id="tab-teach" data-mode="teach" aria-controls="view-teach" aria-selected="false" tabindex="-1">Teach</button>
           <button type="button" role="tab" id="tab-signs" data-mode="signs" aria-controls="view-signs" aria-selected="false" tabindex="-1">Signs</button>
         </nav>
         <div class="topbar-actions">
@@ -188,7 +191,7 @@
             <p class="transcript-empty" id="transcript-empty">Sign a word and it lands here. <span class="muted">Try “hello”.</span></p>
 
             <div class="candidates" id="candidates">
-              <h3 class="eyebrow">Top 3 <span class="muted" id="candidates-hint">for the last sign</span></h3>
+              <h3 class="eyebrow">Top 3 <span class="muted" id="candidates-hint">for the last sign</span> <span class="badge-personal" id="personal-badge" hidden><svg aria-hidden="true"><use href="#i-spark" /></svg>Personalized for you</span></h3>
               <ol class="choice-row" id="candidate-list"></ol>
             </div>
 
@@ -240,6 +243,40 @@
               <ol class="hardest-list" id="hardest"></ol>
               <p class="muted small" id="hardest-empty">Signs you miss more than once show up here.</p>
             </section>
+          </section>
+
+          <section class="view" id="view-teach" role="tabpanel" aria-labelledby="tab-teach" hidden>
+            <header class="view-head">
+              <h2 class="eyebrow">Teach Dex</h2>
+              <span class="view-count mono" id="teach-count">0 signs taught</span>
+            </header>
+            <p class="teach-privacy"><svg aria-hidden="true"><use href="#i-lock" /></svg>Your examples stay on this device.</p>
+            <p class="muted small teach-intro">Pick a sign Dex gets wrong for you and show it three times. Dex then leans toward the way you sign it.</p>
+            <p class="teach-note" id="teach-unavailable" hidden>This model can’t learn your signs: it has no embedding output.</p>
+            <p class="teach-note" id="teach-storage" hidden></p>
+            <label class="search">
+              <span class="visually-hidden">Find a sign to teach</span>
+              <input id="teach-search" type="search" placeholder="Find a sign to teach" autocomplete="off" />
+            </label>
+            <ul class="teach-results" id="teach-results" aria-label="Signs to teach"></ul>
+            <article class="target-card teach-card" id="teach-card" hidden>
+              <p class="eyebrow muted">Show Dex your sign</p>
+              <h3 class="target-word display" id="teach-word"></h3>
+              <ol class="teach-dots" id="teach-dots" aria-label="Examples recorded"></ol>
+              <div class="target-actions">
+                <button type="button" class="button primary large" id="teach-record"><span>Record example</span></button>
+              </div>
+              <p class="teach-status" id="teach-status" aria-live="polite"></p>
+            </article>
+            <section class="teach-taught">
+              <h3 class="eyebrow">Your signs</h3>
+              <ul class="teach-list" id="teach-list"></ul>
+              <p class="muted small" id="teach-empty">No signs taught yet.</p>
+            </section>
+            <div class="teach-controls">
+              <label class="check"><input id="teach-enabled" type="checkbox" role="switch" /> Use my examples</label>
+              <button type="button" class="button ghost small danger" id="teach-reset" disabled>Reset my signs</button>
+            </div>
           </section>
 
           <section class="view" id="view-signs" role="tabpanel" aria-labelledby="tab-signs" hidden>

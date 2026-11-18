@@ -4,6 +4,8 @@
 
 export interface SiteFile {
   workerUrl?: unknown;
+  /** web/model-variant.ts: "v2-kaggle" (default, public) or "v3-citizen". */
+  modelVariant?: unknown;
 }
 
 export interface Setting {

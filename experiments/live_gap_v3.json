@@ -1,0 +1,61 @@
+{
+  "description": "v2 vs v3 on test_clips_v2 (25 signs x 2 takes, one signer), both through the final live pipeline (c6_final of experiments/live_gap_v2.json), 3 browser runs each plus the Python Holistic pipeline. Run once, after v3 was selected and calibrated on validation (kaggle/train_v3.ipynb); nothing is tuned on these clips. The analysis was fixed on 2026-11-18, before any v3 run.",
+  "clips_dir": "data/live_clips_v2",
+  "results_dir": "results/live_gap_v3",
+  "models": {
+    "v2": "web/public/model",
+    "v3": "web/models/v3-citizen"
+  },
+  "scoring": {
+    "segment": "every classified segment of a clip is scored against the clip's label (top-1 and top-3 of its probabilities)",
+    "clip": "the clip's prediction is the mean of its classified segments' probability vectors; a clip without a classified segment counts as wrong",
+    "accepted": "a segment is accepted when its top probability reaches the config's threshold; coverage is the accepted share of classified segments, selective accuracy the top-1 accuracy among them"
+  },
+  "analysis": {
+    "unit": "clip (n = 50: 25 signs x 2 takes); the two takes of a sign are not independent, which the bootstrap over clips does not model",
+    "primary_metrics": "clip top-1 and clip top-3",
+    "browser_repeats": "each browser config runs 3 times; a clip's score is its mean over the runs",
+    "confidence_intervals": "percentile bootstrap over clips, 10000 resamples, seed 0",
+    "comparisons": "v3_final - v2_final per pipeline on clip top-1, paired over clips (sign-flip test), reported with the v2-vs-v3 comparisons on the asl-signs and ASL Citizen test splits in one Holm family (scripts/compare_v3.py); the sign-level interval is a sensitivity analysis",
+    "test": "two-sided paired sign-flip permutation test on the per-clip score differences (exact enumeration up to 20 non-zero differences, otherwise 100000 random sign flips, seed 0)",
+    "multiplicity": "Holm correction over all comparisons of one pipeline and one metric, alpha = 0.05",
+    "difference_intervals": "paired percentile bootstrap over clips, 10000 resamples, seed 0"
+  },
+  "settings": {
+    "build": "head (browser only): the demo as committed in 3fbafa3, built with experiments/head_build_hook.patch, which only records each segment's softmax for the harness; its MediaPipe and classifier run on the page's main thread. Configs without it run the current app with the listed settings",
+    "model": "v1: the CNN the demo shipped (v1 features); v2: the chosen hybrid (v2 features)",
+    "hands": "label_inverted: the first demo's handedness mapping (assumes a mirrored frame); nearest_pose_wrist: Holistic's rule (features_spec.json live.hand_assignment)",
+    "mirrored": "true: landmarks detected on the horizontally flipped frame, as a naive selfie pipeline would (browser only)",
+    "aspect": "calibrated: k = r_train / r_live over the first 2 s (the first demo's default); frame: k from the frame's width / height and aspect.train_width_over_height; off: k = 1",
+    "resampling": "index: kept-frame index (training's rule); time: kept-frame clock",
+    "segmenter": "presence: 3 frames with a hand start, 8 without end, 3 s cap; motion: the motion-energy state machine",
+    "decision": "raw: softmax and the target-precision threshold (meta.json threshold); calibrated: softmax(logits / temperature) and the net-score threshold (meta.json calibration)"
+  },
+  "configs": [
+    {
+      "name": "v2_final",
+      "group": "model",
+      "title": "The final live pipeline (c6_final) with the shipped v2 model (asl-signs only)",
+      "model": "v2",
+      "hands": "nearest_pose_wrist",
+      "mirrored": false,
+      "aspect": "frame",
+      "resampling": "time",
+      "segmenter": "motion",
+      "decision": "calibrated"
+    },
+    {
+      "name": "v3_final",
+      "group": "model",
+      "title": "The final live pipeline (c6_final) with the v3 model (asl-signs + ASL Citizen, webcam augmentation)",
+      "base": "v2_final",
+      "model": "v3",
+      "hands": "nearest_pose_wrist",
+      "mirrored": false,
+      "aspect": "frame",
+      "resampling": "time",
+      "segmenter": "motion",
+      "decision": "calibrated"
+    }
+  ]
+}

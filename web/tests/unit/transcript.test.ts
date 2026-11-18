@@ -67,3 +67,20 @@ describe("Transcript", () => {
     expect(t.add([], true)).toBe("none");
   });
 });
+
+describe("Teach Dex flags", () => {
+  it("marks words and pending choices from personalised decisions until the user changes them", () => {
+    const t = new Transcript();
+    t.add([{ label: "mom", probability: 0.8 }, { label: "dad", probability: 0.1 }], true, true);
+    expect(t.last?.personalized).toBe(true);
+    expect(t.choicesPersonalized).toBe(true);
+    t.pick(1);
+    expect(t.last?.personalized).toBe(false);
+    t.add([{ label: "water", probability: 0.3 }], false, true);
+    expect(t.choicesPersonalized).toBe(true);
+    t.pick(0);
+    expect(t.last?.personalized).toBe(false);
+    t.add([{ label: "milk", probability: 0.9 }], true);
+    expect(t.choicesPersonalized).toBe(false);
+  });
+});

@@ -1,0 +1,620 @@
+{
+ "run": 2,
+ "model_sha256": "f7d79f6755498e4a935c38abc3c24b6636d54c5203c2881c2e37080d8296b1e2",
+ "lead_in_s": 3.5,
+ "params": {
+  "weight": 6.25,
+  "offset": 0.35,
+  "influenceThreshold": 0.05
+ },
+ "settings": {
+  "mode": "auto",
+  "autoSegmenter": "motion",
+  "handRule": "nearest_pose_wrist",
+  "detectMirrored": false,
+  "aspectMode": "frame",
+  "resampling": "time",
+  "decision": "calibrated",
+  "delegate": "GPU",
+  "classifierBackend": "wasm",
+  "personalization": true
+ },
+ "store_modes": [
+  "indexeddb"
+ ],
+ "teaching": {
+  "bed": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "bird": {
+   "examples": 3,
+   "attempts": 4
+  },
+  "book": {
+   "examples": 0,
+   "attempts": 6
+  },
+  "car": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "cat": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "dad": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "dog": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "drink": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "finish": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "food": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "go": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "happy": {
+   "examples": 0,
+   "attempts": 6
+  },
+  "hello": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "home": {
+   "examples": 3,
+   "attempts": 5
+  },
+  "hungry": {
+   "examples": 3,
+   "attempts": 5
+  },
+  "milk": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "mom": {
+   "examples": 0,
+   "attempts": 6
+  },
+  "no": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "please": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "read": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "sad": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "sleep": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "thankyou": {
+   "examples": 0,
+   "attempts": 6
+  },
+  "water": {
+   "examples": 3,
+   "attempts": 3
+  },
+  "yes": {
+   "examples": 3,
+   "attempts": 3
+  }
+ },
+ "half_taught_signs": [
+  "bird",
+  "book",
+  "dad",
+  "dog",
+  "food",
+  "go",
+  "mom",
+  "no",
+  "please",
+  "sad",
+  "sleep",
+  "water",
+  "yes"
+ ],
+ "parity_max_abs_diff": 5.551115123125783e-17,
+ "clips": [
+  {
+   "clip": "bed_2",
+   "label": "bed",
+   "segments": 1,
+   "badged_segments": 1,
+   "base": {
+    "top1": 1,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "bird_2",
+   "label": "bird",
+   "segments": 0,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "book_2",
+   "label": "book",
+   "segments": 0,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "car_2",
+   "label": "car",
+   "segments": 2,
+   "badged_segments": 1,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "cat_2",
+   "label": "cat",
+   "segments": 1,
+   "badged_segments": 1,
+   "base": {
+    "top1": 1,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "dad_2",
+   "label": "dad",
+   "segments": 2,
+   "badged_segments": 2,
+   "base": {
+    "top1": 0,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "dog_2",
+   "label": "dog",
+   "segments": 0,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "drink_2",
+   "label": "drink",
+   "segments": 1,
+   "badged_segments": 1,
+   "base": {
+    "top1": 0,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 0,
+    "top3": 1
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "finish_2",
+   "label": "finish",
+   "segments": 1,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "food_2",
+   "label": "food",
+   "segments": 2,
+   "badged_segments": 1,
+   "base": {
+    "top1": 0,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "go_2",
+   "label": "go",
+   "segments": 1,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 1
+   },
+   "half": {
+    "top1": 0,
+    "top3": 1
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "happy_2",
+   "label": "happy",
+   "segments": 0,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "hello_2",
+   "label": "hello",
+   "segments": 2,
+   "badged_segments": 2,
+   "base": {
+    "top1": 1,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "home_2",
+   "label": "home",
+   "segments": 2,
+   "badged_segments": 0,
+   "base": {
+    "top1": 1,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "hungry_2",
+   "label": "hungry",
+   "segments": 0,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "milk_2",
+   "label": "milk",
+   "segments": 2,
+   "badged_segments": 1,
+   "base": {
+    "top1": 1,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "mom_2",
+   "label": "mom",
+   "segments": 1,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "no_2",
+   "label": "no",
+   "segments": 2,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 1
+   },
+   "half": {
+    "top1": 0,
+    "top3": 1
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "please_2",
+   "label": "please",
+   "segments": 1,
+   "badged_segments": 1,
+   "base": {
+    "top1": 1,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "read_2",
+   "label": "read",
+   "segments": 2,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half": {
+    "top1": 0,
+    "top3": 1
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "sad_2",
+   "label": "sad",
+   "segments": 2,
+   "badged_segments": 2,
+   "base": {
+    "top1": 0,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "sleep_2",
+   "label": "sleep",
+   "segments": 2,
+   "badged_segments": 1,
+   "base": {
+    "top1": 1,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "thank_you_2",
+   "label": "thankyou",
+   "segments": 0,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half_taught": false
+  },
+  {
+   "clip": "water_2",
+   "label": "water",
+   "segments": 0,
+   "badged_segments": 0,
+   "base": {
+    "top1": 0,
+    "top3": 0
+   },
+   "personalized": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half": {
+    "top1": 0,
+    "top3": 0
+   },
+   "half_taught": true
+  },
+  {
+   "clip": "yes_2",
+   "label": "yes",
+   "segments": 2,
+   "badged_segments": 2,
+   "base": {
+    "top1": 1,
+    "top3": 1
+   },
+   "personalized": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half": {
+    "top1": 1,
+    "top3": 1
+   },
+   "half_taught": true
+  }
+ ]
+}

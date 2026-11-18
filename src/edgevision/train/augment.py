@@ -1,10 +1,12 @@
 """Training-batch augmentation in pure torch, vectorised over the batch on its own device.
 
 Every transform keeps missing points (x == y == 0.0) at exactly 0.0. Only the temporal
-transforms (temporal crop, frame dropout) and time masking touch the presence channels. All
+transforms (temporal crop, frame dropout, frame-rate jitter), dropped hand frames and time
+masking touch the presence channels. All
 randomness comes from the explicit generator, which must live on the batch's device, so a seed
 reproduces an augmented batch exactly. A transform whose probability is 0 draws no random
-numbers, so the v2 transforms leave v1 batches bit-for-bit unchanged. There is no horizontal
+numbers, so the v2 and webcam transforms leave earlier batches bit-for-bit unchanged. There is
+no horizontal
 flip: preprocessing already put the dominant hand on the right.
 
 Any landmark count works: L comes from the frame width (2L + 2).
@@ -179,6 +181,88 @@ def frame_dropout(
     )
 
 
+def aspect(
+    points: torch.Tensor, missing: torch.Tensor, cfg: AugmentConfig, generator: torch.Generator
+) -> torch.Tensor:
+    """Stretch x by sqrt(k) and y by 1/sqrt(k) about the origin (the shoulder midpoint after
+    normalisation), log k ~ U(-log(1 + aspect_max), log(1 + aspect_max)): a camera whose aspect
+    ratio is misreported, as the live pipeline sees before its aspect correction."""
+    batch = points.shape[0]
+    chosen = _chosen(cfg.aspect_p, batch, generator, points)
+    limit = math.log1p(cfg.aspect_max)
+    half = torch.exp(0.5 * _uniform((batch,), -limit, limit, generator, points))
+    factors = torch.stack([half, 1.0 / half], dim=-1)
+    moved = torch.where(chosen[:, None, None, None], points * factors[:, None, None, :], points)
+    return moved.masked_fill(missing.unsqueeze(-1), 0.0)
+
+
+def frame_rate(
+    points: torch.Tensor,
+    presence: torch.Tensor,
+    missing: torch.Tensor,
+    cfg: AugmentConfig,
+    generator: torch.Generator,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """A slower camera: keep n = round(T * U(fps_min_ratio, 1)) evenly spaced frames (at least
+    2), then resample them back to T frames linearly, as the live pipeline resamples a sparse
+    segment by time. A blend with a missing endpoint is missing; presence takes the nearest kept
+    frame."""
+    batch, frames = points.shape[:2]
+    chosen = _chosen(cfg.fps_p, batch, generator, points)
+    ratio = _uniform((batch,), cfg.fps_min_ratio, 1.0, generator, points)
+    kept = (ratio * frames).round().long().clamp(2, frames)
+    last_kept = (kept - 1)[:, None]
+    steps = torch.arange(frames, device=points.device, dtype=points.dtype)[None, :]
+    # In kept-frame units, 0 .. kept - 1; multiplying first keeps both ends exact.
+    positions = steps * last_kept.to(points.dtype) / (frames - 1)
+
+    def source(index: torch.Tensor) -> torch.Tensor:
+        """The source frame of kept frame ``index``."""
+        scaled = index.to(points.dtype) * (frames - 1) / last_kept.to(points.dtype)
+        return scaled.round().long().clamp(0, frames - 1)
+
+    lower = positions.floor()
+    weight = positions - lower
+    low = torch.minimum(lower.long(), last_kept)
+    high = torch.minimum(torch.where(weight > 0.0, low + 1, low), last_kept)
+    nearest = torch.minimum((positions + 0.5).floor().long(), last_kept)
+    start, end = _gather_frames(points, source(low)), _gather_frames(points, source(high))
+    resampled_missing = _gather_frames(missing, source(low)) | _gather_frames(missing, source(high))
+    blended = start + (end - start) * weight[:, :, None, None]
+    blended = blended.masked_fill(resampled_missing.unsqueeze(-1), 0.0)
+    resampled_presence = _gather_frames(presence, source(nearest))
+    return (
+        torch.where(chosen[:, None, None, None], blended, points),
+        torch.where(chosen[:, None, None], resampled_presence, presence),
+        torch.where(chosen[:, None, None], resampled_missing, missing),
+    )
+
+
+def hand_drop(
+    points: torch.Tensor,
+    presence: torch.Tensor,
+    missing: torch.Tensor,
+    cfg: AugmentConfig,
+    generator: torch.Generator,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Frames where the tracker lost a hand: in each chosen sample, each hand independently
+    misses a U(0, hand_drop_max) fraction of frames (Bernoulli per frame). Its 21 points become
+    missing and its presence channel 0; pose points are left alone."""
+    batch, frames, landmarks = points.shape[:3]
+    chosen = _chosen(cfg.hand_drop_p, batch, generator, points)
+    rate = _uniform((batch, 2), 0.0, cfg.hand_drop_max, generator, points)
+    draw = torch.rand((batch, frames, 2), generator=generator, device=points.device)
+    dropped = (draw < rate[:, None, :]) & chosen[:, None, None]
+    per_point = torch.zeros((batch, frames, landmarks), dtype=torch.bool, device=points.device)
+    per_point[:, :, LEFT_HAND] = dropped[:, :, :1]
+    per_point[:, :, RIGHT_HAND] = dropped[:, :, 1:]
+    return (
+        points.masked_fill(per_point.unsqueeze(-1), 0.0),
+        presence.masked_fill(dropped, 0.0),
+        missing | per_point,
+    )
+
+
 def time_mask(
     points: torch.Tensor,
     presence: torch.Tensor,
@@ -229,8 +313,9 @@ def landmark_mask(
 
 
 def augment_batch(x: torch.Tensor, cfg: AugmentConfig, generator: torch.Generator) -> torch.Tensor:
-    """Apply the enabled transforms to a (B, T, 2L + 2) batch, in this order: affine, hand
-    rotation, temporal crop, frame dropout, jitter, time masking, landmark masking.
+    """Apply the enabled transforms to a (B, T, 2L + 2) batch, in this order: affine, aspect
+    jitter, hand rotation, temporal crop, frame dropout, frame-rate jitter, jitter, dropped hand
+    frames, time masking, landmark masking.
 
     Returns a new tensor, or ``x`` itself when every probability is 0.
     """
@@ -248,14 +333,20 @@ def augment_batch(x: torch.Tensor, cfg: AugmentConfig, generator: torch.Generato
 
     if cfg.affine_p > 0.0:
         points = affine(points, missing, cfg, generator)
+    if cfg.aspect_p > 0.0:
+        points = aspect(points, missing, cfg, generator)
     if cfg.hand_rotation_p > 0.0:
         points = hand_rotation(points, missing, cfg, generator)
     if cfg.temporal_p > 0.0:
         points, presence, missing = temporal(points, presence, missing, cfg, generator)
     if cfg.frame_dropout_p > 0.0:
         points, presence, missing = frame_dropout(points, presence, missing, cfg, generator)
+    if cfg.fps_p > 0.0:
+        points, presence, missing = frame_rate(points, presence, missing, cfg, generator)
     if cfg.jitter_p > 0.0:
         points = jitter(points, missing, cfg, generator)
+    if cfg.hand_drop_p > 0.0:
+        points, presence, missing = hand_drop(points, presence, missing, cfg, generator)
     if cfg.time_mask_p > 0.0:
         points, presence, missing = time_mask(points, presence, missing, cfg, generator)
     if cfg.landmark_mask_p > 0.0:

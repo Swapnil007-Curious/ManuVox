@@ -1,8 +1,9 @@
 """Training configuration, loaded from experiments/train_*.yaml.
 
 Fields added for v2 (experiment, feature_set, recipe, ema_decay and the extra augmentations)
-default to the v1 behaviour and are left out of a dumped config while they hold their defaults,
-so a v1 run's config.yaml is unchanged.
+and v3 (val_selection and the webcam augmentations) default to the v1 behaviour and are left out
+of a dumped config while they hold their defaults, so earlier runs' config.yaml files are
+unchanged.
 """
 
 from pathlib import Path
@@ -15,7 +16,8 @@ from edgevision.config import SplitConfig, _StrictModel
 from edgevision.models.config import ModelConfig
 from edgevision.models.features import FeatureSet
 
-Recipe = Literal["v1", "v2"]
+Recipe = Literal["v1", "v2", "v3"]
+ValSelection = Literal["pooled", "source_mean"]
 
 
 class AugmentConfig(_StrictModel):
@@ -40,6 +42,16 @@ class AugmentConfig(_StrictModel):
     landmark_mask_max: int = Field(default=4, ge=1)
     hand_rotation_p: float = Field(default=0.0, ge=0.0, le=1.0)
     hand_rotation_deg: float = Field(default=10.0, ge=0.0)
+    # v3 (webcam) additions, also 0.0 by default: aspect jitter (x and y scaled by sqrt(k) and
+    # 1/sqrt(k), log k uniform within +-log(1 + aspect_max)), frame-rate jitter (keep
+    # round(T * U(fps_min_ratio, 1)) evenly spaced frames, then resample back to T linearly) and
+    # dropped hand frames (each hand misses U(0, hand_drop_max) of its frames).
+    aspect_p: float = Field(default=0.0, ge=0.0, le=1.0)
+    aspect_max: float = Field(default=0.15, ge=0.0)
+    fps_p: float = Field(default=0.0, ge=0.0, le=1.0)
+    fps_min_ratio: float = Field(default=0.4, gt=0.0, le=1.0)
+    hand_drop_p: float = Field(default=0.0, ge=0.0, le=1.0)
+    hand_drop_max: float = Field(default=0.3, ge=0.0, le=1.0)
 
     @model_validator(mode="after")
     def _check_scale(self) -> Self:
@@ -52,8 +64,13 @@ class AugmentConfig(_StrictModel):
         return self.frame_dropout_p, self.time_mask_p, self.landmark_mask_p, self.hand_rotation_p
 
     @property
+    def webcam_probabilities(self) -> tuple[float, float, float]:
+        return self.aspect_p, self.fps_p, self.hand_drop_p
+
+    @property
     def enabled(self) -> bool:
-        return max(self.affine_p, self.temporal_p, self.jitter_p, *self.v2_probabilities) > 0.0
+        probabilities = (self.affine_p, self.temporal_p, self.jitter_p)
+        return max(*probabilities, *self.v2_probabilities, *self.webcam_probabilities) > 0.0
 
 
 V2_AUGMENT_FIELDS = (
@@ -66,17 +83,25 @@ V2_AUGMENT_FIELDS = (
     "landmark_mask_max",
     "hand_rotation_p",
     "hand_rotation_deg",
+    "aspect_p",
+    "aspect_max",
+    "fps_p",
+    "fps_min_ratio",
+    "hand_drop_p",
+    "hand_drop_max",
 )
-V2_TRAIN_FIELDS = ("experiment", "feature_set", "recipe", "ema_decay")
+V2_TRAIN_FIELDS = ("experiment", "feature_set", "recipe", "ema_decay", "val_selection")
 
 
 class TrainConfig(_StrictModel):
     """AdamW with a linear warmup over ``warmup_fraction`` of all steps, then cosine decay.
 
     ``experiment`` names the run directory (default "<model>_<split mode>", the v1 names);
-    ``recipe`` is recorded in summary.json, and "v1" rules out EMA and the v2 augmentations.
-    With ``ema_decay`` set, an exponential moving average of the weights is updated after every
-    optimizer step and is what validation, checkpoint selection and best.pt use.
+    ``recipe`` is recorded in summary.json, and "v1" rules out EMA and the v2 and webcam
+    augmentations. With ``ema_decay`` set, an exponential moving average of the weights is
+    updated after every optimizer step and is what validation, checkpoint selection and best.pt
+    use. ``val_selection`` "source_mean" selects the epoch by the unweighted mean of the val top-1
+    of each data source (edgevision.data.citizen.source_of) instead of the pooled val top-1.
     """
 
     model: ModelConfig
@@ -97,13 +122,13 @@ class TrainConfig(_StrictModel):
     feature_set: FeatureSet = "v1"
     recipe: Recipe = "v1"
     ema_decay: float | None = Field(default=None, gt=0.0, lt=1.0)
+    val_selection: ValSelection = "pooled"
 
     @model_validator(mode="after")
     def _check_recipe(self) -> Self:
-        if self.recipe == "v1" and (
-            self.ema_decay is not None or max(self.augment.v2_probabilities) > 0.0
-        ):
-            raise ValueError("recipe v1 uses neither EMA nor the v2 augmentations")
+        extras = (*self.augment.v2_probabilities, *self.augment.webcam_probabilities)
+        if self.recipe == "v1" and (self.ema_decay is not None or max(extras) > 0.0):
+            raise ValueError("recipe v1 uses neither EMA nor the v2 and webcam augmentations")
         return self
 
     @property

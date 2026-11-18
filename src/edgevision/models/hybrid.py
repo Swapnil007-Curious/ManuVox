@@ -85,7 +85,17 @@ class HybridClassifier(SignClassifier):
         epochs, e.g. epochs 76-150 of 150 for the default 0.5."""
         self.head_dropout.active = (epoch - 1) >= self.late_dropout_start * epochs
 
+    def embed(self, x: torch.Tensor) -> torch.Tensor:
+        """The penultimate embedding: the stages' output averaged over time, (B, dim)."""
+        pooled: torch.Tensor = self.stages(self.proj(self.features(x))).mean(dim=1)
+        return pooled
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        hidden = self.stages(self.proj(self.features(x)))
-        logits: torch.Tensor = self.head(self.head_dropout(hidden.mean(dim=1)))
+        logits: torch.Tensor = self.head(self.head_dropout(self.embed(x)))
         return logits
+
+    def forward_with_embedding(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """(logits, embedding) from one pass; the export's two outputs."""
+        embedding = self.embed(x)
+        logits: torch.Tensor = self.head(self.head_dropout(embedding))
+        return logits, embedding

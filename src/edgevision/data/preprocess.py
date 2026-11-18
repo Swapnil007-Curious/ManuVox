@@ -245,7 +245,25 @@ def preprocess_sequence_measured(
     min_hand_frames: int = 3,
 ) -> tuple[PreprocessResult, AspectMeasurement]:
     """preprocess_sequence, plus the aspect measurement of the kept frames."""
-    coords = pivot_sequence(df, pose_indices)
+    return preprocess_coords_measured(
+        pivot_sequence(df, pose_indices),
+        num_frames=num_frames,
+        use_z=use_z,
+        pose_indices=pose_indices,
+        min_hand_frames=min_hand_frames,
+    )
+
+
+def preprocess_coords_measured(
+    coords: FloatArray,
+    *,
+    num_frames: int = 32,
+    use_z: bool = False,
+    pose_indices: Sequence[int] = DEFAULT_POSE_INDICES,
+    min_hand_frames: int = 3,
+) -> tuple[PreprocessResult, AspectMeasurement]:
+    """The steps after pivot_sequence, for selected (T_raw, L, 3) coordinates with snapped x
+    from any source (edgevision.data.citizen passes tracked ASL Citizen landmarks)."""
     presence = hand_presence(coords)
     any_hand = presence.any(axis=1)
     coords, presence = coords[any_hand], presence[any_hand]

@@ -103,3 +103,39 @@ export function serviceWorker(templatePath: string): Plugin {
     },
   };
 }
+
+/**
+ * Serves (dev and preview) and emits (build) the files of a model variant kept outside public/
+ * (web/model-variant.ts). For a public variant it does nothing, so those files never reach a
+ * default build, its service worker or the deployed site.
+ */
+export function modelVariantAssets(files: { url: string; path: string }[]): Plugin {
+  const byUrl = new Map(files.map((file) => [file.url, file.path]));
+  const middleware =
+    (base: string) =>
+    (req: { url?: string }, res: { setHeader(name: string, value: string): void; end(body: Buffer): void }, next: () => void): void => {
+      const path = (req.url ?? "").split("?")[0] ?? "";
+      const relativeUrl = path.startsWith(base) ? path.slice(base.length) : path.replace(/^\//, "");
+      const file = byUrl.get(relativeUrl);
+      if (!file) return next();
+      res.setHeader("Content-Type", file.endsWith(".json") ? "application/json" : "application/octet-stream");
+      for (const [name, value] of Object.entries(CROSS_ORIGIN_ISOLATION_HEADERS)) res.setHeader(name, value);
+      void readFile(file).then((body) => res.end(body));
+    };
+  let base = "/";
+  return {
+    name: "edge-vision-model-variant",
+    configResolved(resolved) {
+      base = resolved.base;
+    },
+    configureServer(server) {
+      if (files.length) server.middlewares.use(middleware(base));
+    },
+    configurePreviewServer(server) {
+      if (files.length) server.middlewares.use(middleware(base));
+    },
+    async generateBundle() {
+      for (const file of files) this.emitFile({ type: "asset", fileName: file.url, source: await readFile(file.path) });
+    },
+  };
+}

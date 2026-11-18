@@ -14,7 +14,7 @@ import numpy.typing as npt
 # onnxruntime ships no py.typed marker or stubs.
 import onnxruntime as ort  # type: ignore[import-untyped]
 
-from edgevision.layout import INPUT_NAME, OUTPUT_NAME, layout_dict
+from edgevision.layout import EMBEDDING_NAME, INPUT_NAME, OUTPUT_NAME, layout_dict
 
 PROVIDERS = ("CPUExecutionProvider",)
 
@@ -73,6 +73,21 @@ class OrtModel:
         """(n, 32, 100) float32 in, (n, num_classes) float32 logits out."""
         (logits,) = self.session.run([OUTPUT_NAME], {INPUT_NAME: x})
         return np.asarray(logits, dtype=np.float32)
+
+    @property
+    def embedding_dim(self) -> int | None:
+        """Width of the "embedding" output, or None when the model has none."""
+        for output in self.session.get_outputs():
+            if output.name == EMBEDDING_NAME:
+                return int(output.shape[1])
+        return None
+
+    def run_with_embedding(
+        self, x: npt.NDArray[np.float32]
+    ) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
+        """(logits, embedding) from one session run; needs the "embedding" output."""
+        logits, embedding = self.session.run([OUTPUT_NAME, EMBEDDING_NAME], {INPUT_NAME: x})
+        return np.asarray(logits, dtype=np.float32), np.asarray(embedding, dtype=np.float32)
 
 
 def label_map_from_metadata(

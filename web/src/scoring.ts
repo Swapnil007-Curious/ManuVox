@@ -14,6 +14,8 @@ export interface Decision {
   probability: number;
   threshold: number;
   top: Candidate[];
+  /** Set when the user's own examples (Teach Dex) changed this decision. */
+  personalized?: boolean;
 }
 
 /** Numerically stable softmax(logits / temperature) in float64. */

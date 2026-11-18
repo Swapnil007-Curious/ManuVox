@@ -111,6 +111,33 @@ experiment.
 `src/edgevision/export/ensemble.py` exports the seeds of one experiment as one ONNX file that
 averages their logits.
 
+## v3: ASL Citizen cross-dataset evaluation and training
+
+[ASL Citizen](https://www.microsoft.com/en-us/research/project/asl-citizen/) is webcam recordings
+of 2,731 ASL signs by 52 signers, with official signer-independent splits. It is licensed for
+non-commercial research only and may not be redistributed. Its data and landmarks never enter
+this repository, its notebooks and dataset stay private on Kaggle, and the v3 model is kept off
+the public site (docs/DATA_LICENSES.md).
+
+- **Label mapping** (`src/edgevision/data/citizen_labels.py`): 236 of the 250 signs map, 171 of
+  them exactly, 35 through numbered variants and 30 through synonyms. The variant and synonym
+  choices come from ASL-LEX 2.0's translations; they are AI-assisted and unconfirmed. 14 signs
+  have no mapping, three of them (can, fall, glasswindow) awaiting a decision between senses.
+- **Extraction** (`kaggle/asl_citizen_extract.ipynb`, built by
+  `scripts/build_kaggle_notebooks.py`): range requests fetch only the needed videos from the
+  46 GB archive, and MediaPipe Holistic runs with the training settings. Shards are resumable,
+  with optional parallel parts.
+- **Cross-dataset test** (`scripts/citizen_eval.py`): the official test split is evaluated once
+  per model and logged in `results/asl_citizen/test_access_log.json`.
+- **v3 training** (`kaggle/train_v3.ipynb`, `experiments/train_e_hybrid_v3citizen.yaml`): the v2
+  hybrid on asl-signs train plus ASL Citizen train, with webcam augmentation (aspect, frame rate,
+  dropped hand frames). The epoch is selected by the mean of the asl-signs and ASL Citizen val
+  top-1, the seed on validation, and the export is fp16 with calibration from validation.
+- **v2 vs v3** (`scripts/compare_v3.py`): the asl-signs test split, the ASL Citizen test split
+  and test_clips_v2, side by side, with paired tests and a Holm correction.
+
+Run instructions: kaggle/ASL_CITIZEN.md.
+
 ## Quantisation
 
 Post-training quantisation with ONNX Runtime, for every completed signer-independent run:
@@ -486,6 +513,30 @@ python scripts/export_web.py --run results/runs/cnn_signer_independent/seed_0 --
   model came from.
 - Commit `model.onnx` only while it is under 10 MB; `.gitignore` admits only that one ONNX file.
 
+### Teach Dex (personalisation)
+
+The Teach tab lets a signer teach Dex their own version of a sign. They pick the sign and record
+three examples (a 3-2-1 countdown each, then the segmenter catches the sign). The app keeps the
+model's penultimate embedding of each example. It is a second ONNX output, `embedding`, 256
+values; the re-export left the logits bit-identical.
+
+- **Storage:** the embeddings are kept in IndexedDB on the device and are never uploaded.
+  Where IndexedDB is blocked they are kept for the session only, and the panel says so.
+  Examples recorded with another model are ignored.
+- **At recognition:** each taught sign's logit becomes logits / T + weight × (s − offset), where
+  s is the highest cosine similarity to the user's examples of that sign. Untaught signs and the
+  "not sure" threshold are unchanged.
+- **Calibration:** weight and offset are fitted on the validation split by simulating three
+  examples per sign for one val signer at a time (`scripts/calibrate_teach.py`, meta.json
+  `personalization`).
+- **Badge:** a prediction the examples changed carries "Personalized for you".
+- **Controls:** the panel has an on/off switch and Reset my signs.
+
+The evaluation is separate from every main result. `web/tests/e2e/teach-eval.spec.ts` teaches
+each sign from take 1 of test_clips_v2 through the real panel, then tests take 2 (`TEACH_EVAL=1`,
+three runs). It drives the installed Chrome with the GPU tracker, as the live-gap runs do. Each
+take-1 clip gets a short still lead-in, so the countdown does not cover the recorded sign. `scripts/teach_report.py` writes `results/teach_dex.md`.
+
 ### Sentence translation
 
 The transcript holds glosses (HELLO MOM DRINK WATER). Translate (or 2 s without signing) sends
@@ -619,6 +670,22 @@ The `web` job in `.github/workflows/ci.yml` runs the type check, the contrast ch
 build and browser tests; the `worker` job type-checks and tests `deploy/worker`. The service
 worker adds the COOP/COEP headers GitHub Pages cannot send (the coi-serviceworker approach), so
 wasm threads are available there too.
+
+### Model variant
+
+`web/site.config.json` `"modelVariant"` (or `VITE_MODEL_VARIANT`) picks the classifier a build
+ships (`web/model-variant.ts`):
+
+- `"v2-kaggle"` is the default and the only variant for the public site. It is trained on
+  asl-signs and committed in `web/public/model/`.
+- `"v3-citizen"` is also trained on ASL Citizen. Its files live in the gitignored
+  `web/models/v3-citizen/` (copy `artifacts/v3/v3_export/model/*` there). Vite serves and emits
+  them only when this variant is chosen, so a default build, its service worker and the
+  deployed site never contain them.
+
+To try v3 locally, run `VITE_MODEL_VARIANT=v3-citizen npm run build && npm run preview`, or use
+`npm run dev` with the same variable. Never deploy a v3 build, and leave `site.config.json` on
+`"v2-kaggle"`.
 
 ### Known limitations
 

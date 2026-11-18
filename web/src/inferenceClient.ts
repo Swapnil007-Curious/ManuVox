@@ -74,11 +74,11 @@ export class InferenceClient {
     return response.result;
   }
 
-  async classify(input: Float32Array): Promise<{ logits: Float32Array; ms: number }> {
+  async classify(input: Float32Array): Promise<{ logits: Float32Array; embedding: Float32Array | null; ms: number }> {
     const copy = Float32Array.from(input);
     const response = await this.request({ type: "classify", input: copy }, [copy.buffer]);
     if (!response.ok || response.type !== "classify") throw new Error("unexpected classify response");
-    return { logits: response.logits, ms: response.ms };
+    return { logits: response.logits, embedding: response.embedding, ms: response.ms };
   }
 
   async closeTracker(): Promise<void> {

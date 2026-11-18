@@ -46,6 +46,7 @@ async function main(): Promise<void> {
   const layout = {
     inputName: meta.input_layout.input_name,
     outputName: meta.input_layout.output_name,
+    embeddingName: null,
     frames: meta.input_layout.num_frames,
     width: meta.input_layout.frame_dim,
   };

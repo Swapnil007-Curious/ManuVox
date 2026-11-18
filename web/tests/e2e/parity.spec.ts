@@ -28,6 +28,24 @@ test("model parity: browser logits match Python onnxruntime", async ({ page }) =
   expect(topMatches).toBe(golden.cases.length);
 });
 
+test("embedding parity: the browser's embedding output matches Python onnxruntime", async ({ page }) => {
+  const golden = readJson<ModelGolden>("tests/golden/model_cases.json");
+  const meta = readJson<{ variant: string; embedding?: { output_name: string; dim: number } | null }>("public/model/meta.json");
+  test.skip(!meta.embedding, "this model has no embedding output");
+  await openDebugPage(page);
+  let worst = 0;
+  for (const item of golden.cases) {
+    expect(item.embedding, `sequence ${item.sequence_id} has a golden embedding`).toBeTruthy();
+    const out = await page.evaluate((values) => window.__edgevision!.classifyWithEmbedding(values), item.input.flat());
+    expect(out.embedding).toHaveLength(meta.embedding!.dim);
+    const diff = maxAbsDiff(out.embedding!, item.embedding!);
+    worst = Math.max(worst, diff);
+    expect(diff, `sequence ${item.sequence_id}`).toBeLessThanOrEqual(FLOAT_TOLERANCE);
+    expect(maxAbsDiff(out.logits, item.logits)).toBeLessThanOrEqual(FLOAT_TOLERANCE);
+  }
+  test.info().annotations.push({ type: "embedding parity", description: `max |embedding diff| ${worst.toExponential(3)}` });
+});
+
 interface PreprocessCase {
   name: string;
   rows: LongRows;

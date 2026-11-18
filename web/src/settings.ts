@@ -53,6 +53,8 @@ export interface Settings {
   lowLightThreshold: number;
   minShoulderDistance: number;
   maxShoulderDistance: number;
+  /** Teach Dex: blend the model with the user's own examples of the signs they taught. */
+  personalization: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -79,6 +81,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lowLightThreshold: DEFAULT_GUIDANCE_SETTINGS.lowLightThreshold,
   minShoulderDistance: DEFAULT_GUIDANCE_SETTINGS.minShoulderDistance,
   maxShoulderDistance: DEFAULT_GUIDANCE_SETTINGS.maxShoulderDistance,
+  personalization: true,
 };
 
 export const STORAGE_KEY = "edge-vision.settings.v3";
@@ -166,6 +169,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     lowLightThreshold: number("lowLightThreshold", DEFAULT_SETTINGS.lowLightThreshold),
     minShoulderDistance: number("minShoulderDistance", DEFAULT_SETTINGS.minShoulderDistance),
     maxShoulderDistance: number("maxShoulderDistance", DEFAULT_SETTINGS.maxShoulderDistance),
+    personalization: typeof source.personalization === "boolean" ? source.personalization : DEFAULT_SETTINGS.personalization,
   };
   if (settings.minShoulderDistance >= settings.maxShoulderDistance) {
     settings.minShoulderDistance = DEFAULT_SETTINGS.minShoulderDistance;

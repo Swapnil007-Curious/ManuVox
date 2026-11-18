@@ -20,6 +20,9 @@ venv/
 /test_clips_v2/
 results/live_gap/*.log
 results/live_gap_v2/*.log
+# Teach Dex evaluation: raw logits and embeddings of the personal clips stay local; the per-clip
+# outcomes (run*.outcomes.json) and the summary are committed.
+results/teach_dex/web/*.raw.json
 # LaTeX build logs (paper/main.pdf itself is committed)
 paper/*.log
 paper/*.blg
@@ -47,3 +50,6 @@ web/test-results/
 web/playwright-report/
 # The exported browser model is committed while it stays under 10 MB.
 !web/public/model/model.onnx
+# The v3 model (trained on ASL Citizen, research licence): local only, never in git or the public
+# build (web/model-variant.ts, docs/DATA_LICENSES.md).
+web/models/

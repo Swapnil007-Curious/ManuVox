@@ -18,11 +18,12 @@ import { assetUrl, trackerAssets } from "./landmarker";
 import { HAND_POINTS, POSE_POINTS, flatPoints, flatVisibility, preprocessSegment, rawHasHand, segmentStats, type LiveFrame } from "./live";
 import { LiveSession, assignHands, type SessionEvent } from "./livePipeline";
 import { preprocessConfig, validateMeta, type WebMeta } from "./meta";
-import { defaultThreads, type BackendChoice } from "./ortBackend";
+import { defaultThreads, type BackendChoice, type Classified } from "./ortBackend";
+import { personalize, type PersonalizationParams, type Personalized, type TaughtExample } from "./personalization";
 import { PoseInterpolator, shouldRunPose } from "./poseInterpolation";
 import { DEFAULT_CONFIG, preprocessRows, toModelInput, type Point2, type PreprocessConfig, type PreprocessResult } from "./preprocess";
 import { RecordingStore, appResult, recordFrames, type AppInfo, type AppResult, type CalibrationRecord } from "./recorder";
-import { decide, softmax, type Decision } from "./scoring";
+import { softmax, type Decision } from "./scoring";
 import { Segmenter, type SegmenterEvent, type SegmenterSettings } from "./segmenter";
 import { DEFAULT_SETTINGS, type Settings } from "./settings";
 import { SEGMENTER } from "./spec";
@@ -77,6 +78,8 @@ export interface SegmentResult {
   excluded: string | null;
   /** Classifier time in ms; null unless classified. */
   classifierMs: number | null;
+  /** The model's penultimate embedding (Teach Dex records it); absent unless classified. */
+  embedding?: Float32Array | null;
 }
 
 export type CameraError = "denied" | "no_camera" | "busy" | "insecure" | "other";
@@ -229,6 +232,8 @@ export class Engine {
   private reading = 0;
   private lastState: EngineState = "off";
   private readonly segmentLog: DebugSegment[] = [];
+  /** Teach Dex: the user's examples for the loaded model (main.ts keeps them in sync). */
+  private taught: TaughtExample[] = [];
 
   private calibration: { status: CalibrationStatus | "pending" | "unavailable"; k: number; rLive: number | null; frames: number } = {
     status: "pending",
@@ -336,6 +341,33 @@ export class Engine {
     return this.settings.decision === "calibrated" && this.meta ? this.meta.calibration.temperature : 1;
   }
 
+  // -------------------------------------------------------------------------------------------
+  // Teach Dex
+
+  /** The blend fitted on val, or null when the model cannot personalise. */
+  personalizationParams(): PersonalizationParams | null {
+    const blend = this.meta?.personalization;
+    if (!blend || !this.meta?.embedding) return null;
+    return { weight: blend.weight, offset: blend.offset, influenceThreshold: blend.influence_threshold };
+  }
+
+  /** Whether the model has an embedding output, so examples can be recorded at all. */
+  canTeach(): boolean {
+    return this.personalizationParams() !== null;
+  }
+
+  setTaughtExamples(examples: readonly TaughtExample[]): void {
+    this.taught = [...examples];
+  }
+
+  /** The decision shown for a segment: personalised when the user taught signs and has it on. */
+  decideSegment(logits: Float32Array, embedding: Float32Array | null, k: number): Personalized {
+    const params = this.personalizationParams();
+    const examples = params && this.settings.personalization ? this.taught : [];
+    const labels = this.meta?.labels ?? [];
+    return personalize(logits, embedding, labels, examples, params ?? { weight: 0, offset: 0, influenceThreshold: 1 }, this.threshold(), k, this.temperature());
+  }
+
   /** Automatic capture through the motion segmenter (the default). */
   motionCapture(): boolean {
     return this.settings.mode === "auto" && this.settings.autoSegmenter === "motion";
@@ -396,9 +428,10 @@ export class Engine {
   }
 
   /** The classifier worker runs requests one at a time, so classifier calls never overlap. */
-  async runClassifier(input: Float32Array): Promise<Float32Array> {
+  async runClassifier(input: Float32Array): Promise<Classified> {
     if (!this.classifierState) throw new Error("classifier not loaded");
-    return (await this.classifierClient.classify(input)).logits;
+    const { logits, embedding } = await this.classifierClient.classify(input);
+    return { logits, embedding };
   }
 
   /** Apply new pipeline settings (from the settings form). */
@@ -508,7 +541,7 @@ export class Engine {
     const base = { start: event.start, end: event.end, frames: frames.length, handFrames: event.handFrames, reason: event.reason };
     if (event.kind === "discarded") {
       record(appResult({ result: null, reason: "insufficient_hand_frames" }, this.threshold()));
-      this.logSegment({ ...logBase, excluded: null, probabilities: null });
+      this.logSegment({ ...logBase, excluded: null, probabilities: null, base_probabilities: null, personalized: false, logits: null, embedding: null });
       this.emit("result", { ...base, kind: "discarded", dominant: Engine.handCountSide(frames), decision: null, excluded: "insufficient_hand_frames", classifierMs: null });
       return;
     }
@@ -530,15 +563,16 @@ export class Engine {
         const why = result.info.reason ?? "float16_overflow";
         this.windows.preprocess.push(p1 - p0);
         record(appResult({ result, reason: why }, this.threshold()));
-        this.logSegment({ ...logBase, excluded: why, probabilities: null });
+        this.logSegment({ ...logBase, excluded: why, probabilities: null, base_probabilities: null, personalized: false, logits: null, embedding: null });
         release();
         this.emit("result", { ...base, kind: "excluded", dominant: Engine.handCountSide(frames), decision: null, excluded: why, classifierMs: null });
         return;
       }
       this.lastSegmentInput = input;
-      const logits = await this.runClassifier(input);
+      const { logits, embedding } = await this.runClassifier(input);
       const p2 = performance.now();
-      const decision = decide(logits, meta.labels, this.threshold(), RECORDED_CANDIDATES, this.temperature());
+      const shown = this.decideSegment(logits, embedding, RECORDED_CANDIDATES);
+      const decision = shown.decision;
       this.windows.preprocess.push(p1 - p0);
       this.windows.classifier.push(p2 - p1);
       record(
@@ -547,9 +581,25 @@ export class Engine {
           this.threshold(),
         ),
       );
-      this.logSegment({ ...logBase, excluded: null, probabilities: Array.from(softmax(logits, this.temperature())) });
+      this.logSegment({
+        ...logBase,
+        excluded: null,
+        probabilities: Array.from(shown.probabilities),
+        base_probabilities: Array.from(softmax(logits, this.temperature())),
+        personalized: shown.influenced,
+        logits: Array.from(logits),
+        embedding: embedding ? Array.from(embedding) : null,
+      });
       release();
-      this.emit("result", { ...base, kind: "classified", dominant: result.info.mirrored ? "left" : "right", decision, excluded: null, classifierMs: p2 - p1 });
+      this.emit("result", {
+        ...base,
+        kind: "classified",
+        dominant: result.info.mirrored ? "left" : "right",
+        decision,
+        excluded: null,
+        classifierMs: p2 - p1,
+        embedding,
+      });
       const p3 = performance.now();
       this.benchmark.addSegment(
         { frames: frames.length, hand_frames: event.handFrames, preprocess_ms: p1 - p0, classifier_ms: p2 - p1, end_to_end_ms: p3 - completedAt, accepted: decision.accepted },
@@ -580,9 +630,9 @@ export class Engine {
     this.guessInFlight = true;
     this.lastGuessAt = now;
     this.runClassifier(input)
-      .then((logits) => {
-        if (this.liveSession.segmenter.state !== "signing") return;
-        this.emit("guess", decide(logits, meta.labels, this.threshold(), 3, this.temperature()));
+      .then(({ logits, embedding }) => {
+        if (this.liveSession.segmenter.state !== "signing" || logits.length !== meta.labels.length) return;
+        this.emit("guess", this.decideSegment(logits, embedding, 3).decision);
       })
       .catch(() => undefined)
       .finally(() => {
@@ -944,6 +994,7 @@ export class Engine {
     const layout = {
       inputName: active.input_layout.input_name,
       outputName: active.input_layout.output_name,
+      embeddingName: active.embedding?.output_name ?? null,
       frames: active.input_layout.num_frames,
       width: active.input_layout.frame_dim,
     };
@@ -1121,7 +1172,12 @@ export class Engine {
       meta: () => this.meta,
       classify: async (input: number[]): Promise<number[]> => {
         await this.ready;
-        return Array.from(await this.runClassifier(Float32Array.from(input)));
+        return Array.from((await this.runClassifier(Float32Array.from(input))).logits);
+      },
+      classifyWithEmbedding: async (input: number[]) => {
+        await this.ready;
+        const { logits, embedding } = await this.runClassifier(Float32Array.from(input));
+        return { logits: Array.from(logits), embedding: embedding ? Array.from(embedding) : null };
       },
       preprocess: (rows) => {
         const cfg = this.config();
