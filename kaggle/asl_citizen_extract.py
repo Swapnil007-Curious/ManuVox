@@ -50,10 +50,15 @@ SHARD_SIZE = int(os.environ.get("EV_SHARD_SIZE", "200"))
 WORKERS = int(os.environ.get("EV_WORKERS", str(os.cpu_count() or 4)))
 # Stop starting shards after this many hours, so a 12-hour commit still saves its output.
 MAX_HOURS = float(os.environ.get("EV_MAX_HOURS", "11"))
-# The smoke check: a video passes when pose and at least one hand are found in more than this
-# fraction of its frames; the smoke test passes when SMOKE_PASS_FRACTION of the videos were
-# tracked and that many of the tracked ones pass.
+# The smoke check. A video passes when pose is found in more than SMOKE_MOST_FRAMES of its
+# frames and at least one hand in more than SMOKE_MOST_FRAMES of its signing span (its first to
+# last frame with a hand), in at least SMOKE_MIN_HAND_FRAMES frames. The span, not the whole
+# video: ASL Citizen signers start and end with their hands at rest out of view (on 20 real
+# videos, 2026-11-18: a hand in 41% of all frames but 98% of the span, medians), and training
+# keeps only frames with a hand (min_hand_frames 3). The smoke test passes when
+# SMOKE_PASS_FRACTION of the videos were tracked and that many of the tracked ones pass.
 SMOKE_MOST_FRAMES = 0.5
+SMOKE_MIN_HAND_FRAMES = 3
 SMOKE_PASS_FRACTION = 0.8
 # "k/N": process only the shards whose index is k modulo N, so N copies of the notebook can run
 # side by side; a run with every part's output as an input then merges them.
@@ -372,17 +377,34 @@ def write_manifest(rows: list[dict], shards: Path, mapping: "MappingResult") -> 
     return counts
 
 
-def presence(landmarks) -> tuple[float, float]:  # type: ignore[no-untyped-def]
-    """Fractions of frames with a pose and with at least one hand (any finite x in the block)."""
+def presence(landmarks) -> dict:  # type: ignore[no-untyped-def]
+    """Frames with a pose and with at least one hand (any finite x in the block): fractions of
+    all frames, the fraction of the signing span (first to last hand frame) with a hand, and the
+    number of hand frames."""
     import numpy as np
 
     if len(landmarks) == 0:
-        return 0.0, 0.0
+        return {"pose": 0.0, "hands": 0.0, "hands_in_span": 0.0, "hand_frames": 0}
     pose = np.isfinite(landmarks[:, POSE:RIGHT, 0]).any(axis=1)
     hands = np.isfinite(landmarks[:, LEFT:POSE, 0]).any(axis=1) | np.isfinite(
         landmarks[:, RIGHT:N_POINTS, 0]
     ).any(axis=1)
-    return float(pose.mean()), float(hands.mean())
+    found = np.flatnonzero(hands)
+    in_span = float(hands[found[0] : found[-1] + 1].mean()) if len(found) else 0.0
+    return {
+        "pose": float(pose.mean()),
+        "hands": float(hands.mean()),
+        "hands_in_span": in_span,
+        "hand_frames": len(found),
+    }
+
+
+def smoke_passes(row: dict) -> bool:
+    return (
+        row["pose"] > SMOKE_MOST_FRAMES
+        and row["hands_in_span"] > SMOKE_MOST_FRAMES
+        and row["hand_frames"] >= SMOKE_MIN_HAND_FRAMES
+    )
 
 
 def smoke_report(shards: Path, wall_seconds: float, total_planned: int) -> bool:
@@ -395,21 +417,24 @@ def smoke_report(shards: Path, wall_seconds: float, total_planned: int) -> bool:
         with np.load(meta_path.with_suffix(".npz"), allow_pickle=False) as data:
             landmarks = data["landmarks"]
         for video in meta["videos"]:
-            pose = hands = 0.0
+            found = presence(landmarks[:0])
             if video["status"] == "ok":
                 start, count = int(video["start"]), int(video["n_frames"])
-                pose, hands = presence(landmarks[start : start + count])
-            rows.append(video | {"pose": pose, "hands": hands})
+                found = presence(landmarks[start : start + count])
+            rows.append(video | found)
     if not rows:
         log("SMOKE FAIL: no videos were processed")
         return False
     log("smoke test, per video: seconds (download + tracking, one worker), frames, fps, frames")
-    log("with a pose, frames with a hand")
+    log("with a pose, frames with a hand (of all frames, and of the signing span from the first")
+    log("to the last hand frame); ok = passes the check")
     for number, row in enumerate(rows, start=1):
         log(
             f"  {number:2d}. {row['status']:<14} {row.get('seconds') or 0:6.1f} s "
             f"{row.get('n_frames') or 0:4d} frames {row.get('fps') or 0:5.1f} fps  "
-            f"pose {100 * row['pose']:3.0f}%  hands {100 * row['hands']:3.0f}%"
+            f"pose {100 * row['pose']:3.0f}%  hands {100 * row['hands']:3.0f}% of all, "
+            f"{100 * row['hands_in_span']:3.0f}% of the span  "
+            f"{'ok' if row['status'] == 'ok' and smoke_passes(row) else '--'}"
         )
     ok = [row for row in rows if row["status"] == "ok"]
     seconds = [row["seconds"] for row in rows if row.get("seconds")]
@@ -420,15 +445,15 @@ def smoke_report(shards: Path, wall_seconds: float, total_planned: int) -> bool:
         f"{total_planned} videos needs about {total_planned * wall_per_video / 3600:.1f} h "
         f"({total_planned * wall_per_video / 3600 / 3:.1f} h per part with 3 parts)"
     )
-    good = [
-        row for row in ok if row["pose"] > SMOKE_MOST_FRAMES and row["hands"] > SMOKE_MOST_FRAMES
-    ]
+    good = [row for row in ok if smoke_passes(row)]
     if ok:
         log(
             f"landmarks: {len(ok)}/{len(rows)} videos tracked; median pose "
-            f"{100 * np.median([r['pose'] for r in ok]):.0f}% and hands "
-            f"{100 * np.median([r['hands'] for r in ok]):.0f}% of frames; {len(good)}/{len(ok)} "
-            f"have both in more than {100 * SMOKE_MOST_FRAMES:.0f}% of frames"
+            f"{100 * np.median([r['pose'] for r in ok]):.0f}% of frames, a hand in "
+            f"{100 * np.median([r['hands'] for r in ok]):.0f}% of all frames and "
+            f"{100 * np.median([r['hands_in_span'] for r in ok]):.0f}% of the signing span; "
+            f"{len(good)}/{len(ok)} have a pose in more than {100 * SMOKE_MOST_FRAMES:.0f}% of "
+            f"frames and a hand in more than {100 * SMOKE_MOST_FRAMES:.0f}% of the span"
         )
     tracked_enough = len(ok) >= SMOKE_PASS_FRACTION * len(rows)
     present_enough = bool(ok) and len(good) >= SMOKE_PASS_FRACTION * len(ok)
@@ -440,7 +465,8 @@ def smoke_report(shards: Path, wall_seconds: float, total_planned: int) -> bool:
         reasons.append(f"only {len(ok)} of {len(rows)} videos were tracked")
     if not present_enough:
         reasons.append(
-            f"only {len(good)} of {len(ok)} tracked videos have a pose and a hand in most frames"
+            f"only {len(good)} of {len(ok)} tracked videos have a pose in most frames and a hand "
+            "in most of the signing span"
         )
     log(f"SMOKE FAIL: {'; '.join(reasons)}. Read the errors above before the full run")
     return False

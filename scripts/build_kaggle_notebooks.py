@@ -231,9 +231,10 @@ SMOKE = Extraction(
     title="SMOKE TEST of the ASL Citizen landmark extraction",
     limit=SMOKE_VIDEOS,
     note=f"""# Tracks only the first {SMOKE_VIDEOS} planned videos into asl-citizen-landmarks-smoke (never the
-# real shards, never a dataset) and prints the seconds per video and whether pose and hand
-# landmarks were found (non-NaN) in most frames. A few minutes; the log ends with SMOKE PASS or
-# SMOKE FAIL. Run it before the three parts.
+# real shards, never a dataset) and prints the seconds per video and whether the landmarks are
+# found (non-NaN): pose in most frames, a hand in most frames of the signing span (signers start
+# and end with their hands out of view). A few minutes; the log ends with SMOKE PASS or SMOKE
+# FAIL. Run it before the three parts.
 """,
 )
 

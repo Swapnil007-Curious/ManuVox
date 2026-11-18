@@ -381,3 +381,25 @@ def test_script_out_writes_only_the_extraction_program(tmp_path):
     labels = json.loads((ROOT / "web/public/model/meta.json").read_text("utf-8"))["labels"]
     assert "def build_mapping(" in program and json.dumps(labels) in program
     compile(program, str(out), "exec")
+
+
+def test_the_smoke_rule_judges_hands_over_the_signing_span():
+    """Signers start and end with their hands out of view, so a hand is judged over the span
+    from the first to the last frame with one; pose over the whole video."""
+    program: dict = {}
+    exec(compile(builder.extraction_program(), "extract", "exec"), program)
+
+    def video(frames: int, hands: list[int]) -> np.ndarray:
+        landmarks = np.full((frames, 543, 3), np.nan, dtype=np.float32)
+        landmarks[:, 489:522] = 0.5  # pose in every frame
+        landmarks[hands, 522:543] = 0.5  # the right hand where listed
+        return landmarks
+
+    resting = program["presence"](video(100, list(range(30, 70))))  # hands only mid-video
+    assert resting["hands"] == pytest.approx(0.4) and resting["hands_in_span"] == 1.0
+    assert program["smoke_passes"](resting)
+    sparse = program["presence"](video(100, list(range(10, 90, 4))))  # 1 in 4 frames of the span
+    assert sparse["hands_in_span"] < 0.5 and not program["smoke_passes"](sparse)
+    few = program["presence"](video(100, [50, 51]))  # a full span of only two frames
+    assert few["hands_in_span"] == 1.0 and not program["smoke_passes"](few)
+    assert program["presence"](video(0, []))["hand_frames"] == 0

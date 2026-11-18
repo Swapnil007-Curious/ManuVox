@@ -268,16 +268,20 @@ class Run:
         )  # fmt: skip
         return log, working
 
-    def check_diagnostics(self, step: str) -> None:
-        """The smoke notebook's first cell: what it must print."""
+    def check_diagnostics(self, step: str, fresh: bool) -> None:
+        """The smoke notebook's first cell: what it must print. A fresh run (no venv yet, as on
+        Kaggle) must show the venv creation and install; a later one may reuse the venv."""
         text = self.diagnostics
         self.check(
             step, "diagnostics: Python version", bool(re.search(r"^3\.\d+\.\d+", text, re.M))
         )
         uv = re.search(r"^uv \d+\.\d+\.\d+.*$", text, re.M)
         self.check(step, "diagnostics: uv --version", bool(uv), uv[0] if uv else "")
-        self.check(step, "diagnostics: venv creation and install output",
-                   "--- uv venv --python" in text and "--- uv pip install" in text)  # fmt: skip
+        installed = "--- uv venv --python" in text and "--- uv pip install" in text
+        reused = "reusing " in text
+        self.check(step, "diagnostics: venv creation and install output"
+                   + ("" if fresh else " (or the venv of an earlier step reused)"),
+                   installed or (reused and not fresh))  # fmt: skip
         self.check(step, "diagnostics: Kaggle's MPLBACKEND breaks the import without clean()",
                    "matplotlib_inline.backend_inline' is not a valid value" in text)  # fmt: skip
         self.check(step, "diagnostics: mediapipe imports and runs Holistic with clean()",
@@ -295,7 +299,7 @@ class Run:
             "3-smoke-real", "asl_citizen_smoke", {"edge-vision-src": self.archive}
         )
         step = "3-smoke-real"
-        self.check_diagnostics(step)
+        self.check_diagnostics(step, fresh=True)
         venv = re.search(r"venv python (\S+): mediapipe (\S+), cv2 (\S+), numpy (\S+)", log)
         self.check(step, "venv versions printed", bool(venv), venv[0] if venv else "")
         archive = re.search(r"ASL_Citizen\.zip: ([\d.]+ GB)[^\n]*", log)
@@ -382,7 +386,10 @@ class Run:
         log, _ = self.run_cell("1-no-source", "asl_citizen_smoke", {})
         self.check("1-no-source", "stops with CODE SOURCE MISSING", "CODE SOURCE MISSING" in log)
         self.check("1-no-source", "never clones", "git clone" not in log)
-        self.check("1-no-source", "builds no environment", "pip install uv" not in log)
+        self.check(
+            "1-no-source", "the main cell builds no environment", "pip install uv" not in log
+        )
+        self.check_diagnostics("1-no-source", fresh=True)  # it needs no input
 
         bad = self.work / "tampered" / "edge-vision-src.tar.gz"
         bad.parent.mkdir(exist_ok=True)
@@ -391,7 +398,7 @@ class Run:
         self.check("2-mismatch", "stops with CODE SOURCE MISMATCH", "CODE SOURCE MISMATCH" in log)
 
         log, smoke = self.run_cell("3-smoke", "asl_citizen_smoke", source)
-        self.check_diagnostics("3-smoke")
+        self.check_diagnostics("3-smoke", fresh=False)
         commit = re.search(r"code commit: ([0-9a-f]{40})", log)
         self.check("3-smoke", "prints the code commit", bool(commit), commit[1] if commit else "")
         self.check("3-smoke", "the fingerprint matches", "(matches this notebook)" in log)

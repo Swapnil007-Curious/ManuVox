@@ -60,7 +60,11 @@ read the log in the version's Output.
   the ASL Citizen archive. The second cell tracks the first 20 videos into
   `asl-citizen-landmarks-smoke` (never the real shards, never a dataset). It prints the seconds
   per video and the share of frames with pose and hand landmarks, and ends with `SMOKE PASS` or
-  `SMOKE FAIL`. Do not start the parts before it passes.
+  `SMOKE FAIL`. A video passes with a pose in most frames and a hand in most frames of its
+  signing span (first to last hand frame): signers start and end with their hands out of view,
+  so on 20 real videos a hand was in 41% of all frames but 98% of the span (medians); training
+  keeps only frames with a hand anyway. The smoke test passes when 80% of the videos do. Do not
+  start the parts before it passes.
 - **Why the first runs failed (2026-11-18):** the Kaggle kernel exports
   `MPLBACKEND=module://matplotlib_inline.backend_inline`, mediapipe imports `matplotlib.pyplot`,
   and the venv has no `matplotlib_inline`, so `import mediapipe` raised `ValueError: Key backend`.
