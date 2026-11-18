@@ -32,17 +32,29 @@ import zipfile
 import zlib
 from pathlib import Path
 
-URL = (
+DEFAULT_URL = (
     "https://download.microsoft.com/download/b/8/8/"
     "b88c0bae-e6c1-43e1-8726-98cf5af36ca4/ASL_Citizen.zip"
 )
-OUT = Path(os.environ.get("EV_OUT", "/kaggle/working/asl-citizen-landmarks"))
+# EV_URL points the program at a stand-in archive for local tests; leave it unset on Kaggle.
+URL = os.environ.get("EV_URL") or DEFAULT_URL
+# > 0: a smoke test on the first N planned videos (kaggle/asl_citizen_smoke.ipynb uses 20).
+LIMIT_VIDEOS = int(os.environ.get("EV_LIMIT_VIDEOS", "0"))
+SMOKE = LIMIT_VIDEOS > 0
+_OUT = Path(os.environ.get("EV_OUT", "/kaggle/working/asl-citizen-landmarks"))
+# A smoke test always writes to its own "-smoke" folder, so it never mixes with the real shards,
+# never writes COMPLETE and is never picked up as training data (it writes SMOKE instead).
+OUT = _OUT.with_name(_OUT.name + "-smoke") if SMOKE and not _OUT.name.endswith("-smoke") else _OUT
 INPUT_ROOT = Path(os.environ.get("EV_INPUT", "/kaggle/input"))
 SHARD_SIZE = int(os.environ.get("EV_SHARD_SIZE", "200"))
 WORKERS = int(os.environ.get("EV_WORKERS", str(os.cpu_count() or 4)))
 # Stop starting shards after this many hours, so a 12-hour commit still saves its output.
 MAX_HOURS = float(os.environ.get("EV_MAX_HOURS", "11"))
-LIMIT_VIDEOS = int(os.environ.get("EV_LIMIT_VIDEOS", "0"))  # > 0: a smoke test on the first N
+# The smoke check: a video passes when pose and at least one hand are found in more than this
+# fraction of its frames; the smoke test passes when SMOKE_PASS_FRACTION of the videos were
+# tracked and that many of the tracked ones pass.
+SMOKE_MOST_FRAMES = 0.5
+SMOKE_PASS_FRACTION = 0.8
 # "k/N": process only the shards whose index is k modulo N, so N copies of the notebook can run
 # side by side; a run with every part's output as an input then merges them.
 PART = os.environ.get("EV_PART", "0/1")
@@ -276,6 +288,7 @@ def write_shard(directory: Path, index: int, records: list[dict], plan_id: str) 
                 "width",
                 "height",
                 "hand_frames",
+                "seconds",
             )
         }
         | {"start": start}
@@ -359,6 +372,80 @@ def write_manifest(rows: list[dict], shards: Path, mapping: "MappingResult") -> 
     return counts
 
 
+def presence(landmarks) -> tuple[float, float]:  # type: ignore[no-untyped-def]
+    """Fractions of frames with a pose and with at least one hand (any finite x in the block)."""
+    import numpy as np
+
+    if len(landmarks) == 0:
+        return 0.0, 0.0
+    pose = np.isfinite(landmarks[:, POSE:RIGHT, 0]).any(axis=1)
+    hands = np.isfinite(landmarks[:, LEFT:POSE, 0]).any(axis=1) | np.isfinite(
+        landmarks[:, RIGHT:N_POINTS, 0]
+    ).any(axis=1)
+    return float(pose.mean()), float(hands.mean())
+
+
+def smoke_report(shards: Path, wall_seconds: float, total_planned: int) -> bool:
+    """Per-video time and landmark presence from the written shards, and a pass/fail line."""
+    import numpy as np
+
+    rows = []
+    for meta_path in sorted(shards.glob("shard_*.json")):
+        meta = json.loads(meta_path.read_text())
+        with np.load(meta_path.with_suffix(".npz"), allow_pickle=False) as data:
+            landmarks = data["landmarks"]
+        for video in meta["videos"]:
+            pose = hands = 0.0
+            if video["status"] == "ok":
+                start, count = int(video["start"]), int(video["n_frames"])
+                pose, hands = presence(landmarks[start : start + count])
+            rows.append(video | {"pose": pose, "hands": hands})
+    if not rows:
+        log("SMOKE FAIL: no videos were processed")
+        return False
+    log("smoke test, per video: seconds (download + tracking, one worker), frames, fps, frames")
+    log("with a pose, frames with a hand")
+    for number, row in enumerate(rows, start=1):
+        log(
+            f"  {number:2d}. {row['status']:<14} {row.get('seconds') or 0:6.1f} s "
+            f"{row.get('n_frames') or 0:4d} frames {row.get('fps') or 0:5.1f} fps  "
+            f"pose {100 * row['pose']:3.0f}%  hands {100 * row['hands']:3.0f}%"
+        )
+    ok = [row for row in rows if row["status"] == "ok"]
+    seconds = [row["seconds"] for row in rows if row.get("seconds")]
+    wall_per_video = wall_seconds / len(rows)
+    log(
+        f"time: {np.mean(seconds):.1f} s per video per worker (median {np.median(seconds):.1f}); "
+        f"wall {wall_per_video:.1f} s per video with {WORKERS} workers, so the full run of "
+        f"{total_planned} videos needs about {total_planned * wall_per_video / 3600:.1f} h "
+        f"({total_planned * wall_per_video / 3600 / 3:.1f} h per part with 3 parts)"
+    )
+    good = [
+        row for row in ok if row["pose"] > SMOKE_MOST_FRAMES and row["hands"] > SMOKE_MOST_FRAMES
+    ]
+    if ok:
+        log(
+            f"landmarks: {len(ok)}/{len(rows)} videos tracked; median pose "
+            f"{100 * np.median([r['pose'] for r in ok]):.0f}% and hands "
+            f"{100 * np.median([r['hands'] for r in ok]):.0f}% of frames; {len(good)}/{len(ok)} "
+            f"have both in more than {100 * SMOKE_MOST_FRAMES:.0f}% of frames"
+        )
+    tracked_enough = len(ok) >= SMOKE_PASS_FRACTION * len(rows)
+    present_enough = bool(ok) and len(good) >= SMOKE_PASS_FRACTION * len(ok)
+    if tracked_enough and present_enough:
+        log("SMOKE PASS: downloads, tracking and shards work; run the full extraction")
+        return True
+    reasons = []
+    if not tracked_enough:
+        reasons.append(f"only {len(ok)} of {len(rows)} videos were tracked")
+    if not present_enough:
+        reasons.append(
+            f"only {len(good)} of {len(ok)} tracked videos have a pose and a hand in most frames"
+        )
+    log(f"SMOKE FAIL: {'; '.join(reasons)}. Read the errors above before the full run")
+    return False
+
+
 README = """# asl-citizen-landmarks-private
 
 MediaPipe Holistic landmarks for the ASL Citizen videos whose glosses map onto the 250-sign
@@ -402,12 +489,18 @@ def main() -> int:
     log(f"mediapipe {mp.__version__}, opencv {cv2.__version__}, numpy {np.__version__}")
     if mp.__version__ != "0.10.21":
         log("WARNING: the training data was tracked with mediapipe 0.10.21")
+    if SMOKE and OUT.name.endswith("-smoke") and OUT.exists():
+        shutil.rmtree(OUT)  # a smoke folder is disposable: every smoke run starts empty
     OUT.mkdir(parents=True, exist_ok=True)
     shards = OUT / "shards"
     shards.mkdir(exist_ok=True)
     free = shutil.disk_usage(OUT).free / 1e9
     log(f"output {OUT} ({free:.1f} GB free), {WORKERS} workers, shards of {SHARD_SIZE} videos")
 
+    if SMOKE:
+        log(f"SMOKE TEST: the first {LIMIT_VIDEOS} planned videos into {OUT} (not the real shards)")
+    if URL != DEFAULT_URL:
+        log(f"EV_URL is set: reading {URL} instead of the Microsoft Download Center (local test)")
     size = archive_size()
     log(f"ASL_Citizen.zip: {size / 1e9:.2f} GB ({size:,} bytes); range requests accepted")
     archive = zipfile.ZipFile(io.BufferedReader(RemoteFile(size), buffer_size=1 << 20))
@@ -443,9 +536,10 @@ def main() -> int:
     if missing:
         log(f"WARNING: {len(missing)} planned videos are not in the archive, e.g. {missing[:3]}")
     planned = [row for row in planned if f"ASL_Citizen/videos/{row['file']}" in entries]
-    if LIMIT_VIDEOS > 0:
+    total_planned = len(planned)
+    if SMOKE:
         planned = planned[:LIMIT_VIDEOS]
-        log(f"smoke test: only the first {LIMIT_VIDEOS} planned videos")
+        log(f"smoke test: {len(planned)} of the {total_planned} planned videos")
     batches = [planned[i : i + SHARD_SIZE] for i in range(0, len(planned), SHARD_SIZE)]
     settings = {
         "holistic": HOLISTIC,
@@ -473,7 +567,7 @@ def main() -> int:
         log(f"ERROR: {len(stale)} shards in {shards} come from another plan; move them away first")
         return 1
     log(f"plan {plan_id}: {len(planned)} videos in {len(batches)} shards")
-    copied = carry_over(shards, plan_id)
+    copied = 0 if SMOKE else carry_over(shards, plan_id)
     if copied:
         log(f"carried over {copied} finished shards from {INPUT_ROOT}")
     part, parts = (int(value) for value in PART.split("/"))
@@ -527,8 +621,15 @@ def main() -> int:
     finished = all(shard_done(shards, i) for i in range(len(batches)))
     counts = write_manifest(planned, shards, mapping)
     (OUT / "README.md").write_text(README)
-    (OUT / "dataset-metadata.json").write_text(json.dumps(dataset_metadata(), indent=1))
     log(f"manifest: {counts}")
+    if SMOKE:
+        (OUT / "COMPLETE").unlink(missing_ok=True)
+        (OUT / "SMOKE").write_text(
+            f"smoke test of {len(planned)} videos; not training data, never upload as a dataset\n"
+        )
+        smoke_report(shards, time.time() - session_start, total_planned)
+        return 0
+    (OUT / "dataset-metadata.json").write_text(json.dumps(dataset_metadata(), indent=1))
     if finished:
         (OUT / "COMPLETE").write_text(time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()))
         log(f"COMPLETE: all {len(batches)} shards written to {OUT}")

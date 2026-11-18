@@ -1,8 +1,16 @@
 """Steps of kaggle/train_v3.ipynb that are not training itself.
 
+    python scripts/v3_kaggle.py locate --input /kaggle/input --unpack-dir /tmp
     python scripts/v3_kaggle.py build-dataset --landmarks DIR --kaggle-processed DIR --out DIR
     python scripts/v3_kaggle.py select --runs DIR --out FILE
     python scripts/v3_kaggle.py pack --work DIR --output ZIP
+
+locate finds the inputs wherever Kaggle mounts them and prints shell assignments (DATA_ROOT,
+LANDMARKS, PREVIOUS_RUNS) for the notebook to eval; what it found goes to stderr. The landmarks
+are the folder of a manifest.csv with the extraction's columns, a COMPLETE marker and shards
+(a shards/ folder, or shards.zip, which it unpacks under --unpack-dir), from the dataset
+asl-citizen-landmarks-private or from the extraction notebook's output added as an input;
+smoke-test outputs and unfinished runs are listed and skipped.
 
 build-dataset preprocesses the ASL Citizen train and val videos of the mapped signs (never test)
 and joins them to the asl-signs processed dir (edgevision.data.citizen.combine). select picks the
@@ -13,13 +21,25 @@ notebook).
 """
 
 import argparse
+import csv
 import json
+import os
+import shlex
+import shutil
 import sys
 import zipfile
 from pathlib import Path
+from typing import Any
 
 from edgevision.data import citizen
 from edgevision.train.data import label_map_from_manifest, read_manifest
+
+# Columns of the extraction's manifest.csv that the training side reads.
+LANDMARK_COLUMNS = frozenset({"video_file", "participant", "split", "label", "rule", "shard"})
+DATASET_SLUG = "asl-citizen-landmarks-private"
+RUN_NAME = "e_hybrid_v3citizen"
+# Folders never walked: the asl-signs parquet tree (94k files) and the landmark shards.
+PRUNED = frozenset({"train_landmarks", "shards", ".git", "node_modules", "__pycache__"})
 
 # Files under the work dir that pack includes (globs relative to it). Nothing derived from ASL
 # Citizen data apart from the trained weights, their metrics and the dataset counts.
@@ -39,6 +59,129 @@ PACK_GLOBS = (
     "train_v3.log",
 )
 NEVER_PACKED = ("features.npz", "manifest.csv", "shard_")
+
+
+def walk(root: Path) -> list[tuple[Path, list[str], list[str]]]:
+    """os.walk below root, in sorted order, skipping PRUNED folders."""
+    found = []
+    for directory, folders, files in os.walk(root):
+        folders[:] = sorted(name for name in folders if name not in PRUNED)
+        found.append((Path(directory), folders, sorted(files)))
+    return found
+
+
+def landmark_candidates(input_root: Path) -> list[dict[str, Any]]:
+    """Every folder below input_root whose manifest.csv has the extraction's columns."""
+    candidates = []
+    for directory, _, files in walk(input_root):
+        if "manifest.csv" not in files:
+            continue
+        try:
+            with (directory / "manifest.csv").open(newline="", encoding="utf-8") as handle:
+                header = set(next(csv.reader(handle), []))
+        except (OSError, UnicodeDecodeError):
+            continue
+        if not header >= LANDMARK_COLUMNS:
+            continue
+        candidates.append(
+            {
+                "root": directory,
+                "complete": (directory / "COMPLETE").is_file(),
+                "smoke": (directory / "SMOKE").exists() or directory.name.endswith("-smoke"),
+                "shards": (directory / "shards").is_dir(),
+                "shards_zip": (directory / "shards.zip").is_file(),
+            }
+        )
+    return candidates
+
+
+def describe(candidate: dict[str, Any]) -> str:
+    if candidate["smoke"]:
+        return "skipped: smoke-test output, never training data"
+    if not candidate["complete"]:
+        return "skipped: no COMPLETE marker, the extraction did not finish"
+    if not (candidate["shards"] or candidate["shards_zip"]):
+        return "skipped: no shards/ folder or shards.zip"
+    return "usable" + (" (shards.zip)" if not candidate["shards"] else "")
+
+
+def choose_landmarks(candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The first usable candidate, the private dataset before notebook outputs."""
+    usable = [c for c in candidates if describe(c).startswith("usable")]
+    usable.sort(key=lambda c: (DATASET_SLUG not in c["root"].as_posix(), c["root"].as_posix()))
+    return usable[0] if usable else None
+
+
+def materialize(candidate: dict[str, Any], unpack_dir: Path) -> Path:
+    """The candidate itself, or, when it holds shards.zip only, an unpacked copy in unpack_dir
+    (outside /kaggle/working, so the notebook's saved output does not hold a second copy)."""
+    root: Path = candidate["root"]
+    if candidate["shards"]:
+        return root
+    target = unpack_dir / "asl-citizen-landmarks-input"
+    if target.exists():
+        shutil.rmtree(target)
+    (target / "shards").mkdir(parents=True)
+    for path in root.iterdir():
+        if path.is_file() and path.name != "shards.zip":
+            shutil.copy2(path, target / path.name)
+    with zipfile.ZipFile(root / "shards.zip") as archive:
+        for member in archive.infolist():
+            name = Path(member.filename).name  # flat, whether or not the zip has a shards/ prefix
+            if member.is_dir() or not name.startswith("shard_"):
+                continue
+            with archive.open(member) as source, (target / "shards" / name).open("wb") as sink:
+                shutil.copyfileobj(source, sink)
+    return target
+
+
+def find_asl_signs(input_root: Path) -> Path | None:
+    """The competition folder: train.csv next to train_landmarks/."""
+    for directory, _, files in walk(input_root):
+        if "train.csv" in files and (directory / "train_landmarks").is_dir():
+            return directory
+    return None
+
+
+def find_previous_runs(input_root: Path) -> list[Path]:
+    return [
+        directory / RUN_NAME for directory, folders, _ in walk(input_root) if RUN_NAME in folders
+    ]
+
+
+def note(text: str) -> None:
+    print(text, file=sys.stderr)
+
+
+def locate(args: argparse.Namespace) -> int:
+    input_root: Path = args.input
+    if not input_root.is_dir():
+        note(f"no input folder {input_root}")
+    asl_signs = find_asl_signs(input_root) if input_root.is_dir() else None
+    note(f"asl-signs (train.csv beside train_landmarks/): {asl_signs or 'none found'}")
+    candidates = landmark_candidates(input_root) if input_root.is_dir() else []
+    note(f"ASL Citizen manifest.csv files found: {len(candidates)}")
+    for candidate in candidates:
+        note(f"  {candidate['root']}: {describe(candidate)}")
+    chosen = choose_landmarks(candidates)
+    landmarks = materialize(chosen, args.unpack_dir) if chosen else None
+    if chosen and landmarks != chosen["root"]:
+        note(f"unpacked {chosen['root'] / 'shards.zip'} into {landmarks}")
+    if chosen:
+        manifest = (landmarks / "manifest.csv").read_text("utf-8").splitlines()
+        note(f"using {landmarks}: {len(manifest) - 1} videos in manifest.csv")
+    else:
+        note(
+            "no usable ASL Citizen landmarks: add the dataset asl-citizen-landmarks-private or the "
+            "extraction notebook's merge-run version (the one that printed COMPLETE) as an input"
+        )
+    previous = find_previous_runs(input_root) if input_root.is_dir() else []
+    for path in previous:
+        note(f"earlier runs to carry over: {path}")
+    print(f"DATA_ROOT={shlex.quote(str(asl_signs or ''))}")
+    print(f"LANDMARKS={shlex.quote(str(landmarks or ''))}")
+    print("PREVIOUS_RUNS=(" + " ".join(shlex.quote(str(path)) for path in previous) + ")")
+    return 0
 
 
 def build_dataset(args: argparse.Namespace) -> int:
@@ -106,6 +249,9 @@ def main(argv: list[str] | None = None) -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     commands = parser.add_subparsers(dest="command", required=True)
+    finder = commands.add_parser("locate")
+    finder.add_argument("--input", type=Path, default=Path("/kaggle/input"))
+    finder.add_argument("--unpack-dir", type=Path, default=Path("/tmp"))
     build = commands.add_parser("build-dataset")
     build.add_argument("--landmarks", type=Path, required=True)
     build.add_argument("--kaggle-processed", type=Path, required=True)
@@ -118,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
     packer.add_argument("--work", type=Path, required=True)
     packer.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
-    handlers = {"build-dataset": build_dataset, "select": select, "pack": pack}
+    handlers = {"locate": locate, "build-dataset": build_dataset, "select": select, "pack": pack}
     return handlers[args.command](args)
 
 
