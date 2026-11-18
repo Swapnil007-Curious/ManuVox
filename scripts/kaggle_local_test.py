@@ -48,6 +48,15 @@ SITECUSTOMIZE = """import sys
 if sys.version_info[:2] != ({major}, {minor}):
     raise ModuleNotFoundError("No module named 'wrapt' (stand-in for Kaggle's sitecustomize)")
 """
+# Variables the Kaggle kernel exports into %%bash cells, as its logs show: the notebook's
+# matplotlib backend (mediapipe imports matplotlib.pyplot; the venv has no matplotlib_inline)
+# and uv's system-Python switch ("The `--system` flag has no effect" in uv venv's output).
+KAGGLE_ENV = {
+    "MPLBACKEND": "module://matplotlib_inline.backend_inline",
+    "UV_SYSTEM_PYTHON": "true",
+    "LD_LIBRARY_PATH": "/usr/local/cuda/lib64:/usr/local/nvidia/lib64",
+    "KAGGLE_KERNEL_RUN_TYPE": "Batch",
+}
 
 
 class RangeServer(http.server.ThreadingHTTPServer):
@@ -121,12 +130,17 @@ def standin_archive(clips: list[Path], out: Path) -> dict[str, str]:
     return labels
 
 
-def cell_script(name: str, out: Path) -> Path:
+def cell_scripts(name: str, folder: Path) -> list[Path]:
+    """Every cell of kaggle/<name>.ipynb as a bash script, in notebook order."""
     notebook = json.loads((ROOT / "kaggle" / f"{name}.ipynb").read_text("utf-8"))
-    source = "".join(notebook["cells"][0]["source"])
-    assert source.startswith("%%bash\n"), name
-    out.write_text(source.split("\n", 1)[1], encoding="utf-8", newline="\n")
-    return out
+    scripts = []
+    for cell in notebook["cells"]:
+        source = "".join(cell["source"])
+        assert source.startswith("%%bash\n"), (name, cell["id"])
+        script = folder / f"{name}.{cell['id']}.sh"
+        script.write_text(source.split("\n", 1)[1], encoding="utf-8", newline="\n")
+        scripts.append(script)
+    return scripts
 
 
 def tampered(archive: Path, out: Path) -> None:
@@ -202,6 +216,8 @@ class Run:
         self.checks: list[dict[str, Any]] = []
         self.notes: list[str] = []
         self.env: dict[str, str] = {}
+        self.real_archive: bool = args.real_archive
+        self.diagnostics = ""
 
     def check(self, step: str, what: str, ok: bool, detail: str = "") -> None:
         self.checks.append({"step": step, "check": what, "ok": bool(ok), "detail": detail})
@@ -227,23 +243,90 @@ class Run:
             else:
                 target.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target / source.name)
-        script = cell_script(notebook, base / f"{notebook}.sh")
         env = dict(self.env, EV_WORK=working.as_posix(), EV_INPUT=input_root.as_posix())
-        started = time.time()
-        done = subprocess.run(
-            [self.bash, str(script)], env=env, capture_output=True, text=True, timeout=3600
-        )
-        seconds = time.time() - started
-        (base / "cell_output.txt").write_text(done.stdout + done.stderr, encoding="utf-8")
+        # Like Save & Run All: every cell in order, each its own bash process.
+        for script in cell_scripts(notebook, base):
+            started = time.time()
+            done = subprocess.run(
+                [self.bash, str(script)], env=env, capture_output=True, text=True, timeout=7200
+            )
+            seconds = time.time() - started
+            output = base / f"{script.stem}.output.txt"
+            output.write_text(done.stdout + done.stderr, encoding="utf-8")
+            print(f"{step}: {script.stem} exited {done.returncode} after {seconds:.0f} s")
+            self.check(step, f"cell {script.stem} exits 0", done.returncode == 0)
         log_path = working / f"{notebook}.log"
         log = log_path.read_text("utf-8", errors="replace") if log_path.is_file() else ""
-        print(f"{step}: {notebook} exited {done.returncode} after {seconds:.0f} s; log {log_path}")
-        self.check(step, "the cell exits 0", done.returncode == 0, f"{done.returncode}")
+        diagnostics = working / "diagnostics.log"
+        self.diagnostics = (
+            diagnostics.read_text("utf-8", errors="replace") if diagnostics.is_file() else ""
+        )
+        print(f"{step}: log {log_path}")
         self.check(
             step, "no 'Error in sitecustomize' (clean() keeps Kaggle's hooks out of the venv)",
             "Error in sitecustomize" not in log,
         )  # fmt: skip
         return log, working
+
+    def check_diagnostics(self, step: str) -> None:
+        """The smoke notebook's first cell: what it must print."""
+        text = self.diagnostics
+        self.check(
+            step, "diagnostics: Python version", bool(re.search(r"^3\.\d+\.\d+", text, re.M))
+        )
+        uv = re.search(r"^uv \d+\.\d+\.\d+.*$", text, re.M)
+        self.check(step, "diagnostics: uv --version", bool(uv), uv[0] if uv else "")
+        self.check(step, "diagnostics: venv creation and install output",
+                   "--- uv venv --python" in text and "--- uv pip install" in text)  # fmt: skip
+        self.check(step, "diagnostics: Kaggle's MPLBACKEND breaks the import without clean()",
+                   "matplotlib_inline.backend_inline' is not a valid value" in text)  # fmt: skip
+        self.check(step, "diagnostics: mediapipe imports and runs Holistic with clean()",
+                   "DIAGNOSTICS: mediapipe OK" in text)  # fmt: skip
+        self.check(step, "diagnostics: free disk space", "--- free disk space" in text
+                   and "Avail" in text)  # fmt: skip
+        head = re.search(r"^\S+: (HTTP \d+.*|HEAD FAILED.*)$", text, re.M)
+        answer = head[1] if head else "no HEAD line"
+        self.check(step, "diagnostics: HEAD request answered with ranges",
+                   "Accept-Ranges bytes" in answer, answer)  # fmt: skip
+
+    def real_smoke(self) -> int:
+        """The smoke notebook as on Kaggle, against the Microsoft download URL (20 videos)."""
+        log, smoke = self.run_cell(
+            "3-smoke-real", "asl_citizen_smoke", {"edge-vision-src": self.archive}
+        )
+        step = "3-smoke-real"
+        self.check_diagnostics(step)
+        venv = re.search(r"venv python (\S+): mediapipe (\S+), cv2 (\S+), numpy (\S+)", log)
+        self.check(step, "venv versions printed", bool(venv), venv[0] if venv else "")
+        archive = re.search(r"ASL_Citizen\.zip: ([\d.]+ GB)[^\n]*", log)
+        self.check(
+            step, "reads the real archive index", bool(archive), archive[0] if archive else ""
+        )
+        per_video = re.search(r"time: [^\n]*", log)
+        self.check(
+            step, "prints the seconds per video", bool(per_video), per_video[0] if per_video else ""
+        )
+        landmarks = re.search(r"landmarks: [^\n]*", log)
+        self.info(step, landmarks[0] if landmarks else "no landmark summary")
+        verdict = re.search(r"SMOKE (PASS|FAIL)[^\n]*", log)
+        said = verdict[0] if verdict else "no verdict"
+        self.check(
+            step, "SMOKE PASS on real ASL Citizen videos", said.startswith("SMOKE PASS"), said
+        )
+        self.check(step, "writes only the -smoke folder",
+                   (smoke / "asl-citizen-landmarks-smoke" / "SMOKE").is_file()
+                   and not (smoke / "asl-citizen-landmarks").exists())  # fmt: skip
+        return self.finish([])
+
+    def finish(self, clips: list[Path], videos: list[dict[str, Any]] | None = None) -> int:
+        failed = [check for check in self.checks if not check["ok"]]
+        report = {"archive": str(self.archive), "clips": [str(c) for c in clips],
+                  "videos": videos or [], "checks": self.checks, "notes": self.notes,
+                  "failed": len(failed)}  # fmt: skip
+        (self.work / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
+        print(f"\n{len(self.checks) - len(failed)}/{len(self.checks)} checks passed; "
+              f"report {self.work / 'report.json'}")  # fmt: skip
+        return 1 if failed else 0
 
     def main(self, clips: list[Path], kaggle_python: str) -> int:
         self.work.mkdir(parents=True, exist_ok=True)
@@ -261,15 +344,21 @@ class Run:
         (hooks / "sitecustomize.py").write_text(
             SITECUSTOMIZE.format(major=version[0], minor=version[1]), encoding="utf-8"
         )
-        server_dir = self.work / "server"
-        server_dir.mkdir(exist_ok=True)
-        standin = server_dir / "ASL_Citizen.zip"
-        labels = standin_archive(clips, standin)
-        server = RangeServer(("127.0.0.1", 0), RangeHandler)
-        server.archive = standin
-        threading.Thread(target=server.serve_forever, daemon=True).start()
-        url = f"http://127.0.0.1:{server.server_address[1]}/ASL_Citizen.zip"
-        print(f"Kaggle's Python: {'.'.join(version)} ({kaggle_env}); stand-in archive at {url}")
+        labels: dict[str, str] = {}
+        server = None
+        url = ""
+        if not self.real_archive:
+            server_dir = self.work / "server"
+            server_dir.mkdir(exist_ok=True)
+            standin = server_dir / "ASL_Citizen.zip"
+            labels = standin_archive(clips, standin)
+            server = RangeServer(("127.0.0.1", 0), RangeHandler)
+            server.archive = standin
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            url = f"http://127.0.0.1:{server.server_address[1]}/ASL_Citizen.zip"
+        print(
+            f"Kaggle's Python: {'.'.join(version)} ({kaggle_env}); archive {url or 'Microsoft URL'}"
+        )
         self.env = {
             key: value
             for key, value in os.environ.items()
@@ -279,13 +368,15 @@ class Run:
             PATH=str(bin_dir) + os.pathsep + os.environ["PATH"],
             PYTHONPATH=str(hooks),
             EV_TMP=(self.work / "tmp").as_posix(),
-            EV_URL=url,
-            EV_SHARD_SIZE="1",
-            EV_WORKERS="2",
             UV_CACHE_DIR=str(self.work / "uv-cache"),
             UV_PYTHON_INSTALL_DIR=str(self.work / "uv-python"),
             UV_PYTHON_PREFERENCE="only-managed",  # Kaggle has no system Python 3.11 either
         )
+        self.env.update(KAGGLE_ENV)
+        if self.real_archive:
+            return self.real_smoke()
+        # The stand-in archive: its URL, and one clip per shard so the three parts share them.
+        self.env.update(EV_URL=url, EV_SHARD_SIZE="1", EV_WORKERS="2")
         source = {"edge-vision-src": self.archive}
 
         log, _ = self.run_cell("1-no-source", "asl_citizen_smoke", {})
@@ -300,6 +391,7 @@ class Run:
         self.check("2-mismatch", "stops with CODE SOURCE MISMATCH", "CODE SOURCE MISMATCH" in log)
 
         log, smoke = self.run_cell("3-smoke", "asl_citizen_smoke", source)
+        self.check_diagnostics("3-smoke")
         commit = re.search(r"code commit: ([0-9a-f]{40})", log)
         self.check("3-smoke", "prints the code commit", bool(commit), commit[1] if commit else "")
         self.check("3-smoke", "the fingerprint matches", "(matches this notebook)" in log)
@@ -387,7 +479,7 @@ class Run:
         self.check("6-locate", "gathers a shards.zip dataset",
                    found.endswith("asl-citizen-landmarks-input"), found)  # fmt: skip
 
-        videos = read_back(out)
+        videos = read_back(out) if (out / "manifest.csv").is_file() else []
         tracked = [video for video in videos if video.get("frames")]
         self.check("7-landmarks", "every clip tracked", len(tracked) == len(labels),
                    f"{len(tracked)} of {len(labels)}")  # fmt: skip
@@ -408,15 +500,9 @@ class Run:
             reference = self.reference / f"{stems[name]}.holistic.npz" if self.reference else None
             if reference and reference.is_file():
                 self.compare(name, video, reference, out)
-        server.shutdown()
-        failed = [check for check in self.checks if not check["ok"]]
-        report = {"archive": str(self.archive), "clips": [str(c) for c in clips],
-                  "videos": videos, "checks": self.checks, "notes": self.notes,
-                  "failed": len(failed)}  # fmt: skip
-        (self.work / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
-        print(f"\n{len(self.checks) - len(failed)}/{len(self.checks)} checks passed; "
-              f"report {self.work / 'report.json'}")  # fmt: skip
-        return 1 if failed else 0
+        if server:
+            server.shutdown()
+        return self.finish(clips, videos)
 
     def compare(self, name: str, video: dict[str, Any], reference: Path, out: Path) -> None:
         """The cell's landmarks against an earlier local Holistic run of the same clip
@@ -469,7 +555,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("clips", nargs="+", type=Path, help="video clips named <sign>_<n>.mp4")
+    parser.add_argument("clips", nargs="*", type=Path, help="video clips named <sign>_<n>.mp4")
     parser.add_argument("--archive", type=Path, required=True, help="edge-vision-src.tar.gz")
     parser.add_argument("--kaggle-python", default=sys.executable, help="plays Kaggle's Python")
     parser.add_argument("--work", type=Path, required=True)
@@ -478,7 +564,13 @@ def main(argv: list[str] | None = None) -> int:
         "--reference", type=Path, help="<clip>.holistic.npz of the clips from a local run, e.g. "
         "data/live_clips_v2; the cell's landmarks must match them",
     )  # fmt: skip
+    parser.add_argument(
+        "--real-archive", action="store_true",
+        help="run only the smoke notebook, unchanged, against the Microsoft download URL",
+    )  # fmt: skip
     args = parser.parse_args(argv)
+    if not args.real_archive and not args.clips:
+        parser.error("give the clips, or --real-archive")
     return Run(args).main([clip.resolve() for clip in args.clips], args.kaggle_python)
 
 

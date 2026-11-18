@@ -127,10 +127,25 @@ SRC="$TMPROOT/edge-vision-src"
 SOURCE_FINGERPRINT="@FINGERPRINT@"
 VENV_PYTHON="@VENV_PYTHON@"
 mkdir -p "$WORK" "$TMPROOT"
-# clean runs a venv's Python without Kaggle's site hooks: Kaggle's PYTHONPATH holds a
-# sitecustomize that imports wrapt, which a fresh venv lacks.
-clean() { env -u PYTHONPATH -u PYTHONSTARTUP -u PYTHONHOME PYTHONNOUSERSITE=1 "$@"; }
-uv() { python -m uv "$@"; }
+# clean runs a venv's Python with only the variables it needs. The Kaggle kernel exports its
+# own: PYTHONPATH holds a sitecustomize that imports wrapt, and MPLBACKEND names
+# matplotlib_inline, which made "import mediapipe" (it imports matplotlib.pyplot) fail in the
+# venv. So the environment starts empty, keeps CLEAN_KEEP and every EV_* variable, and sets
+# MPLBACKEND=Agg.
+CLEAN_KEEP="HOME USER LOGNAME PATH LANG LC_ALL LC_CTYPE TZ TMPDIR TEMP TMP TERM
+  LD_LIBRARY_PATH CUDA_VISIBLE_DEVICES CUDA_HOME NVIDIA_VISIBLE_DEVICES NVIDIA_DRIVER_CAPABILITIES
+  OMP_NUM_THREADS HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
+  SSL_CERT_FILE SSL_CERT_DIR SYSTEMROOT WINDIR COMSPEC USERPROFILE APPDATA LOCALAPPDATA PATHEXT
+  NUMBER_OF_PROCESSORS PROCESSOR_ARCHITECTURE"
+clean() {
+  local name keep=()
+  for name in $CLEAN_KEEP $(compgen -e EV_); do
+    if [ -n "${!name+x}" ]; then keep+=("$name=${!name}"); fi
+  done
+  env -i "${keep[@]}" MPLBACKEND=Agg PYTHONNOUSERSITE=1 "$@"
+}
+# Kaggle also sets UV_SYSTEM_PYTHON ("The --system flag has no effect" in uv venv's output).
+uv() { env -u UV_SYSTEM_PYTHON -u VIRTUAL_ENV python -m uv "$@"; }
 venv_python() { if [ -e "$1/bin/python" ]; then echo "$1/bin/python"; else echo "$1/Scripts/python.exe"; fi; }
 kaggle_python() { python -c 'import platform; print(platform.python_version())' 2>&1; }
 # find below the inputs without walking the asl-signs parquet tree or the landmark shards
@@ -249,23 +264,8 @@ MERGE = Extraction(
 )
 EXTRACTIONS = (SMOKE, part(1), part(2), part(3), MERGE)
 
-EXTRACTION_RUN = r"""if [ "$EV_LIMIT_VIDEOS" -gt 0 ]; then
-  OUT="$WORK/asl-citizen-landmarks-smoke"
-else
-  OUT="$WORK/asl-citizen-landmarks"
-fi
-export EV_OUT="$OUT"
-LOG="$WORK/$NAME.log"
-MPENV="$TMPROOT/mpenv"
-finish() {
-  [ -n "${1:-}" ] && echo "$1" | tee -a "$LOG"
-  echo "=== $(date -u '+%F %T') UTC: finished; this cell always exits 0, so read $LOG" | tee -a "$LOG"
-  exit 0
-}
-echo "=== $(date -u '+%F %T') UTC: start $NAME (EV_PART $EV_PART, EV_LIMIT_VIDEOS $EV_LIMIT_VIDEOS); Kaggle python $(kaggle_python)" | tee -a "$LOG"
-get_source 2>&1 | tee -a "$LOG"
-[ "${PIPESTATUS[0]}" -eq 0 ] || finish "STOPPED: no usable code source (see above); nothing was extracted."
-
+# The mediapipe venv, shared by the diagnostics cell and the extraction cells.
+MPENV_SETUP = r"""MPENV="$TMPROOT/mpenv"
 venv_versions() {
   clean "$(venv_python "$MPENV")" -c 'import platform, mediapipe, cv2, numpy; print(f"venv python {platform.python_version()}: mediapipe {mediapipe.__version__}, cv2 {cv2.__version__}, numpy {numpy.__version__}")'
 }
@@ -291,6 +291,24 @@ setup_environment() {
   echo "--- versions inside $MPENV"
   venv_versions || { echo "STEP FAILED: importing mediapipe, cv2 and numpy in $MPENV"; return 1; }
 }
+"""
+
+EXTRACTION_RUN = r"""if [ "$EV_LIMIT_VIDEOS" -gt 0 ]; then
+  OUT="$WORK/asl-citizen-landmarks-smoke"
+else
+  OUT="$WORK/asl-citizen-landmarks"
+fi
+export EV_OUT="$OUT"
+LOG="$WORK/$NAME.log"
+finish() {
+  [ -n "${1:-}" ] && echo "$1" | tee -a "$LOG"
+  echo "=== $(date -u '+%F %T') UTC: finished; this cell always exits 0, so read $LOG" | tee -a "$LOG"
+  exit 0
+}
+echo "=== $(date -u '+%F %T') UTC: start $NAME (EV_PART $EV_PART, EV_LIMIT_VIDEOS $EV_LIMIT_VIDEOS); Kaggle python $(kaggle_python)" | tee -a "$LOG"
+get_source 2>&1 | tee -a "$LOG"
+[ "${PIPESTATUS[0]}" -eq 0 ] || finish "STOPPED: no usable code source (see above); nothing was extracted."
+
 setup_environment 2>&1 | tee -a "$LOG"
 [ "${PIPESTATUS[0]}" -eq 0 ] || finish "ENVIRONMENT FAILED: nothing was extracted. The full error is above and in $LOG."
 PY=$(venv_python "$MPENV")
@@ -313,6 +331,94 @@ fi
 """
 
 
+DIAGNOSTICS = r"""%%bash
+# DIAGNOSTICS (edge-vision), the first cell of the smoke test. It needs no input and never stops
+# the notebook: it prints the Python version, uv --version, the output of the venv creation and
+# the package install (the same commands as the extraction, so the next cell reuses the venv),
+# an import and Holistic test of mediapipe with Kaggle's environment and with clean(), ldd on
+# mediapipe's native modules if that import fails, the free disk space and a HEAD request to the
+# ASL Citizen archive. Everything also goes to diagnostics.log in the output.
+set -u
+@COMMON@@MPENV_SETUP@DIAG_LOG="$WORK/diagnostics.log"
+URL="${EV_URL:-@URL@}"
+# Variables whose values are shown; of the others only the names (they may hold tokens).
+SHOWN='^(MPLBACKEND|PYTHON[A-Z_]*|LD_LIBRARY_PATH|LD_PRELOAD|UV_[A-Z_]*|PIP_[A-Z_]*|VIRTUAL_ENV|CONDA_[A-Z_]*|PATH|HOME|LANG|LC_ALL|TMPDIR)='
+diagnostics() {
+  echo "=== $(date -u '+%F %T') UTC: diagnostics"
+  echo "--- Kaggle's Python"
+  command -v python
+  python -c 'import platform, sys; print(sys.version); print(platform.platform())'
+  echo "--- environment variables (values only for the ones that steer Python, uv and pip)"
+  env | grep -E "$SHOWN" | sort | cut -c1-300
+  echo "other names: $(env | grep -vE "$SHOWN" | cut -d= -f1 | grep -E '^[A-Za-z_][A-Za-z0-9_]*$' | sort | tr '\n' ' ')"
+  echo "--- uv --version"
+  python -m uv --version 2>/dev/null || python -m pip install -q --disable-pip-version-check uv
+  uv --version
+  echo "--- the venv creation and the package install"
+  setup_environment
+  echo "setup_environment exit status: $?"
+  local py
+  py=$(venv_python "$MPENV")
+  echo "--- import mediapipe with Kaggle's environment (how the extraction ran before the fix)"
+  "$py" -c 'import mediapipe; print("import ok")' 2>&1 | tail -n 2
+  echo "--- import mediapipe and run Holistic with clean() (how the extraction runs)"
+  if clean "$py" -c 'import mediapipe as mp, numpy as np
+h = mp.solutions.holistic.Holistic(static_image_mode=False, model_complexity=1)
+h.process(np.zeros((360, 640, 3), np.uint8))
+h.close()
+print("mediapipe", mp.__version__, "import and Holistic ok")'; then
+    echo "DIAGNOSTICS: mediapipe OK"
+  else
+    echo "DIAGNOSTICS: mediapipe FAILED; ldd of its native modules:"
+    find "$MPENV" -path '*site-packages/mediapipe*' -name '*.so' | while read -r so; do
+      echo "$so"
+      ldd "$so" 2>&1 | sed 's/^/    /'
+    done
+  fi
+  echo "--- free disk space"
+  df -h "$WORK" "$TMPROOT" 2>&1
+  echo "--- HEAD request to the ASL Citizen archive"
+  python - "$URL" <<'PYEOF'
+import sys, urllib.request
+
+request = urllib.request.Request(sys.argv[1], method="HEAD")
+try:
+    with urllib.request.urlopen(request, timeout=60) as response:
+        size = int(response.headers.get("Content-Length") or 0)
+        print(f"{sys.argv[1]}: HTTP {response.status}, Content-Length {size:,} bytes "
+              f"({size / 1e9:.2f} GB), Accept-Ranges {response.headers.get('Accept-Ranges')}")
+except Exception as error:
+    print(f"{sys.argv[1]}: HEAD FAILED, {type(error).__name__}: {error}")
+PYEOF
+  echo "=== $(date -u '+%F %T') UTC: diagnostics done"
+}
+diagnostics 2>&1 | tee -a "$DIAG_LOG"
+exit 0
+"""
+
+
+def archive_url() -> str:
+    """DEFAULT_URL of kaggle/asl_citizen_extract.py (two string literals in parentheses)."""
+    match = re.search(
+        r'DEFAULT_URL = \(\s*"([^"]+)"\s*"([^"]+)"\s*\)', EXTRACT_BODY.read_text("utf-8")
+    )
+    if not match:
+        raise ValueError(f"no DEFAULT_URL in {EXTRACT_BODY}")
+    return match.group(1) + match.group(2)
+
+
+def mpenv_setup() -> str:
+    return MPENV_SETUP.replace("@PACKAGES@", " ".join(MPENV_PACKAGES))
+
+
+def diagnostics_cell() -> str:
+    return (
+        DIAGNOSTICS.replace("@COMMON@", common())
+        .replace("@MPENV_SETUP@", mpenv_setup())
+        .replace("@URL@", archive_url())
+    )
+
+
 def extraction_cell(spec: Extraction) -> str:
     header = f"""%%bash
 # {spec.title} (edge-vision).
@@ -326,8 +432,8 @@ export EV_LIMIT_VIDEOS={spec.limit}    # > 0: SMOKE TEST of the first N videos, 
 export EV_PART="{spec.part}"         # k/N: this run's share of the shards
 NAME={spec.name}
 """
-    run = EXTRACTION_RUN.replace("@PACKAGES@", " ".join(MPENV_PACKAGES))
-    return header + common() + run + (DATASET_STEP if spec.dataset else "") + "finish\n"
+    dataset = DATASET_STEP if spec.dataset else ""
+    return header + common() + mpenv_setup() + EXTRACTION_RUN + dataset + "finish\n"
 
 
 def train_cell() -> str:
@@ -337,18 +443,19 @@ def train_cell() -> str:
     return "%%bash\n" + body.replace(COMMON_MARKER, common())
 
 
-def notebook(cell: str, settings: dict[str, object]) -> str:
-    lines = cell.splitlines(keepends=True)
+def notebook(cells: dict[str, str], settings: dict[str, object]) -> str:
+    """A notebook of bash code cells, {cell id: source}, run in order."""
     payload = {
         "cells": [
             {
                 "cell_type": "code",
                 "execution_count": None,
-                "id": "main",
+                "id": cell_id,
                 "metadata": {"trusted": True},
                 "outputs": [],
-                "source": lines,
+                "source": source.splitlines(keepends=True),
             }
+            for cell_id, source in cells.items()
         ],
         "metadata": {
             "kaggle": {"language": "python", "sourceType": "notebook", **settings},
@@ -367,15 +474,18 @@ def notebook_paths() -> dict[str, Path]:
 
 
 def built() -> dict[str, str]:
-    notebooks = {
-        spec.name: notebook(extraction_cell(spec), EXTRACT_SETTINGS) for spec in EXTRACTIONS
-    }
-    notebooks["train_v3"] = notebook(train_cell(), TRAIN_SETTINGS)
+    notebooks = {}
+    for spec in EXTRACTIONS:
+        cells = {"diagnostics": diagnostics_cell()} if spec is SMOKE else {}
+        cells["main"] = extraction_cell(spec)
+        notebooks[spec.name] = notebook(cells, EXTRACT_SETTINGS)
+    notebooks["train_v3"] = notebook({"main": train_cell()}, TRAIN_SETTINGS)
     return notebooks
 
 
 def embedded_fingerprint(notebook_text: str) -> str | None:
-    source = "".join(json.loads(notebook_text)["cells"][0]["source"])
+    """The fingerprint in the notebook's main cell (the last one)."""
+    source = "".join(json.loads(notebook_text)["cells"][-1]["source"])
     match = FINGERPRINT_LINE.search(source)
     return match.group(1) if match else None
 

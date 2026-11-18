@@ -4,6 +4,7 @@ fingerprint and archive checks, and what each generated cell contains."""
 import importlib.util
 import io
 import json
+import os
 import shlex
 import shutil
 import subprocess
@@ -258,12 +259,80 @@ def test_the_committed_tree_has_no_forbidden_files():
     assert [name for name in names if builder.FORBIDDEN.search(name)] == []
 
 
-def cell(name: str) -> str:
+def cells(name: str) -> dict[str, str]:
+    """{cell id: source} of kaggle/<name>.ipynb, in order."""
     notebook = json.loads((ROOT / "kaggle" / f"{name}.ipynb").read_text("utf-8"))
-    (only,) = notebook["cells"]
     assert notebook["metadata"]["kaggle"]["isInternetEnabled"] is True
     assert notebook["metadata"]["kaggle"]["isGpuEnabled"] is (name == "train_v3")
-    return "".join(only["source"])
+    return {c["id"]: "".join(c["source"]) for c in notebook["cells"]}
+
+
+def cell(name: str) -> str:
+    """The main cell; only the smoke test has another one, the diagnostics cell, before it."""
+    found = cells(name)
+    assert list(found) == (["diagnostics", "main"] if name == "asl_citizen_smoke" else ["main"])
+    return found["main"]
+
+
+def test_the_smoke_test_starts_with_the_diagnostics_cell():
+    source = cells("asl_citizen_smoke")["diagnostics"]
+    assert source.startswith("%%bash\n") and source.rstrip().endswith("exit 0")
+    for printed in (
+        "sys.version",  # the Python version
+        "uv --version",
+        "setup_environment",  # the venv creation and the package install
+        "ldd",  # mediapipe's native modules, when the import fails
+        "df -h",  # free disk space
+        'method="HEAD"',
+    ):
+        assert printed in source, printed
+    assert builder.archive_url() in source
+    assert "get_source" not in source.split("# ---- end of the common part ----")[1]
+
+
+def bash() -> str | None:
+    found = shutil.which("bash")
+    # Windows' C:\Windows\System32\bash.exe starts WSL, which cannot run this Python.
+    return found if found and "system32" not in found.lower() else None
+
+
+def test_clean_drops_the_kaggle_kernel_variables(tmp_path):
+    """The cause of the failed Kaggle runs: the kernel's MPLBACKEND (matplotlib_inline) reached
+    the venv, where mediapipe's import of matplotlib.pyplot rejected it."""
+    if bash() is None:
+        pytest.skip("no bash")
+    common = builder.common()
+    script = tmp_path / "clean.sh"
+    script.write_text(
+        common
+        + 'clean "$PYTHON_UNDER_TEST" -c "import json, os; print(json.dumps(dict(os.environ)))"\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+    env = dict(
+        os.environ,
+        EV_WORK=str(tmp_path / "work"),
+        EV_TMP=str(tmp_path / "tmp"),
+        EV_INPUT=str(tmp_path / "input"),
+        EV_PART="1/3",
+        MPLBACKEND="module://matplotlib_inline.backend_inline",
+        PYTHONPATH="/kaggle/lib/kagglegym",
+        UV_SYSTEM_PYTHON="true",
+        KAGGLE_USER_SECRETS_TOKEN="secret",
+        PYTHON_UNDER_TEST=sys.executable,
+    )
+    done = subprocess.run([bash(), str(script)], env=env, capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    seen = json.loads(done.stdout.strip().splitlines()[-1])
+    assert seen["MPLBACKEND"] == "Agg" and seen["PYTHONNOUSERSITE"] == "1"
+    assert seen["EV_PART"] == "1/3" and "EV_INPUT" in seen and "PATH" in seen
+    for gone in (
+        "PYTHONPATH",
+        "UV_SYSTEM_PYTHON",
+        "KAGGLE_USER_SECRETS_TOKEN",
+        "PYTHON_UNDER_TEST",
+    ):
+        assert gone not in seen, gone
 
 
 @pytest.mark.parametrize("name", list(builder.notebook_paths()))

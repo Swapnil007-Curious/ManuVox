@@ -54,10 +54,18 @@ read the log in the version's Output.
 | 2 | `kaggle/asl_citizen_part1.ipynb`, `_part2`, `_part3` (side by side) | edge-vision-src | 3.5 to 5 h each |
 | 3 | `kaggle/asl_citizen_merge.ipynb` | edge-vision-src + the three part notebooks' outputs | about 10 min plus the upload |
 
-- **Smoke test:** tracks the first 20 videos into `asl-citizen-landmarks-smoke` (never the real
-  shards, never a dataset). It prints the seconds per video and the share of frames with pose and
-  hand landmarks, and ends with `SMOKE PASS` or `SMOKE FAIL`. Do not start the parts before it
-  passes.
+- **Smoke test:** its first cell is a diagnostics cell (`diagnostics.log`): Python version,
+  `uv --version`, the venv creation and install output, a mediapipe import and Holistic test,
+  `ldd` on mediapipe's native modules if that fails, the free disk space and a HEAD request to
+  the ASL Citizen archive. The second cell tracks the first 20 videos into
+  `asl-citizen-landmarks-smoke` (never the real shards, never a dataset). It prints the seconds
+  per video and the share of frames with pose and hand landmarks, and ends with `SMOKE PASS` or
+  `SMOKE FAIL`. Do not start the parts before it passes.
+- **Why the first runs failed (2026-11-18):** the Kaggle kernel exports
+  `MPLBACKEND=module://matplotlib_inline.backend_inline`, mediapipe imports `matplotlib.pyplot`,
+  and the venv has no `matplotlib_inline`, so `import mediapipe` raised `ValueError: Key backend`.
+  The venv's Python now runs with an allowlisted environment and `MPLBACKEND=Agg` (`clean()` in
+  `scripts/build_kaggle_notebooks.py`).
 - **Parts:** each tracks every third shard (`EV_PART` 0/3, 1/3, 2/3). If Kaggle won't start
   three sessions at once, run them one after another. A finished part's log says
   `part k/3 finished`.
@@ -86,16 +94,28 @@ The output is roughly 1 GB.
 
 ### Local test
 
-`python scripts/kaggle_local_test.py --archive artifacts/v3/upload/edge-vision-src.tar.gz
---kaggle-python <a Python 3.13> --work <scratch dir> --reference data/live_clips_v2
-test_clips_v2/<sign>_1.mp4 ...` runs the
-cells as written, in bash, on a few clips. A venv plays Kaggle's Python and a stand-in archive
-is served with range requests. It runs the missing and mismatched code source cases, the smoke
-test, the three parts, the merge and the training input detection, then reads the landmarks
-back and compares them with the local Holistic run of the same clips. Whether pose and hands are
-in most frames depends on the clips, so the harness reports it rather than checking it (the demo
-clips show a hand in only 21 to 38 percent of frames, in both runs alike). Delete the work folder
-afterwards.
+`scripts/kaggle_local_test.py` runs the notebook cells as written, in bash, with the variables
+the Kaggle kernel exports (`KAGGLE_ENV`). A venv of a Python 3.13 plays Kaggle's Python; the
+cells then install uv, Python 3.11 and mediapipe themselves. With clips, a stand-in archive is
+served with range requests (the clips plus every gloss the label mapping names). The run covers
+the missing and mismatched code source cases, the smoke test with its diagnostics cell, the
+three parts, the merge and the training input detection, then reads the landmarks back and
+compares them with the local Holistic run of the same clips (`--reference`). Whether pose and
+hands are in most frames depends on the clips, so it reports that rather than checking it (the
+demo clips show a hand in only 21 to 38 percent of frames, in both runs alike). With
+`--real-archive` it runs only the smoke notebook, unchanged, against the Microsoft download URL.
+
+On Linux (WSL or a container), `scripts/kaggle_linux_test.sh WORK_DIR ...` fetches uv and its
+standalone CPython 3.13 into WORK_DIR and runs the harness with them:
+
+    bash scripts/kaggle_linux_test.sh ~/ev-kaggle-test \
+        --archive artifacts/v3/upload/edge-vision-src.tar.gz --reference data/live_clips_v2 \
+        test_clips_v2/bed_1.mp4 test_clips_v2/bird_1.mp4 test_clips_v2/book_1.mp4
+    bash scripts/kaggle_linux_test.sh ~/ev-kaggle-test \
+        --archive artifacts/v3/upload/edge-vision-src.tar.gz --real-archive
+
+Delete WORK_DIR afterwards: it holds landmarks of the clips (and, with `--real-archive`, of 20
+ASL Citizen videos).
 
 ## 2. Evaluate the shipped v2 model on the ASL Citizen test split (local)
 
