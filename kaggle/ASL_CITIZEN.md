@@ -147,6 +147,11 @@ refuses a second run on the same model, and writes `results/asl_citizen/v2_test.
      Notebooks > asl_citizen_merge (the version whose log says COMPLETE). The cell finds the
      manifest and the shards at any depth, in a folder or zipped, and lists every candidate
      with the reason it was used or skipped.
+   - The cell first prints the folders under `/kaggle/input` (to depth 3). It takes the
+     competition from `competitions/asl-signs` or `asl-signs`, or any `train.csv` with the
+     competition's columns, the sign map beside it and its first sequence file present, and it
+     follows symlinked folders. Re-importing a notebook can drop its inputs: before committing,
+     check that the Input panel lists all three.
 4. **Save Version > Save & Run All (Commit).**
 
 The cell checks that Kaggle's Python imports the training dependencies (after installing the

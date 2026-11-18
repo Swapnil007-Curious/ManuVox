@@ -158,15 +158,60 @@ def test_locate_prefers_the_dataset_and_ignores_other_manifests(tmp_path, extrac
     assert "landmark folders (manifest.csv with the extraction's columns): 2" in report
 
 
+def competition(folder: Path, columns: str = "path,participant_id,sequence_id,sign") -> Path:
+    """A minimal asl-signs competition folder: train.csv, the sign map and one sequence file."""
+    (folder / "train_landmarks" / "2044").mkdir(parents=True)
+    (folder / "train_landmarks" / "2044" / "635217.parquet").write_bytes(b"PAR1")
+    (folder / "train.csv").write_text(
+        f"{columns}\ntrain_landmarks/2044/635217.parquet,2044,635217,blow\n"
+    )
+    (folder / "sign_to_prediction_index_map.json").write_text('{"blow": 0}')
+    return folder
+
+
+def test_locate_finds_asl_signs_at_the_kaggle_mount_and_lists_the_inputs(tmp_path, capsys):
+    found = competition(tmp_path / "input" / "competitions" / "asl-signs")
+    values, report = locate(tmp_path / "input", tmp_path / "unpack", capsys)
+    assert Path(values["DATA_ROOT"]) == found
+    assert f"{found / 'train.csv'}: usable" in report
+    assert "asl-signs/: 2 files (sign_to_prediction_index_map.json, train.csv)" in report
+    assert "train_landmarks/ (not listed)" in report
+
+
+def test_locate_follows_a_symlinked_competition_mount(tmp_path, capsys):
+    real = competition(tmp_path / "mounted" / "asl-signs")
+    (tmp_path / "input" / "competitions").mkdir(parents=True)
+    link = tmp_path / "input" / "competitions" / "asl signs"
+    try:
+        link.symlink_to(real, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks need privileges here")
+    values, report = locate(tmp_path / "input", tmp_path / "unpack", capsys)
+    assert Path(values["DATA_ROOT"]) == link and "(symlink)" in report
+
+
+def test_locate_rejects_other_train_csv_files_with_the_reason(tmp_path, capsys):
+    other = tmp_path / "input" / "something-else"
+    other.mkdir(parents=True)
+    (other / "train.csv").write_text("id,target\n1,0\n")
+    no_map = competition(tmp_path / "input" / "no-map")
+    (no_map / "sign_to_prediction_index_map.json").unlink()
+    no_file = competition(tmp_path / "input" / "no-file")
+    (no_file / "train_landmarks" / "2044" / "635217.parquet").unlink()
+    values, report = locate(tmp_path / "input", tmp_path / "unpack", capsys)
+    assert values["DATA_ROOT"] == ""
+    assert "not the competition's train.csv (columns id, target)" in report
+    assert "no sign_to_prediction_index_map.json beside it" in report
+    assert "its first sequence file train_landmarks/2044/635217.parquet is missing" in report
+
+
 def test_locate_finds_asl_signs_and_earlier_runs_and_quotes_paths(tmp_path, extraction, capsys):
-    competition = tmp_path / "input" / "competitions" / "asl signs"
-    (competition / "train_landmarks").mkdir(parents=True)
-    (competition / "train.csv").write_text("path,participant_id,sequence_id,sign\n")
+    found = competition(tmp_path / "input" / "competitions" / "asl signs")
     runs = tmp_path / "input" / "train v3 output" / "runs" / v3.RUN_NAME
     runs.mkdir(parents=True)
     place(extraction[0], tmp_path / "input" / "asl-citizen-landmarks-private" / "l")
     values, _ = locate(tmp_path / "input", tmp_path / "unpack", capsys)
-    assert Path(values["DATA_ROOT"]) == competition
+    assert Path(values["DATA_ROOT"]) == found
     assert Path(values["PREVIOUS_RUNS"]) == runs
 
 

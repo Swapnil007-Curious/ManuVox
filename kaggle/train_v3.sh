@@ -106,8 +106,17 @@ train_venv() {
   eval "$(py scripts/v3_kaggle.py locate --input "$EV_INPUT" --unpack-dir "$TMPROOT")"
   echo "asl-signs: ${DATA_ROOT:-NOT FOUND}"
   echo "ASL Citizen landmarks: ${LANDMARKS:-NOT FOUND}"
+  if [ -z "$DATA_ROOT" ]; then
+    echo "ERROR: no asl-signs data under $EV_INPUT (the folders above). Add Input > Competitions >"
+    echo "  Google - Isolated Sign Language Recognition (join it and accept its rules first), check"
+    echo "  that it is listed in the Input panel, then Save Version again."
+  fi
+  if [ -z "$LANDMARKS" ]; then
+    echo "ERROR: no usable ASL Citizen landmarks (see the list above). Add Input > Your Work >"
+    echo "  Datasets > asl-citizen-landmarks-private (or the asl_citizen_merge output), then Save Version."
+  fi
   if [ -z "$DATA_ROOT" ] || [ -z "$LANDMARKS" ]; then
-    echo "ERROR: an input is missing (see the list above); add it with Add Input and commit again; stopping."
+    echo "STOPPED: an input is missing; nothing was trained."
     exit 0
   fi
   for previous in "${PREVIOUS_RUNS[@]}"; do

@@ -49,6 +49,11 @@ RUN_NAME = "e_hybrid_v3citizen"
 # Folders never walked: the asl-signs parquet tree (94k files) and the landmark shards.
 PRUNED = frozenset({"train_landmarks", "shards", ".git", "node_modules", "__pycache__"})
 SHARD_NAME = re.compile(r"shard_(\d{5})\.npz")
+# The asl-signs competition: train.csv columns, the sign map beside it, and where Kaggle mounts
+# it (newer and older layouts), checked before the walk.
+ASL_SIGNS_COLUMNS = frozenset({"path", "participant_id", "sequence_id", "sign"})
+ASL_SIGNS_SIGN_MAP = "sign_to_prediction_index_map.json"
+ASL_SIGNS_MOUNTS = ("competitions/asl-signs", "asl-signs")
 GATHERED = "asl-citizen-landmarks-input"
 
 # Files under the work dir that pack includes (globs relative to it). Nothing derived from ASL
@@ -72,12 +77,50 @@ NEVER_PACKED = ("features.npz", "manifest.csv", "shard_")
 
 
 def walk(root: Path) -> list[tuple[Path, list[str], list[str]]]:
-    """os.walk below root, in sorted order, skipping PRUNED folders."""
+    """os.walk below root, in sorted order, skipping PRUNED folders. It follows symlinked
+    folders (an input may be mounted as a link) and visits each real folder once."""
     found = []
-    for directory, folders, files in os.walk(root):
+    seen: set[str] = set()
+    for directory, folders, files in os.walk(root, followlinks=True):
+        real = os.path.realpath(directory)
+        if real in seen:
+            folders[:] = []
+            continue
+        seen.add(real)
         folders[:] = sorted(name for name in folders if name not in PRUNED)
         found.append((Path(directory), folders, sorted(files)))
     return found
+
+
+def input_tree(root: Path, depth: int = 3, limit: int = 60) -> list[str]:
+    """The folders below root to the given depth, with their file and folder counts, so the log
+    shows what Kaggle mounted (PRUNED folders are named, not listed)."""
+    lines: list[str] = []
+
+    def visit(path: Path, level: int) -> None:
+        if len(lines) >= limit:
+            return
+        indent = "  " * level
+        link = " (symlink)" if path.is_symlink() else ""
+        try:
+            entries = sorted(os.scandir(path), key=lambda entry: entry.name)
+        except OSError as error:
+            lines.append(f"{indent}{path.name}/{link}: unreadable, {error}")
+            return
+        folders = [entry for entry in entries if entry.is_dir()]
+        files = [entry.name for entry in entries if not entry.is_dir()]
+        shown = ", ".join(files[:4]) + (", ..." if len(files) > 4 else "")
+        lines.append(f"{indent}{path.name or path}/{link}: {len(files)} files ({shown})")
+        for entry in folders:
+            if entry.name in PRUNED:
+                lines.append(f"{indent}  {entry.name}/ (not listed)")
+            elif level < depth:
+                visit(Path(entry.path), level + 1)
+            else:
+                lines.append(f"{indent}  {entry.name}/ ...")
+
+    visit(root, 0)
+    return lines[:limit]
 
 
 def shard_index(name: str) -> int | None:
@@ -322,11 +365,43 @@ def find_landmarks(input_root: Path, unpack_dir: Path) -> Path | None:
     return landmarks
 
 
+def check_asl_signs(train_csv: Path) -> str:
+    """ "usable", or why this train.csv is not the competition's: preprocessing reads train.csv
+    with ASL_SIGNS_COLUMNS, the sign map beside it and each row's path relative to its folder."""
+    try:
+        with train_csv.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            columns = set(reader.fieldnames or [])
+            first = next(reader, None)
+    except (OSError, UnicodeDecodeError) as error:
+        return f"unreadable: {type(error).__name__}: {error}"
+    if not columns >= ASL_SIGNS_COLUMNS:
+        return f"not the competition's train.csv (columns {', '.join(sorted(columns)[:6])})"
+    if not (train_csv.parent / ASL_SIGNS_SIGN_MAP).is_file():
+        return f"no {ASL_SIGNS_SIGN_MAP} beside it"
+    if first is None:
+        return "no rows"
+    if not (train_csv.parent / first["path"]).is_file():
+        return f"its first sequence file {first['path']} is missing"
+    return "usable"
+
+
 def find_asl_signs(input_root: Path) -> Path | None:
-    """The competition folder: train.csv next to train_landmarks/."""
-    for directory, _, files in walk(input_root):
-        if "train.csv" in files and (directory / "train_landmarks").is_dir():
-            return directory
+    """The competition folder: the known mount points first, then every train.csv below the
+    inputs; each one is reported with its verdict."""
+    candidates = [input_root / mount / "train.csv" for mount in ASL_SIGNS_MOUNTS]
+    candidates += [
+        folder / "train.csv" for folder, _, files in walk(input_root) if "train.csv" in files
+    ]
+    seen: set[str] = set()
+    for path in candidates:
+        if not path.is_file() or os.path.realpath(path) in seen:
+            continue
+        seen.add(os.path.realpath(path))
+        verdict = check_asl_signs(path)
+        note(f"  {path}: {verdict}")
+        if verdict == "usable":
+            return path.parent
     return None
 
 
@@ -344,8 +419,13 @@ def locate(args: argparse.Namespace) -> int:
     input_root: Path = args.input
     if not input_root.is_dir():
         note(f"no input folder {input_root}")
+    else:
+        note(f"the inputs (folders to depth 3, {', '.join(sorted(PRUNED))} not listed):")
+        for line in input_tree(input_root):
+            note(f"  {line}")
+    note("asl-signs (train.csv with the competition's columns, sign map and sequence files):")
     asl_signs = find_asl_signs(input_root) if input_root.is_dir() else None
-    note(f"asl-signs (train.csv beside train_landmarks/): {asl_signs or 'none found'}")
+    note(f"asl-signs: {asl_signs or 'none found'}")
     landmarks = find_landmarks(input_root, args.unpack_dir)
     previous = find_previous_runs(input_root) if input_root.is_dir() else []
     for path in previous:
