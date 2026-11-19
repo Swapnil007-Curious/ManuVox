@@ -1,0 +1,98 @@
+{
+  "name": "v2",
+  "model": {
+    "run": "d_hybrid_v2feat_v2recipe/seed_0",
+    "variant": "fp16",
+    "model_sha256": "f7d79f6755498e4a935c38abc3c24b6636d54c5203c2881c2e37080d8296b1e2",
+    "data_source": "asl-signs"
+  },
+  "split": "asl-citizen test (official)",
+  "preprocessing": {
+    "rules": [
+      "exact",
+      "variant",
+      "synonym"
+    ],
+    "splits": [
+      "test"
+    ],
+    "counts": {
+      "planned": 3536,
+      "not_tracked": 0,
+      "total": 3536,
+      "kept": 3523,
+      "excluded": 13,
+      "excluded_by_reason": {
+        "insufficient_hand_frames": 13
+      },
+      "kept_by_split": {
+        "train": 0,
+        "val": 0,
+        "test": 3523
+      },
+      "signs_by_split": {
+        "train": 0,
+        "val": 0,
+        "test": 236
+      }
+    }
+  },
+  "videos": 3523,
+  "excluded_videos": 13,
+  "signers": 11,
+  "signs": 236,
+  "top1": 0.43145046835083734,
+  "top1_ci": [
+    0.41527107578768097,
+    0.44791370990632984
+  ],
+  "top1_ci_signer": [
+    0.39269618519695637,
+    0.4655270696536629
+  ],
+  "top3": 0.5764973034345728,
+  "top3_ci": [
+    0.5603179108714164,
+    0.5926766959977292
+  ],
+  "top3_ci_signer": [
+    0.5392785048465986,
+    0.6114255385252693
+  ],
+  "top1_all_videos": 0.4298642533936652,
+  "top1_by_signer_min": 0.313953488372093,
+  "top1_by_signer_max": 0.5,
+  "ece_raw": 0.14722175619993674,
+  "ece_raw_ci": [
+    0.13352688667256793,
+    0.16187231628546403
+  ],
+  "ece": 0.06571951420303383,
+  "ece_ci": [
+    0.05367083242860888,
+    0.07997802879339114
+  ],
+  "temperature": 0.8681554789606684,
+  "threshold": 0.4877964799342001,
+  "coverage": 0.3113823445926767,
+  "selective_accuracy": 0.7976298997265269,
+  "wrong_rejected": 0.889166250624064,
+  "correct_rejected": 0.4243421052631579,
+  "by_rule": {
+    "exact": {
+      "videos": 2083,
+      "top1": 0.48631781084973597,
+      "top3": 0.6461833893422948
+    },
+    "synonym": {
+      "videos": 481,
+      "top1": 0.4386694386694387,
+      "top3": 0.5488565488565489
+    },
+    "variant": {
+      "videos": 959,
+      "top1": 0.3086548488008342,
+      "top3": 0.43899895724713245
+    }
+  }
+}

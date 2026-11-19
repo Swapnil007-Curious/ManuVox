@@ -7,7 +7,11 @@
 # drown out ASL Citizen's ~1k. No test data enters any decision.
 #
 # The split section matches the combined split file: asl-signs keeps its signer-independent split
-# (4 test, 3 val signers, seed 42) and ASL Citizen its official one (11 test, 6 val signers).
+# (4 test, 3 val signers, seed 42) and ASL Citizen its official train and val signers. The ASL
+# Citizen test split never enters this dir (it is evaluated locally, once), and only 5 of the 6
+# official val signers have videos of the planned signs, so the dir holds 4 test and 3 + 5 = 8
+# val signers. (The first Kaggle run stopped on 15 / 9, which counted the ASL Citizen test
+# signers and all six val signers.)
 experiment: e_hybrid_v3citizen
 feature_set: v2
 recipe: v3
@@ -28,8 +32,8 @@ model:
 processed_dir: /kaggle/working/processed_v3
 split:
   mode: signer_independent
-  n_test_signers: 15
-  n_val_signers: 9
+  n_test_signers: 4
+  n_val_signers: 8
   val_fraction: 0.1
   test_fraction: 0.1
   seed: 42

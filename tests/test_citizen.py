@@ -181,3 +181,41 @@ def test_combine_refuses_overlapping_ids(landmarks, tmp_path):
     citizen.build_processed(root, tmp_path / "citizen", SIGNS, pose_indices=V2_POSE_INDICES)
     with pytest.raises(ValueError, match="overlap"):
         citizen.combine(kaggle, kaggle, tmp_path / "twice")
+
+
+# Signers of the ASL Citizen official val split with videos of the planned signs (the
+# extraction's manifest.csv, 2026-11-19: P13 has none of them, so 5 of the 6 official ones).
+CITIZEN_VAL_SIGNERS_IN_PLAN = 5
+
+
+def test_the_v3_config_split_matches_the_combined_dir():
+    """The combined dir holds the asl-signs signer-independent split and the ASL Citizen train and
+    val signers only (its test split is evaluated locally, once), so training accepts its split
+    file only with these counts. The first Kaggle run stopped on 15 / 9."""
+    from edgevision.train.config import load_train_config
+
+    root = Path(__file__).resolve().parents[1]
+    cfg = load_train_config(root / "experiments/train_e_hybrid_v3citizen.yaml")
+    asl_signs = json.loads(
+        (
+            root / "results/runs/cnn_signer_independent/seed_0/splits_signer_independent.json"
+        ).read_text("utf-8")
+    )
+    assert cfg.split.mode == asl_signs["mode"] and cfg.split.seed == asl_signs["seed"]
+    assert cfg.split.n_test_signers == len(asl_signs["participants"]["test"])
+    assert cfg.split.n_val_signers == (
+        len(asl_signs["participants"]["val"]) + CITIZEN_VAL_SIGNERS_IN_PLAN
+    )
+
+
+def test_combine_skips_the_allow_pickle_scalar_of_old_numpy(landmarks, tmp_path):
+    """NumPy before 2.1 stored savez_compressed(..., allow_pickle=False) as an array."""
+    root, _ = landmarks
+    kaggle = build_v2_processed_dir(tmp_path / "kaggle").root
+    with np.load(kaggle / "features.npz", allow_pickle=False) as data:
+        arrays = {key: data[key] for key in data.files}
+    np.savez_compressed(kaggle / "features.npz", allow_pickle=np.asarray(False), **arrays)
+    citizen.build_processed(root, tmp_path / "citizen", SIGNS, pose_indices=V2_POSE_INDICES)
+    citizen.combine(kaggle, tmp_path / "citizen", tmp_path / "combined")
+    with np.load(tmp_path / "combined" / "features.npz", allow_pickle=False) as data:
+        assert "allow_pickle" not in data.files and set(arrays) <= set(data.files)

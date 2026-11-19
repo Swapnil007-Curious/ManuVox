@@ -254,8 +254,15 @@ def _save_npz(path: Path, arrays: dict[str, npt.NDArray[Any]]) -> None:
 
 
 def _load_arrays(processed_dir: Path) -> dict[str, npt.NDArray[Any]]:
+    """The arrays of features.npz. NumPy before 2.1 had no allow_pickle argument in
+    savez_compressed and stored it as a 0-d array named "allow_pickle"; such files exist, so
+    that scalar is left out."""
     with np.load(processed_dir / "features.npz", allow_pickle=False) as data:
-        return {key: data[key] for key in data.files}
+        return {
+            key: data[key]
+            for key in data.files
+            if not (key == "allow_pickle" and data[key].ndim == 0)
+        }
 
 
 def combine(
