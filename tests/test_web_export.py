@@ -703,3 +703,21 @@ def test_committed_model_files_are_consistent():
     if model_path.exists():
         assert sha256_file(model_path) == meta.model_sha256
         assert model_path.stat().st_size == meta.model_bytes
+
+
+def test_model_cases_come_from_asl_signs_val_rows_only():
+    """v3's val split pools asl-signs and ASL Citizen; golden files are the kind that get
+    committed, so no processed ASL Citizen sequence may become a model case."""
+    from edgevision.data.citizen import CITIZEN_SEQUENCE_OFFSET
+
+    asl_signs = np.arange(1_000, 1_000 + 200, dtype=np.int64)
+    pooled = np.concatenate([asl_signs, CITIZEN_SEQUENCE_OFFSET + np.arange(40)])
+    rows = web_export.model_case_rows(pooled)
+    assert len(rows) == web_export.MODEL_CASES
+    assert (pooled[rows] < CITIZEN_SEQUENCE_OFFSET).all()
+    assert rows[0] == 0 and rows[-1] == len(asl_signs) - 1  # spread over the asl-signs rows
+    # A val split without ASL Citizen rows gets the rows it always had (v2's golden files).
+    expected = np.unique(np.linspace(0, 199, web_export.MODEL_CASES).round().astype(np.intp))
+    np.testing.assert_array_equal(web_export.model_case_rows(asl_signs), expected)
+    with pytest.raises(ValueError, match="asl-signs sequences"):
+        web_export.model_case_rows(CITIZEN_SEQUENCE_OFFSET + np.arange(100))

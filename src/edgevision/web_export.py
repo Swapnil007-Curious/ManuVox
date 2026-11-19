@@ -23,6 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from edgevision import spec
 from edgevision.config import PreprocessConfig
+from edgevision.data import citizen
 from edgevision.data.io import to_storage
 from edgevision.data.landmarks import N_HAND, NOSE, SHOULDERS, pose_swap_pairs
 from edgevision.data.preprocess import MIN_SCALE, X_GRID, preprocess_sequence, snap_x
@@ -92,6 +93,7 @@ PREPROCESS_CASES_V2_FILE = "preprocess_cases_v2.json"
 ASPECT_CASES_FILE = "aspect_cases.json"
 RECORDING_EXAMPLE_FILE = "recording_example.json"
 MODEL_CASES_FILE = "model_cases.json"
+SOURCE_ASL_SIGNS = citizen.SOURCES.index("asl-signs")  # citizen.source_of value
 PREPROCESS_REPORT_FILE = "preprocess_report.json"
 SHA256_PATTERN = r"^[0-9a-f]{64}$"
 
@@ -1247,11 +1249,19 @@ def build_preprocess_golden(
     )
 
 
-def model_case_rows(n_val: int, n_cases: int = MODEL_CASES) -> npt.NDArray[np.intp]:
-    """Evenly spaced val rows, so the cases span the split rather than its first sequences."""
-    if n_val < n_cases:
-        raise ValueError(f"val has {n_val} sequences, {n_cases} model cases are needed")
-    return np.unique(np.linspace(0, n_val - 1, n_cases).round().astype(np.intp))
+def model_case_rows(sequence_id: npt.ArrayLike, n_cases: int = MODEL_CASES) -> npt.NDArray[np.intp]:
+    """Evenly spaced val rows, so the cases span the split rather than its first sequences.
+
+    Only asl-signs rows: golden files are the kind that get committed (web/tests/golden), and
+    ASL Citizen data and anything processed from it may not be (docs/DATA_LICENSES.md). A val
+    split without ASL Citizen rows gets the same rows as before."""
+    eligible = np.flatnonzero(citizen.source_of(sequence_id) == SOURCE_ASL_SIGNS)
+    if len(eligible) < n_cases:
+        raise ValueError(
+            f"val has {len(eligible)} asl-signs sequences, {n_cases} model cases are needed"
+        )
+    picks = np.unique(np.linspace(0, len(eligible) - 1, n_cases).round().astype(np.intp))
+    return eligible[picks]
 
 
 def build_model_golden(
@@ -1263,7 +1273,7 @@ def build_model_golden(
     model_sha256: str,
     embeddings: Float32Array | None = None,
 ) -> ModelGolden:
-    rows = model_case_rows(len(val.y))
+    rows = model_case_rows(val.sequence_id)
     return ModelGolden(
         schema_version=GOLDEN_SCHEMA_VERSION,
         description=(
@@ -1711,7 +1721,7 @@ def _export_file(
             dim=embedding_dim,
             source="the stages' output averaged over time, the vector the classifier head reads",
         )
-        rows = model_case_rows(len(val.y))
+        rows = model_case_rows(val.sequence_id)
         _, case_embeddings = model.run_with_embedding(val.X[rows])
         golden_embeddings = np.zeros((len(val.y), embedding_dim), dtype=np.float32)
         golden_embeddings[rows] = case_embeddings
