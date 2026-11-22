@@ -12,10 +12,13 @@ Date (UTC) & Commit & Evaluated on test \\
 2026-11-04 & d34f874+ & quantized v1 variants \\
 2026-11-06 & 3fbafa3+ & v2 models \\
 2026-11-15 & 3fbafa3+ & signer-dependent v1, v1 models, v2 models \\
-2026-11-16 & 36219ea+ & v1 models, v2 models, shipped ONNX file (saved logits for this paper) \\
-2026-11-17 & 36219ea+ & shipped ONNX file (saved logits for this paper) \\
+2026-11-16 & 36219ea+ & v1 models, v2 models, deployed v2 ONNX file (saved logits for this paper) \\
+2026-11-17 & 36219ea+ & deployed v2 ONNX file (saved logits for this paper) \\
+2026-11-19 & 7b61bf9 & v2 on the ASL Citizen test split (saved logits for this paper) \\
+2026-11-21 & cd6dc79+ & v3 on the ASL Citizen test split (saved logits for this paper) \\
+2026-11-21 & cd6dc79+ & v3 ONNX file (saved logits for this paper) \\
 \bottomrule
 \end{tabular}
-\caption{Every logged run of the only script that reads the test split (\cfg{results/final*/test\_access\_log.json}); + marks a working tree with uncommitted changes. The v2 models were designed after the v1 evaluation in the first row.}
+\caption{Every logged test-split access: \cfg{final\_eval.py} for the Google ISLR test split and \cfg{citizen\_eval.py} for the ASL Citizen test split, the only scripts that read them (\cfg{results/final*/} and \cfg{results/asl\_citizen/test\_access\_log.json}); + marks a working tree with uncommitted changes. The v2 models were designed after the v1 evaluation in the first row; v3 was trained and selected before either of its two accesses.}
 \label{tab:testaccess}
 \end{table}

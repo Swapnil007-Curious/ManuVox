@@ -1,4 +1,4 @@
-// Sentence translator for the Edge-Vision web demo (web/), a Cloudflare Worker.
+// Sentence translator for the ManuVox web app (web/), a Cloudflare Worker.
 //
 // POST /translate takes {glosses: [...]} (recognised signs, each from the app's vocabulary),
 // asks the provider's OpenAI-compatible chat completions for one short English sentence with a

@@ -68,6 +68,14 @@ def split_comparison(first: Path, second: Path) -> tuple[dict[str, Any], dict[st
         b = topk_correct(data["b"], data["y"], k)
         result = paired(a, b, clusters=data["clusters"])
         result["a_ci"], result["b_ci"] = stats.bootstrap_ci(a), stats.bootstrap_ci(b)
+        if data["clusters"] is not None:
+            # Each signer's own difference (b - a): with few signers, these say more than an
+            # interval from resampling them.
+            groups = data["clusters"]
+            result["diff_by_cluster"] = {
+                str(int(c)): float(b[groups == c].mean() - a[groups == c].mean())
+                for c in np.unique(groups)
+            }
         out.append(result)
     return out[0], out[1]
 

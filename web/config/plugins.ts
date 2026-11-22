@@ -70,7 +70,8 @@ async function listFiles(directory: string): Promise<string[]> {
   return nested.flat();
 }
 
-const EXCLUDED = [/\.map$/, /^sw\.js$/, /(^|\/)\.DS_Store$/];
+// The social preview image (og-image.png) is only for link previews, never needed offline.
+const EXCLUDED = [/\.map$/, /^sw\.js$/, /(^|\/)\.DS_Store$/, /^og-image\.png$/];
 
 export function serviceWorker(templatePath: string): Plugin {
   let config: ResolvedConfig;

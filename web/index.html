@@ -3,8 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Edge-Vision</title>
-    <meta name="description" content="Sign to speech in the browser: recognises 250 isolated ASL signs from your webcam on this device and builds simple sentences." />
+    <title>ManuVox</title>
+    <meta name="description" content="ManuVox: your hands, spoken aloud. Recognises 250 isolated ASL signs from your webcam on this device and builds simple sentences. Not a full ASL translator." />
+    <meta name="application-name" content="ManuVox" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ManuVox" />
+    <meta property="og:title" content="ManuVox: Your hands, spoken aloud." />
+    <meta property="og:description" content="Recognises 250 isolated ASL signs from your webcam, entirely on this device. A research demo, not a full ASL translator." />
+    <meta property="og:url" content="https://swapnil007-curious.github.io/manuvox/" />
+    <meta property="og:image" content="https://swapnil007-curious.github.io/manuvox/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="ManuVox wordmark with the tagline: Your hands, spoken aloud." />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#0F1115" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#F3F5F9" media="(prefers-color-scheme: light)" />
     <meta name="color-scheme" content="dark light" />
@@ -42,7 +53,7 @@
             <circle cx="43" cy="22" r="20" fill="#FF9E7A" />
             <circle cx="43" cy="22" r="20" fill="#F5D76E" clip-path="url(#mark-left)" />
           </svg>
-          <span class="wordmark">Edge-Vision</span>
+          <span class="wordmark">ManuVox</span>
         </div>
         <nav class="modes" role="tablist" aria-label="Mode">
           <span class="modes-indicator" aria-hidden="true"></span>
@@ -54,7 +65,7 @@
         <div class="topbar-actions">
           <button type="button" class="vocab-chip" id="vocab-chip">Knows <b class="mono" id="vocab-count">250</b> signs · see list</button>
           <button type="button" class="icon-button" id="open-settings" aria-label="Settings" aria-haspopup="dialog"><svg><use href="#i-gear" /></svg></button>
-          <button type="button" class="icon-button" id="open-about" aria-label="About Edge-Vision" aria-haspopup="dialog"><svg><use href="#i-info" /></svg></button>
+          <button type="button" class="icon-button" id="open-about" aria-label="About ManuVox" aria-haspopup="dialog"><svg><use href="#i-info" /></svg></button>
         </div>
       </header>
 
@@ -179,7 +190,7 @@
           <!-- Phones only: the top bar has no room for these, so they ride on the sheet, visible at both detents. -->
           <div class="sheet-bar">
             <button type="button" class="vocab-chip" id="sheet-vocab-chip">Knows <b class="mono">250</b> signs · see list</button>
-            <button type="button" class="icon-button small" id="sheet-about" aria-label="About Edge-Vision" aria-haspopup="dialog"><svg><use href="#i-info" /></svg></button>
+            <button type="button" class="icon-button small" id="sheet-about" aria-label="About ManuVox" aria-haspopup="dialog"><svg><use href="#i-info" /></svg></button>
           </div>
 
           <section class="view" id="view-translate" role="tabpanel" aria-labelledby="tab-translate">
@@ -408,9 +419,10 @@
     <dialog class="sheet-dialog" id="about-dialog" aria-labelledby="about-title">
       <div class="dialog-inner">
         <header class="dialog-head">
-          <h2 id="about-title" class="display">Edge-Vision</h2>
+          <h2 id="about-title" class="display">ManuVox</h2>
           <button type="button" class="icon-button" id="about-close" aria-label="Close"><svg><use href="#i-close" /></svg></button>
         </header>
+        <p class="about-tagline">Your hands, spoken aloud.</p>
         <p class="about-lede">Recognises 250 isolated ASL signs and builds simple sentences. Not a full ASL translator.</p>
         <ul class="about-list">
           <li>Video never leaves your device. Only recognised words are sent for sentence translation; without a connection, sentences are joined on the device and marked “basic”.</li>
@@ -427,7 +439,7 @@
         </dl>
         <p class="muted small" id="model-info">Model: loading…</p>
         <p class="muted small" id="offline-status">Offline use: not yet available.</p>
-        <p class="muted small">Sign videos open on <a class="link" href="https://www.signasl.org/" target="_blank" rel="noopener noreferrer">SignASL.org</a>. Source: <a class="link" href="https://github.com/Swapnil007-Curious/edge-vision" target="_blank" rel="noopener noreferrer">github.com/Swapnil007-Curious/edge-vision</a>.</p>
+        <p class="muted small">Sign videos open on <a class="link" href="https://www.signasl.org/" target="_blank" rel="noopener noreferrer">SignASL.org</a>. Source: <a class="link" href="https://github.com/Swapnil007-Curious/manuvox" target="_blank" rel="noopener noreferrer">github.com/Swapnil007-Curious/manuvox</a>.</p>
       </div>
     </dialog>
 
@@ -439,7 +451,7 @@
           <li data-step="3">Try a sign</li>
         </ol>
         <h2 class="display" id="onboarding-title">Allow the camera</h2>
-        <p id="onboarding-body">Edge-Vision reads your hands from the camera to recognise signs. Video stays on this device; nothing is recorded. Your browser will ask for permission next.</p>
+        <p id="onboarding-body">ManuVox reads your hands from the camera to recognise signs. Video stays on this device; nothing is recorded. Your browser will ask for permission next.</p>
         <div class="onboarding-actions">
           <button type="button" class="button primary large" id="onboarding-primary">Allow camera</button>
           <button type="button" class="button ghost" id="onboarding-skip">Skip</button>

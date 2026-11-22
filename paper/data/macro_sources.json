@@ -1529,6 +1529,20 @@
   "field": "agreement_mean|model=transformer|variant=int8_static_full",
   "scale": 100.0
  },
+ "q.int8.least": {
+  "text": "$-$2.7",
+  "raw": -0.026618232565776,
+  "source": "results/tables/test_quant_summary.csv",
+  "field": "derived: over every int8 variant of the v1 models, delta_vs_fp32_mean",
+  "scale": 100.0
+ },
+ "q.int8.most": {
+  "text": "$-$10.4",
+  "raw": -0.10368181258465708,
+  "source": "results/tables/test_quant_summary.csv",
+  "field": "derived: over every int8 variant of the v1 models, delta_vs_fp32_mean",
+  "scale": 100.0
+ },
  "q.hybrid.onnxfp32.p50": {
   "text": "4.10",
   "raw": 4.1044,
@@ -8533,15 +8547,15 @@
   "scale": 1.0
  },
  "lg.sharedconf": {
-  "text": "9",
-  "raw": 9.0,
+  "text": "6",
+  "raw": 6.0,
   "source": "results/live_gap_v2/summary.json",
-  "field": "derived: signs whose most frequent wrong guess is the same in both pipelines",
+  "field": "derived: signs whose most frequent wrong guess is the same in both pipelines, without ties",
   "scale": 1.0
  },
  "lg.sharedconflist": {
-  "text": "car$\\to$fast, cat$\\to$hair, dad$\\to$donkey, drink$\\to$look, go$\\to$green, no$\\to$read, sad$\\to$mitten, sleep$\\to$sleepy, yes$\\to$can",
-  "raw": "car$\\to$fast, cat$\\to$hair, dad$\\to$donkey, drink$\\to$look, go$\\to$green, no$\\to$read, sad$\\to$mitten, sleep$\\to$sleepy, yes$\\to$can",
+  "text": "dad$\\to$donkey, drink$\\to$look, go$\\to$green, no$\\to$read, sleep$\\to$sleepy, yes$\\to$can",
+  "raw": "dad$\\to$donkey, drink$\\to$look, go$\\to$green, no$\\to$read, sleep$\\to$sleepy, yes$\\to$can",
   "source": "results/live_gap_v2/summary.json",
   "field": "derived: those signs and guesses",
   "scale": 1.0
@@ -8887,6 +8901,1519 @@
   "raw": 0.2,
   "source": "results/live_gap_v2/summary.json",
   "field": "derived: k / number of clips",
+  "scale": 100.0
+ },
+ "cit.map.exact": {
+  "text": "171",
+  "raw": 171.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "coverage.exact",
+  "scale": 1.0
+ },
+ "cit.map.variant": {
+  "text": "35",
+  "raw": 35.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "coverage.variant",
+  "scale": 1.0
+ },
+ "cit.map.synonym": {
+  "text": "30",
+  "raw": 30.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "coverage.synonym",
+  "scale": 1.0
+ },
+ "cit.map.mapped": {
+  "text": "236",
+  "raw": 236.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "coverage.mapped",
+  "scale": 1.0
+ },
+ "cit.map.unmapped": {
+  "text": "14",
+  "raw": 14.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "coverage.unmapped",
+  "scale": 1.0
+ },
+ "cit.map.vocabulary": {
+  "text": "250",
+  "raw": 250.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "coverage.vocabulary",
+  "scale": 1.0
+ },
+ "cit.all.videos": {
+  "text": "83,399",
+  "raw": 83399.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "dataset.videos",
+  "scale": 1.0
+ },
+ "cit.all.glosses": {
+  "text": "2,731",
+  "raw": 2731.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "dataset.glosses",
+  "scale": 1.0
+ },
+ "cit.all.signers": {
+  "text": "52",
+  "raw": 52.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "dataset.signers",
+  "scale": 1.0
+ },
+ "cit.all.trainsigners": {
+  "text": "35",
+  "raw": 35.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "dataset.signers_by_split.train",
+  "scale": 1.0
+ },
+ "cit.all.valsigners": {
+  "text": "6",
+  "raw": 6.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "dataset.signers_by_split.val",
+  "scale": 1.0
+ },
+ "cit.all.testsigners": {
+  "text": "11",
+  "raw": 11.0,
+  "source": "paper/data/citizen_mapping.json",
+  "field": "dataset.signers_by_split.test",
+  "scale": 1.0
+ },
+ "cit.videos": {
+  "text": "3,523",
+  "raw": 3523.0,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "videos",
+  "scale": 1.0
+ },
+ "cit.signers": {
+  "text": "11",
+  "raw": 11.0,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "signers",
+  "scale": 1.0
+ },
+ "cit.signs": {
+  "text": "236",
+  "raw": 236.0,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "signs",
+  "scale": 1.0
+ },
+ "cit.excluded": {
+  "text": "13",
+  "raw": 13.0,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "excluded_videos",
+  "scale": 1.0
+ },
+ "cit.rule.exact": {
+  "text": "2,083",
+  "raw": 2083.0,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "by_rule.exact.videos",
+  "scale": 1.0
+ },
+ "cit.rule.variant": {
+  "text": "959",
+  "raw": 959.0,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "by_rule.variant.videos",
+  "scale": 1.0
+ },
+ "cit.rule.synonym": {
+  "text": "481",
+  "raw": 481.0,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "by_rule.synonym.videos",
+  "scale": 1.0
+ },
+ "cit.v2.top1": {
+  "text": "43.1",
+  "raw": 0.43145046835083734,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "top1",
+  "scale": 100.0
+ },
+ "cit.v2.top1ci": {
+  "text": "[41.5, 44.8]",
+  "raw": [
+   0.41527107578768097,
+   0.44791370990632984
+  ],
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "top1_ci.0,1",
+  "scale": 100.0
+ },
+ "cit.v2.top1cis": {
+  "text": "[39.3, 46.6]",
+  "raw": [
+   0.39269618519695637,
+   0.4655270696536629
+  ],
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "top1_ci_signer.0,1",
+  "scale": 100.0
+ },
+ "cit.v2.top3": {
+  "text": "57.6",
+  "raw": 0.5764973034345728,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "top3",
+  "scale": 100.0
+ },
+ "cit.v2.sigmin": {
+  "text": "31.4",
+  "raw": 0.313953488372093,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "top1_by_signer_min",
+  "scale": 100.0
+ },
+ "cit.v2.sigmax": {
+  "text": "50.0",
+  "raw": 0.5,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "top1_by_signer_max",
+  "scale": 100.0
+ },
+ "cit.v2.eceraw": {
+  "text": "0.147",
+  "raw": 0.14722175619993674,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "ece_raw",
+  "scale": 1.0
+ },
+ "cit.v2.ece": {
+  "text": "0.066",
+  "raw": 0.06571951420303383,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "ece",
+  "scale": 1.0
+ },
+ "cit.v2.cov": {
+  "text": "31.1",
+  "raw": 0.3113823445926767,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "coverage",
+  "scale": 100.0
+ },
+ "cit.v2.sel": {
+  "text": "79.8",
+  "raw": 0.7976298997265269,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "selective_accuracy",
+  "scale": 100.0
+ },
+ "cit.v2.exact": {
+  "text": "48.6",
+  "raw": 0.48631781084973597,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "by_rule.exact.top1",
+  "scale": 100.0
+ },
+ "cit.v2.variant": {
+  "text": "30.9",
+  "raw": 0.3086548488008342,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "by_rule.variant.top1",
+  "scale": 100.0
+ },
+ "cit.v2.synonym": {
+  "text": "43.9",
+  "raw": 0.4386694386694387,
+  "source": "results/asl_citizen/v2_test.json",
+  "field": "by_rule.synonym.top1",
+  "scale": 100.0
+ },
+ "cit.v3.top1": {
+  "text": "92.1",
+  "raw": 0.9210899801305705,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "top1",
+  "scale": 100.0
+ },
+ "cit.v3.top1ci": {
+  "text": "[91.2, 93.0]",
+  "raw": [
+   0.91172296338348,
+   0.9298892988929889
+  ],
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "top1_ci.0,1",
+  "scale": 100.0
+ },
+ "cit.v3.top1cis": {
+  "text": "[90.3, 93.9]",
+  "raw": [
+   0.9033453597426853,
+   0.9388972274875076
+  ],
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "top1_ci_signer.0,1",
+  "scale": 100.0
+ },
+ "cit.v3.top3": {
+  "text": "97.2",
+  "raw": 0.9721827987510644,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "top3",
+  "scale": 100.0
+ },
+ "cit.v3.sigmin": {
+  "text": "87.1",
+  "raw": 0.8714733542319749,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "top1_by_signer_min",
+  "scale": 100.0
+ },
+ "cit.v3.sigmax": {
+  "text": "97.5",
+  "raw": 0.9752321981424149,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "top1_by_signer_max",
+  "scale": 100.0
+ },
+ "cit.v3.eceraw": {
+  "text": "0.150",
+  "raw": 0.14997247473987413,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "ece_raw",
+  "scale": 1.0
+ },
+ "cit.v3.ece": {
+  "text": "0.066",
+  "raw": 0.06569741220085323,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "ece",
+  "scale": 1.0
+ },
+ "cit.v3.cov": {
+  "text": "88.1",
+  "raw": 0.8813511212035198,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "coverage",
+  "scale": 100.0
+ },
+ "cit.v3.sel": {
+  "text": "97.3",
+  "raw": 0.9726247987117552,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "selective_accuracy",
+  "scale": 100.0
+ },
+ "cit.v3.exact": {
+  "text": "91.1",
+  "raw": 0.9107057129140662,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "by_rule.exact.top1",
+  "scale": 100.0
+ },
+ "cit.v3.variant": {
+  "text": "93.6",
+  "raw": 0.9363920750782064,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "by_rule.variant.top1",
+  "scale": 100.0
+ },
+ "cit.v3.synonym": {
+  "text": "93.6",
+  "raw": 0.9355509355509356,
+  "source": "results/asl_citizen/v3_test.json",
+  "field": "by_rule.synonym.top1",
+  "scale": 100.0
+ },
+ "v3.train": {
+  "text": "62,959",
+  "raw": 62959.0,
+  "source": "paper/data/v3_training.json",
+  "field": "seeds.seed_2.train_sequences",
+  "scale": 1.0
+ },
+ "v3.val": {
+  "text": "13,656",
+  "raw": 13656.0,
+  "source": "paper/data/v3_training.json",
+  "field": "seeds.seed_2.val_sequences",
+  "scale": 1.0
+ },
+ "v3.cit.train": {
+  "text": "4,242",
+  "raw": 4242.0,
+  "source": "paper/data/v3_training.json",
+  "field": "split_counts.train.asl-citizen",
+  "scale": 1.0
+ },
+ "v3.cit.val": {
+  "text": "1,083",
+  "raw": 1083.0,
+  "source": "paper/data/v3_training.json",
+  "field": "split_counts.val.asl-citizen",
+  "scale": 1.0
+ },
+ "v3.trainsigners": {
+  "text": "49",
+  "raw": 49.0,
+  "source": "paper/data/v3_training.json",
+  "field": "split_signers.train",
+  "scale": 1.0
+ },
+ "v3.valsigners": {
+  "text": "8",
+  "raw": 8.0,
+  "source": "paper/data/v3_training.json",
+  "field": "split_signers.val",
+  "scale": 1.0
+ },
+ "v3.valsigners.ks": {
+  "text": "3",
+  "raw": 3.0,
+  "source": "paper/data/v3_training.json",
+  "field": "split_signers_by_source.val.asl-signs",
+  "scale": 1.0
+ },
+ "v3.valsigners.cit": {
+  "text": "5",
+  "raw": 5.0,
+  "source": "paper/data/v3_training.json",
+  "field": "split_signers_by_source.val.asl-citizen",
+  "scale": 1.0
+ },
+ "v3.seed": {
+  "text": "2",
+  "raw": 2.0,
+  "source": "paper/data/v3_training.json",
+  "field": "derived: chosen seed",
+  "scale": 1.0
+ },
+ "v3.val.top1": {
+  "text": "70.2",
+  "raw": 0.7019625073227885,
+  "source": "paper/data/v3_training.json",
+  "field": "seeds.seed_2.best_val_top1",
+  "scale": 100.0
+ },
+ "v3.val.ks": {
+  "text": "68.0",
+  "raw": 0.6800286327845383,
+  "source": "paper/data/v3_training.json",
+  "field": "seeds.seed_2.best_val_top1_by_source.asl-signs",
+  "scale": 100.0
+ },
+ "v3.val.cit": {
+  "text": "95.7",
+  "raw": 0.9566020313942751,
+  "source": "paper/data/v3_training.json",
+  "field": "seeds.seed_2.best_val_top1_by_source.asl-citizen",
+  "scale": 100.0
+ },
+ "v3.selmin": {
+  "text": "81.5",
+  "raw": 0.8148120240950742,
+  "source": "paper/data/v3_training.json",
+  "field": "derived: lowest best_val_select over seeds",
+  "scale": 100.0
+ },
+ "v3.selmax": {
+  "text": "81.8",
+  "raw": 0.8183153320894068,
+  "source": "paper/data/v3_training.json",
+  "field": "derived: highest best_val_select over seeds",
+  "scale": 100.0
+ },
+ "v3.seeds": {
+  "text": "3",
+  "raw": 3.0,
+  "source": "paper/data/v3_training.json",
+  "field": "derived: number of seeds",
+  "scale": 1.0
+ },
+ "v3.trainmin": {
+  "text": "42",
+  "raw": 41.56201955261667,
+  "source": "paper/data/v3_training.json",
+  "field": "derived: mean total_train_seconds / 60 over seeds",
+  "scale": 1.0
+ },
+ "v3.gpu": {
+  "text": "Tesla T4",
+  "raw": "Tesla T4",
+  "source": "paper/data/v3_training.json",
+  "field": "seeds.seed_2.device_name",
+  "scale": 1.0
+ },
+ "v3.commit": {
+  "text": "cd6dc79",
+  "raw": "cd6dc790dafcc8d113f38d594325c75a2dbd426e",
+  "source": "paper/data/v3_training.json",
+  "field": "code_commit",
+  "scale": 1.0
+ },
+ "v3c.ks.n": {
+  "text": "16,242",
+  "raw": 16242.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.items",
+  "scale": 1.0
+ },
+ "v3c.ks.a": {
+  "text": "68.4",
+  "raw": 0.6842137667774905,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.a",
+  "scale": 100.0
+ },
+ "v3c.ks.b": {
+  "text": "69.4",
+  "raw": 0.694311045437754,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.b",
+  "scale": 100.0
+ },
+ "v3c.ks.aci": {
+  "text": "[67.7, 69.1]",
+  "raw": [
+   0.6770702499692157,
+   0.6914788819110947
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.a_ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.ks.bci": {
+  "text": "[68.7, 70.1]",
+  "raw": [
+   0.6872306366211057,
+   0.7014530230267209
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.b_ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.ks.diff": {
+  "text": "+1.0",
+  "raw": 0.010097278660263515,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.diff",
+  "scale": 100.0
+ },
+ "v3c.ks.ci": {
+  "text": "[0.5, 1.5]",
+  "raw": [
+   0.004863933013175717,
+   0.015207486762713952
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.ks.better": {
+  "text": "1,010",
+  "raw": 1010.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.better",
+  "scale": 1.0
+ },
+ "v3c.ks.worse": {
+  "text": "846",
+  "raw": 846.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.worse",
+  "scale": 1.0
+ },
+ "v3c.ks.p": {
+  "text": "$<$0.001",
+  "raw": 0.00047999520004799953,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.p_holm",
+  "scale": 1.0
+ },
+ "v3c.ks.sig": {
+  "text": "significant",
+  "raw": 0.00047999520004799953,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.p_holm",
+  "scale": 1.0
+ },
+ "v3c.ks.cci": {
+  "text": "[0.8, 1.3]",
+  "raw": [
+   0.008161388585550895,
+   0.01266361604767479
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.asl-signs test.ci_cluster.0,1",
+  "scale": 100.0
+ },
+ "v3c.ks.cmin": {
+  "text": "+0.8",
+  "raw": 0.007866728366496933,
+  "source": "results/v2_vs_v3.json",
+  "field": "derived: per-signer differences (top1.asl-signs test.diff_by_cluster)",
+  "scale": 100.0
+ },
+ "v3c.ks.cmax": {
+  "text": "+1.4",
+  "raw": 0.013787340714434881,
+  "source": "results/v2_vs_v3.json",
+  "field": "derived: per-signer differences (top1.asl-signs test.diff_by_cluster)",
+  "scale": 100.0
+ },
+ "v3c.ks.cpos": {
+  "text": "4",
+  "raw": 4.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "derived: per-signer differences (top1.asl-signs test.diff_by_cluster)",
+  "scale": 1.0
+ },
+ "v3c.ks.cn": {
+  "text": "4",
+  "raw": 4.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "derived: per-signer differences (top1.asl-signs test.diff_by_cluster)",
+  "scale": 1.0
+ },
+ "v3c.ks.a3": {
+  "text": "82.3",
+  "raw": 0.8232360546730698,
+  "source": "results/v2_vs_v3.json",
+  "field": "top3.asl-signs test.a",
+  "scale": 100.0
+ },
+ "v3c.ks.b3": {
+  "text": "83.4",
+  "raw": 0.8339490210565201,
+  "source": "results/v2_vs_v3.json",
+  "field": "top3.asl-signs test.b",
+  "scale": 100.0
+ },
+ "v3c.cit.n": {
+  "text": "3,523",
+  "raw": 3523.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.items",
+  "scale": 1.0
+ },
+ "v3c.cit.a": {
+  "text": "43.1",
+  "raw": 0.43145046835083734,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.a",
+  "scale": 100.0
+ },
+ "v3c.cit.b": {
+  "text": "92.1",
+  "raw": 0.9210899801305705,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.b",
+  "scale": 100.0
+ },
+ "v3c.cit.aci": {
+  "text": "[41.5, 44.8]",
+  "raw": [
+   0.41527107578768097,
+   0.44791370990632984
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.a_ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.cit.bci": {
+  "text": "[91.2, 93.0]",
+  "raw": [
+   0.91172296338348,
+   0.9298892988929889
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.b_ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.cit.diff": {
+  "text": "+49.0",
+  "raw": 0.4896395117797332,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.diff",
+  "scale": 100.0
+ },
+ "v3c.cit.ci": {
+  "text": "[47.3, 50.7]",
+  "raw": [
+   0.47260857223956854,
+   0.5066704513198979
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.cit.better": {
+  "text": "1,758",
+  "raw": 1758.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.better",
+  "scale": 1.0
+ },
+ "v3c.cit.worse": {
+  "text": "33",
+  "raw": 33.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.worse",
+  "scale": 1.0
+ },
+ "v3c.cit.p": {
+  "text": "$<$0.001",
+  "raw": 3.999960000399996e-05,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.p_holm",
+  "scale": 1.0
+ },
+ "v3c.cit.sig": {
+  "text": "significant",
+  "raw": 3.999960000399996e-05,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.p_holm",
+  "scale": 1.0
+ },
+ "v3c.cit.cci": {
+  "text": "[45.4, 53.4]",
+  "raw": [
+   0.4538126386147369,
+   0.5341896843735988
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.ASL Citizen test.ci_cluster.0,1",
+  "scale": 100.0
+ },
+ "v3c.cit.cmin": {
+  "text": "+42.4",
+  "raw": 0.42394822006472493,
+  "source": "results/v2_vs_v3.json",
+  "field": "derived: per-signer differences (top1.ASL Citizen test.diff_by_cluster)",
+  "scale": 100.0
+ },
+ "v3c.cit.cmax": {
+  "text": "+65.6",
+  "raw": 0.6563467492260062,
+  "source": "results/v2_vs_v3.json",
+  "field": "derived: per-signer differences (top1.ASL Citizen test.diff_by_cluster)",
+  "scale": 100.0
+ },
+ "v3c.cit.cpos": {
+  "text": "11",
+  "raw": 11.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "derived: per-signer differences (top1.ASL Citizen test.diff_by_cluster)",
+  "scale": 1.0
+ },
+ "v3c.cit.cn": {
+  "text": "11",
+  "raw": 11.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "derived: per-signer differences (top1.ASL Citizen test.diff_by_cluster)",
+  "scale": 1.0
+ },
+ "v3c.cit.a3": {
+  "text": "57.6",
+  "raw": 0.5764973034345728,
+  "source": "results/v2_vs_v3.json",
+  "field": "top3.ASL Citizen test.a",
+  "scale": 100.0
+ },
+ "v3c.cit.b3": {
+  "text": "97.2",
+  "raw": 0.9721827987510644,
+  "source": "results/v2_vs_v3.json",
+  "field": "top3.ASL Citizen test.b",
+  "scale": 100.0
+ },
+ "v3c.web.n": {
+  "text": "50",
+  "raw": 50.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.items",
+  "scale": 1.0
+ },
+ "v3c.web.a": {
+  "text": "34.0",
+  "raw": 0.34,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.a",
+  "scale": 100.0
+ },
+ "v3c.web.b": {
+  "text": "44.7",
+  "raw": 0.44666666666666666,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.b",
+  "scale": 100.0
+ },
+ "v3c.web.aci": {
+  "text": "[21.3, 46.7]",
+  "raw": [
+   0.21333333333333335,
+   0.4666666666666666
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.a_ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.web.bci": {
+  "text": "[31.3, 57.3]",
+  "raw": [
+   0.3133333333333333,
+   0.5733333333333333
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.b_ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.web.diff": {
+  "text": "+10.7",
+  "raw": 0.10666666666666667,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.diff",
+  "scale": 100.0
+ },
+ "v3c.web.ci": {
+  "text": "[$-$1.3, 23.3]",
+  "raw": [
+   -0.013333333333333338,
+   0.2333333333333333
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.web.better": {
+  "text": "13",
+  "raw": 13.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.better",
+  "scale": 1.0
+ },
+ "v3c.web.worse": {
+  "text": "6",
+  "raw": 6.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.worse",
+  "scale": 1.0
+ },
+ "v3c.web.p": {
+  "text": "0.238",
+  "raw": 0.237518310546875,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.p_holm",
+  "scale": 1.0
+ },
+ "v3c.web.sig": {
+  "text": "not significant",
+  "raw": 0.237518310546875,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.p_holm",
+  "scale": 1.0
+ },
+ "v3c.web.cci": {
+  "text": "[$-$1.3, 23.3]",
+  "raw": [
+   -0.01333333333333333,
+   0.23333333333333336
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, browser.ci_cluster.0,1",
+  "scale": 100.0
+ },
+ "v3c.web.a3": {
+  "text": "51.3",
+  "raw": 0.5133333333333333,
+  "source": "results/v2_vs_v3.json",
+  "field": "top3.test_clips_v2, browser.a",
+  "scale": 100.0
+ },
+ "v3c.web.b3": {
+  "text": "56.0",
+  "raw": 0.56,
+  "source": "results/v2_vs_v3.json",
+  "field": "top3.test_clips_v2, browser.b",
+  "scale": 100.0
+ },
+ "v3c.py.n": {
+  "text": "50",
+  "raw": 50.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.items",
+  "scale": 1.0
+ },
+ "v3c.py.a": {
+  "text": "40.0",
+  "raw": 0.4,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.a",
+  "scale": 100.0
+ },
+ "v3c.py.b": {
+  "text": "46.0",
+  "raw": 0.46,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.b",
+  "scale": 100.0
+ },
+ "v3c.py.aci": {
+  "text": "[26.0, 54.0]",
+  "raw": [
+   0.26,
+   0.54
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.a_ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.py.bci": {
+  "text": "[32.0, 60.0]",
+  "raw": [
+   0.32,
+   0.6
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.b_ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.py.diff": {
+  "text": "+6.0",
+  "raw": 0.06,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.diff",
+  "scale": 100.0
+ },
+ "v3c.py.ci": {
+  "text": "[$-$6.0, 18.0]",
+  "raw": [
+   -0.06,
+   0.18
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.ci.0,1",
+  "scale": 100.0
+ },
+ "v3c.py.better": {
+  "text": "6",
+  "raw": 6.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.better",
+  "scale": 1.0
+ },
+ "v3c.py.worse": {
+  "text": "3",
+  "raw": 3.0,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.worse",
+  "scale": 1.0
+ },
+ "v3c.py.p": {
+  "text": "0.508",
+  "raw": 0.5078125,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.p_holm",
+  "scale": 1.0
+ },
+ "v3c.py.sig": {
+  "text": "not significant",
+  "raw": 0.5078125,
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.p_holm",
+  "scale": 1.0
+ },
+ "v3c.py.cci": {
+  "text": "[$-$4.0, 18.0]",
+  "raw": [
+   -0.04,
+   0.18
+  ],
+  "source": "results/v2_vs_v3.json",
+  "field": "top1.test_clips_v2, Python.ci_cluster.0,1",
+  "scale": 100.0
+ },
+ "v3c.py.a3": {
+  "text": "56.0",
+  "raw": 0.56,
+  "source": "results/v2_vs_v3.json",
+  "field": "top3.test_clips_v2, Python.a",
+  "scale": 100.0
+ },
+ "v3c.py.b3": {
+  "text": "68.0",
+  "raw": 0.68,
+  "source": "results/v2_vs_v3.json",
+  "field": "top3.test_clips_v2, Python.b",
+  "scale": 100.0
+ },
+ "cit.v2.drop": {
+  "text": "25.3",
+  "raw": 0.2527632984266531,
+  "source": "results/v2_vs_v3.json + results/asl_citizen/v2_test.json",
+  "field": "derived: v2 top-1 on the Google ISLR test split minus v2 top-1 on ASL Citizen test",
+  "scale": 100.0
+ },
+ "lat.v2.p50": {
+  "text": "14.3",
+  "raw": 14.28,
+  "source": "results/perf/v2_vs_v3_classifier_latency.json",
+  "field": "models.v2.configs.wasmx1.median_p50_ms",
+  "scale": 1.0
+ },
+ "lat.v2.p95": {
+  "text": "21.2",
+  "raw": 21.25,
+  "source": "results/perf/v2_vs_v3_classifier_latency.json",
+  "field": "models.v2.configs.wasmx1.median_p95_ms",
+  "scale": 1.0
+ },
+ "lat.v3.p50": {
+  "text": "13.3",
+  "raw": 13.26,
+  "source": "results/perf/v2_vs_v3_classifier_latency.json",
+  "field": "models.v3.configs.wasmx1.median_p50_ms",
+  "scale": 1.0
+ },
+ "lat.v3.p95": {
+  "text": "31.3",
+  "raw": 31.31,
+  "source": "results/perf/v2_vs_v3_classifier_latency.json",
+  "field": "models.v3.configs.wasmx1.median_p95_ms",
+  "scale": 1.0
+ },
+ "lat.v3.mb": {
+  "text": "6.9",
+  "raw": 6.929778,
+  "source": "results/perf/v2_vs_v3_classifier_latency.json",
+  "field": "derived: models.v3.bytes / 1e6",
+  "scale": 1.0
+ },
+ "lat.p95lo": {
+  "text": "20.7",
+  "raw": 20.69,
+  "source": "results/perf/v2_vs_v3_classifier_latency.json",
+  "field": "derived: lowest wasm x1 p95 over all rounds",
+  "scale": 1.0
+ },
+ "lat.p95hi": {
+  "text": "33.9",
+  "raw": 33.88,
+  "source": "results/perf/v2_vs_v3_classifier_latency.json",
+  "field": "derived: highest wasm x1 p95 over all rounds",
+  "scale": 1.0
+ },
+ "td.v2.n": {
+  "text": "25",
+  "raw": 25.0,
+  "source": "results/teach_dex.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.items",
+  "scale": 1.0
+ },
+ "td.v2.model": {
+  "text": "31",
+  "raw": 0.30666666666666664,
+  "source": "results/teach_dex.json",
+  "field": "top1.model",
+  "scale": 100.0
+ },
+ "td.v2.modelci": {
+  "text": "[15, 48]",
+  "raw": [
+   0.14666666666666667,
+   0.48
+  ],
+  "source": "results/teach_dex.json",
+  "field": "top1.model_ci.0,1",
+  "scale": 100.0
+ },
+ "td.v2.teach": {
+  "text": "47",
+  "raw": 0.46666666666666656,
+  "source": "results/teach_dex.json",
+  "field": "top1.teach_dex",
+  "scale": 100.0
+ },
+ "td.v2.teachci": {
+  "text": "[29, 64]",
+  "raw": [
+   0.29333333333333333,
+   0.64
+  ],
+  "source": "results/teach_dex.json",
+  "field": "top1.teach_dex_ci.0,1",
+  "scale": 100.0
+ },
+ "td.v2.diff": {
+  "text": "+16",
+  "raw": 0.16,
+  "source": "results/teach_dex.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.diff",
+  "scale": 100.0
+ },
+ "td.v2.ci": {
+  "text": "[5, 28]",
+  "raw": [
+   0.05333333333333334,
+   0.28
+  ],
+  "source": "results/teach_dex.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.ci.0,1",
+  "scale": 100.0
+ },
+ "td.v2.better": {
+  "text": "7",
+  "raw": 7.0,
+  "source": "results/teach_dex.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.better",
+  "scale": 1.0
+ },
+ "td.v2.worse": {
+  "text": "0",
+  "raw": 0.0,
+  "source": "results/teach_dex.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.worse",
+  "scale": 1.0
+ },
+ "td.v2.p": {
+  "text": "0.031",
+  "raw": 0.03125,
+  "source": "results/teach_dex.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.p_holm",
+  "scale": 1.0
+ },
+ "td.v2.sig": {
+  "text": "significant",
+  "raw": 0.03125,
+  "source": "results/teach_dex.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.p_holm",
+  "scale": 1.0
+ },
+ "td.v2.harm": {
+  "text": "+0",
+  "raw": 0.0,
+  "source": "results/teach_dex.json",
+  "field": "comparisons.13 taught: the 12 untaught signs vs the model alone.diff",
+  "scale": 100.0
+ },
+ "td.v2.model3": {
+  "text": "45",
+  "raw": 0.4533333333333333,
+  "source": "results/teach_dex.json",
+  "field": "top3.model",
+  "scale": 100.0
+ },
+ "td.v2.teach3": {
+  "text": "56",
+  "raw": 0.56,
+  "source": "results/teach_dex.json",
+  "field": "top3.teach_dex",
+  "scale": 100.0
+ },
+ "td.v2.runs": {
+  "text": "3",
+  "raw": 3.0,
+  "source": "results/teach_dex.json",
+  "field": "runs",
+  "scale": 1.0
+ },
+ "td.v2.half": {
+  "text": "13",
+  "raw": 13.0,
+  "source": "results/teach_dex.json",
+  "field": "derived: len(half_taught_signs)",
+  "scale": 1.0
+ },
+ "td.v2.exmin": {
+  "text": "63",
+  "raw": 63.0,
+  "source": "results/teach_dex.json",
+  "field": "derived: min(examples_recorded_per_run)",
+  "scale": 1.0
+ },
+ "td.v2.exmax": {
+  "text": "66",
+  "raw": 66.0,
+  "source": "results/teach_dex.json",
+  "field": "derived: max(examples_recorded_per_run)",
+  "scale": 1.0
+ },
+ "td.v2.noexmin": {
+  "text": "2",
+  "raw": 2.0,
+  "source": "results/teach_dex.json",
+  "field": "derived: number of signs without examples, per run",
+  "scale": 1.0
+ },
+ "td.v2.noexmax": {
+  "text": "4",
+  "raw": 4.0,
+  "source": "results/teach_dex.json",
+  "field": "derived: number of signs without examples, per run",
+  "scale": 1.0
+ },
+ "td.v2.segmin": {
+  "text": "26",
+  "raw": 26.0,
+  "source": "results/teach_dex.json",
+  "field": "derived: min(segments_per_run)",
+  "scale": 1.0
+ },
+ "td.v2.segmax": {
+  "text": "30",
+  "raw": 30.0,
+  "source": "results/teach_dex.json",
+  "field": "derived: max(segments_per_run)",
+  "scale": 1.0
+ },
+ "td.v2.gainmin": {
+  "text": "+12",
+  "raw": 0.12,
+  "source": "results/teach_dex/web",
+  "field": "derived: per-run mean of personalized.top1 - base.top1",
+  "scale": 100.0
+ },
+ "td.v2.gainmax": {
+  "text": "+20",
+  "raw": 0.2,
+  "source": "results/teach_dex/web",
+  "field": "derived: per-run mean of personalized.top1 - base.top1",
+  "scale": 100.0
+ },
+ "td.v2.weight": {
+  "text": "6.25",
+  "raw": 6.25,
+  "source": "results/teach_dex/calibration.json",
+  "field": "weight",
+  "scale": 1.0
+ },
+ "td.v2.offset": {
+  "text": "0.35",
+  "raw": 0.35,
+  "source": "results/teach_dex/calibration.json",
+  "field": "offset",
+  "scale": 1.0
+ },
+ "td.v2.valbefore": {
+  "text": "66.5",
+  "raw": 0.66450287208705,
+  "source": "results/teach_dex/calibration.json",
+  "field": "simulation.top1_taught_before",
+  "scale": 100.0
+ },
+ "td.v2.valafter": {
+  "text": "71.3",
+  "raw": 0.7134918040442721,
+  "source": "results/teach_dex/calibration.json",
+  "field": "simulation.top1_taught_after",
+  "scale": 100.0
+ },
+ "td.v2.valuntaught0": {
+  "text": "67.7",
+  "raw": 0.6770757997145044,
+  "source": "results/teach_dex/calibration.json",
+  "field": "simulation.top1_untaught_before",
+  "scale": 100.0
+ },
+ "td.v2.valuntaught1": {
+  "text": "67.6",
+  "raw": 0.6762935333348796,
+  "source": "results/teach_dex/calibration.json",
+  "field": "simulation.top1_untaught_after",
+  "scale": 100.0
+ },
+ "td.v3.n": {
+  "text": "25",
+  "raw": 25.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.items",
+  "scale": 1.0
+ },
+ "td.v3.model": {
+  "text": "23",
+  "raw": 0.22666666666666666,
+  "source": "results/teach_dex_v3.json",
+  "field": "top1.model",
+  "scale": 100.0
+ },
+ "td.v3.modelci": {
+  "text": "[9, 37]",
+  "raw": [
+   0.09333333333333334,
+   0.3733333333333333
+  ],
+  "source": "results/teach_dex_v3.json",
+  "field": "top1.model_ci.0,1",
+  "scale": 100.0
+ },
+ "td.v3.teach": {
+  "text": "28",
+  "raw": 0.27999999999999997,
+  "source": "results/teach_dex_v3.json",
+  "field": "top1.teach_dex",
+  "scale": 100.0
+ },
+ "td.v3.teachci": {
+  "text": "[13, 44]",
+  "raw": [
+   0.13333333333333333,
+   0.43999999999999995
+  ],
+  "source": "results/teach_dex_v3.json",
+  "field": "top1.teach_dex_ci.0,1",
+  "scale": 100.0
+ },
+ "td.v3.diff": {
+  "text": "+5",
+  "raw": 0.05333333333333333,
+  "source": "results/teach_dex_v3.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.diff",
+  "scale": 100.0
+ },
+ "td.v3.ci": {
+  "text": "[0, 12]",
+  "raw": [
+   0.0,
+   0.12
+  ],
+  "source": "results/teach_dex_v3.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.ci.0,1",
+  "scale": 100.0
+ },
+ "td.v3.better": {
+  "text": "3",
+  "raw": 3.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.better",
+  "scale": 1.0
+ },
+ "td.v3.worse": {
+  "text": "0",
+  "raw": 0.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.worse",
+  "scale": 1.0
+ },
+ "td.v3.p": {
+  "text": "0.500",
+  "raw": 0.5,
+  "source": "results/teach_dex_v3.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.p_holm",
+  "scale": 1.0
+ },
+ "td.v3.sig": {
+  "text": "not significant",
+  "raw": 0.5,
+  "source": "results/teach_dex_v3.json",
+  "field": "comparisons.all 25 signs taught vs the model alone.p_holm",
+  "scale": 1.0
+ },
+ "td.v3.harm": {
+  "text": "+0",
+  "raw": 0.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "comparisons.13 taught: the 12 untaught signs vs the model alone.diff",
+  "scale": 100.0
+ },
+ "td.v3.model3": {
+  "text": "39",
+  "raw": 0.38666666666666655,
+  "source": "results/teach_dex_v3.json",
+  "field": "top3.model",
+  "scale": 100.0
+ },
+ "td.v3.teach3": {
+  "text": "43",
+  "raw": 0.42666666666666664,
+  "source": "results/teach_dex_v3.json",
+  "field": "top3.teach_dex",
+  "scale": 100.0
+ },
+ "td.v3.runs": {
+  "text": "3",
+  "raw": 3.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "runs",
+  "scale": 1.0
+ },
+ "td.v3.half": {
+  "text": "13",
+  "raw": 13.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "derived: len(half_taught_signs)",
+  "scale": 1.0
+ },
+ "td.v3.exmin": {
+  "text": "59",
+  "raw": 59.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "derived: min(examples_recorded_per_run)",
+  "scale": 1.0
+ },
+ "td.v3.exmax": {
+  "text": "64",
+  "raw": 64.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "derived: max(examples_recorded_per_run)",
+  "scale": 1.0
+ },
+ "td.v3.noexmin": {
+  "text": "2",
+  "raw": 2.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "derived: number of signs without examples, per run",
+  "scale": 1.0
+ },
+ "td.v3.noexmax": {
+  "text": "4",
+  "raw": 4.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "derived: number of signs without examples, per run",
+  "scale": 1.0
+ },
+ "td.v3.segmin": {
+  "text": "15",
+  "raw": 15.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "derived: min(segments_per_run)",
+  "scale": 1.0
+ },
+ "td.v3.segmax": {
+  "text": "28",
+  "raw": 28.0,
+  "source": "results/teach_dex_v3.json",
+  "field": "derived: max(segments_per_run)",
+  "scale": 1.0
+ },
+ "td.v3.gainmin": {
+  "text": "+4",
+  "raw": 0.04,
+  "source": "results/teach_dex_v3/web",
+  "field": "derived: per-run mean of personalized.top1 - base.top1",
+  "scale": 100.0
+ },
+ "td.v3.gainmax": {
+  "text": "+8",
+  "raw": 0.08,
+  "source": "results/teach_dex_v3/web",
+  "field": "derived: per-run mean of personalized.top1 - base.top1",
+  "scale": 100.0
+ },
+ "td.v3.weight": {
+  "text": "5.00",
+  "raw": 5.0,
+  "source": "results/teach_dex_v3/calibration.json",
+  "field": "weight",
+  "scale": 1.0
+ },
+ "td.v3.offset": {
+  "text": "0.36",
+  "raw": 0.36,
+  "source": "results/teach_dex_v3/calibration.json",
+  "field": "offset",
+  "scale": 1.0
+ },
+ "td.v3.valbefore": {
+  "text": "66.9",
+  "raw": 0.668565824499136,
+  "source": "results/teach_dex_v3/calibration.json",
+  "field": "simulation.top1_taught_before",
+  "scale": 100.0
+ },
+ "td.v3.valafter": {
+  "text": "70.9",
+  "raw": 0.7091486480175594,
+  "source": "results/teach_dex_v3/calibration.json",
+  "field": "simulation.top1_taught_after",
+  "scale": 100.0
+ },
+ "td.v3.valuntaught0": {
+  "text": "68.1",
+  "raw": 0.6808690536685341,
+  "source": "results/teach_dex_v3/calibration.json",
+  "field": "simulation.top1_untaught_before",
+  "scale": 100.0
+ },
+ "td.v3.valuntaught1": {
+  "text": "68.0",
+  "raw": 0.6801605860039682,
+  "source": "results/teach_dex_v3/calibration.json",
+  "field": "simulation.top1_untaught_after",
+  "scale": 100.0
+ },
+ "td.examples": {
+  "text": "3",
+  "raw": 3.0,
+  "source": "results/teach_dex/calibration.json",
+  "field": "examples_per_sign",
+  "scale": 1.0
+ },
+ "td.draws": {
+  "text": "120",
+  "raw": 120.0,
+  "source": "results/teach_dex_v3/calibration.json",
+  "field": "simulation.draws",
+  "scale": 1.0
+ },
+ "td.leadin": {
+  "text": "3.5",
+  "raw": 3.5,
+  "source": "results/teach_dex/web/run1.outcomes.json",
+  "field": "lead_in_s",
+  "scale": 1.0
+ },
+ "td.embdim": {
+  "text": "256",
+  "raw": 256.0,
+  "source": "web/public/model/meta.json",
+  "field": "embedding.dim",
+  "scale": 1.0
+ },
+ "lg3.web.v2.seg": {
+  "text": "41",
+  "raw": 0.4050343729040912,
+  "source": "results/live_gap_v3/summary.json",
+  "field": "rows[pipeline=web;config=v2_final].segment_top1",
+  "scale": 100.0
+ },
+ "lg3.web.v3.seg": {
+  "text": "54",
+  "raw": 0.5360099595393714,
+  "source": "results/live_gap_v3/summary.json",
+  "field": "rows[pipeline=web;config=v3_final].segment_top1",
+  "scale": 100.0
+ },
+ "lg3.py.v2.seg": {
+  "text": "43",
+  "raw": 0.42857142857142855,
+  "source": "results/live_gap_v3/summary.json",
+  "field": "rows[pipeline=python;config=v2_final].segment_top1",
+  "scale": 100.0
+ },
+ "lg3.py.v3.seg": {
+  "text": "53",
+  "raw": 0.5324675324675324,
+  "source": "results/live_gap_v3/summary.json",
+  "field": "rows[pipeline=python;config=v3_final].segment_top1",
+  "scale": 100.0
+ },
+ "lg3.web.v2.take2": {
+  "text": "32",
+  "raw": 0.32,
+  "source": "results/live_gap_v3/web",
+  "field": "derived: mean over 3 runs of clip top-1 on the take-2 clips (v2_final)",
+  "scale": 100.0
+ },
+ "lg3.web.v3.take2": {
+  "text": "39",
+  "raw": 0.38666666666666666,
+  "source": "results/live_gap_v3/web",
+  "field": "derived: mean over 3 runs of clip top-1 on the take-2 clips (v3_final)",
   "scale": 100.0
  }
 }

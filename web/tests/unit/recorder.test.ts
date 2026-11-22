@@ -138,7 +138,7 @@ describe("recordings file", () => {
   });
 
   it("names the download with the local time", () => {
-    expect(recordingsFileName(new Date(2026, 10, 7, 9, 5, 3))).toBe("edge-vision-recordings-20261107-090503.json");
+    expect(recordingsFileName(new Date(2026, 10, 7, 9, 5, 3))).toBe("manuvox-recordings-20261107-090503.json");
   });
 
   it("packs matrices row by row", () => {

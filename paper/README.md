@@ -1,7 +1,7 @@
-# Edge-Vision paper
+# ManuVox paper
 
 LaTeX preprint (ACL two-column style, `acl.sty` and `acl_natbib.bst` from
-https://github.com/acl-org/acl-style-files) on the live gap of the Edge-Vision sign recognizer.
+https://github.com/acl-org/acl-style-files) on the live gap of the ManuVox sign recognizer (research codename Edge-Vision).
 Every number in the text is a macro generated from the result files; nothing is typed by hand.
 
 ## Build
@@ -35,6 +35,11 @@ pdflatex, bibtex, pdflatex twice) works as well. For Overleaf, upload `paper/` w
 | Tracking fps (HUD on/off, CPU fallback) | `web/scripts/benchmark-tracking.mjs` | `results/perf/tracking_*.json` |
 | Live gap v2 (50 clips) | `scripts/live_gap.py python`, `web/scripts/live-gap.mjs --per-clip`, `scripts/live_gap.py report` (with `--configs experiments/live_gap_v2.json`) | `results/live_gap_v2/summary.json`, `results/live_gap_v2.csv`, `.md` |
 | Live gap pilot (10 clips) | the same, with `experiments/live_gap.json` | `results/live_gap.csv` |
+| ASL Citizen test (v2 cross-dataset, v3), label mapping | `scripts/citizen_eval.py` (once per model), `src/edgevision/data/citizen_labels.py` | `results/asl_citizen/{v2,v3}_test.json`, `data/citizen_mapping.json` (counts snapshot) |
+| v3 training and selection | `kaggle/train_v3.ipynb` (bundle in the git-ignored `artifacts/v3/`) | `data/v3_training.json` (counts snapshot) |
+| v2 vs v3 on the three test sets | `scripts/compare_v3.py` | `results/v2_vs_v3.json` |
+| v2 vs v3 browser latency | `web/scripts/benchmark.mjs`, `scripts/compare_latency.py` | `results/perf/v2_vs_v3_classifier_latency.json` |
+| Teach Dex (personalization, separate) | `scripts/calibrate_teach.py`, `web/tests/e2e/teach-eval.spec.ts`, `scripts/teach_report.py` | `results/teach_dex.json`, `results/teach_dex_v3.json`, `results/teach_dex*/calibration.json` |
 
 The live evaluation, end to end (clips are personal recordings and are not in git):
 
@@ -55,27 +60,25 @@ cd ..; python scripts\live_gap.py report --configs experiments\live_gap_v2.json 
 | `main.tex` | preamble, title, section order |
 | `sections/*.tex` | the text |
 | `tables/` | generated: one file per table and `numbers.tex` (the `\V{key}` macros) |
-| `figures/` | generated vector figures (Figure 1 is TikZ in `sections/system.tex`) |
+| `figures/` | generated vector figures (the live-pipeline figure is TikZ in `sections/livegap.tex`) |
 | `data/` | `macro_sources.json` (key -> printed text, raw value, source file, field, scale), `reference_verification.json`, and snapshots of git-ignored inputs (dataset statistics, live-clip metadata, the skeleton frame's landmarks) |
 | `references.bib` | bibliography; every entry checked against the ACL Anthology, arXiv, Crossref or the official proceedings page |
 | `CLAIMS.md` | the claims audit |
 | `REVIEW.md` | an independent review of the draft and how each point was handled |
 
-## Author TODOs
+## Open items before submission
 
-- Name, surname and e-mail in `main.tex` (`\surname{TODO}`, `\email{TODO}`).
-- The AI assistance disclosure in the acknowledgments (`TODO-AUTHOR-WRITES-THIS`).
-- State your ASL experience in the Limitations (`\authortodo{...}`, printed in red).
-- State how the 25 live signs were chosen and where the sign forms came from, and the recording
-  setup (distance, lighting, rest pose), in Section 6.2 (`\authortodo{...}`).
-- Paste Kaggle's official citation block for the competition into `kaggle2023islr` (the author list
-  could not be verified automatically; the page renders client-side) and confirm the data licence
-  sentence on the competition's Data tab.
-- Pick a title (options below).
-
-Title options (the review judged "Closing the Live Gap" an overclaim, since most of the gap remains;
-option 1 is in `main.tex`):
-
-1. Where Live Sign Recognition Breaks: Auditing the Train--Serve Gap of a Landmark-Based ASL Recognizer on a Low-Power Laptop
-2. From Benchmark to Webcam: Measuring the Train--Serve Gap in Landmark-Based Sign Recognition
-3. One Silent Fault: Hand-Slot Assignment and the Live Gap of an In-Browser Sign Recognizer
+- The Kaggle competition's citation block and data licence could not be read automatically (the
+  pages render client-side; the API needs credentials). `kaggle2023islr` keeps the form verified
+  against the page title and URL; confirm the author list and the licence sentence on
+  https://www.kaggle.com/competitions/asl-signs (Overview > Citation, Data) in a logged-in
+  browser.
+- Limitations states: "The author is not a fluent signer; the signs in the live recordings were
+  learned from online ASL video dictionaries." Confirm this describes the author's ASL background.
+- How the 25 live-test signs were chosen from the 250 is not recorded; add one sentence to the
+  Clips paragraph (Section 6.2) if it should be stated.
+- Repeat the v3 Teach Dex run (Section 6.4 reports it as compromised; see
+  `results/teach_dex_v3/VALIDITY.md`) on an idle laptop, with the frame rate logged, the browser
+  restarted between runs and v2 and v3 interleaved.
+- Have a fluent, ideally Deaf, signer check the 65 non-exact ASL Citizen label mappings and rate the
+  50 live clips (second review, C5 and F1 in `REVIEW.md`).

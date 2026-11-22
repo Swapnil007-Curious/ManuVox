@@ -95,7 +95,9 @@ ALLOWED_DIGIT_PATTERNS = [
     r"\bfp(?:16|32)\b",
     r"\bint8\b",
     r"top-[135]",
-    r"\bv[12]\b",
+    r"\bv[123]\b",
+    r"\b[Tt]akes?[ -][12]\b",  # take 1 and take 2 of the live clips: names, not results
+    r"\bseed[ -]\d\b",  # a training seed's name
     r"\b[A-Z]\d\b",
     r"\(([a-f])\)",
     r"CC BY 4\.0",

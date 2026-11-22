@@ -1,4 +1,4 @@
-% Edge-Vision research paper (preprint). Build: see paper/README.md (tectonic main.tex).
+% ManuVox research paper (preprint; research codename Edge-Vision). Build: see paper/README.md (tectonic main.tex).
 % Every number in the text is a macro \V{key} from tables/numbers.tex, written by
 % scripts/paper_tables.py from the result files; do not type numbers by hand.
 \documentclass[11pt]{article}
@@ -28,20 +28,17 @@
 \input{tables/numbers.tex}
 
 % ---------------------------------------------------------------- author block helpers
-\newcommand{\surname}[1]{#1}
 \newcommand{\email}[1]{\texttt{#1}}
 
 % ---------------------------------------------------------------- misc
 \newcommand{\cfg}[1]{\texttt{#1}}
-% Facts only the author can supply; listed in paper/README.md (Author TODOs).
-\newcommand{\authortodo}[1]{\textcolor{red}{[TODO-AUTHOR: #1]}}
 \setlist{nosep,leftmargin=*}
 
-\title{Where Live Sign Recognition Breaks: Auditing the Train--Serve Gap of a Landmark-Based ASL Recognizer on a Low-Power Laptop}
+\title{ManuVox: Auditing the Train--Serve Gap of a Landmark-Based Sign Recognizer on a Laptop}
 
-\author{Swapnil \surname{TODO} \\
+\author{Swapnil Shukla \\
   Independent Researcher, India \\
-  \email{TODO}}
+  \email{swapnil.shukla.usa@gmail.com}}
 
 \begin{document}
 \maketitle
@@ -59,9 +56,6 @@
 % toward the page limit.
 \input{sections/limitations}
 \input{sections/ethics}
-
-\section*{Acknowledgments}
-\textbf{AI assistance disclosure:} TODO-AUTHOR-WRITES-THIS
 
 \bibliography{references}
 

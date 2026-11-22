@@ -1,4 +1,5 @@
-// Cloudflare Worker: the sentence translator of the Edge-Vision web demo (web/).
+// Cloudflare Worker: the sentence translator of the ManuVox web app (web/). The Worker keeps its
+// original name, edge-vision-translate, so its URL is unchanged.
 // Deploy: npx wrangler login; npx wrangler secret put LLM_API_KEY; npx wrangler deploy
 {
   "$schema": "node_modules/wrangler/config-schema.json",

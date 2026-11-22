@@ -517,7 +517,7 @@ def models(m: Macros) -> None:
         "\\end{tabular}",
         "\\caption{Signer-independent results: validation and test top-1/top-3 (\\%, mean $\\pm$ sd over "
         "seeds 0--2), parameter count, ONNX size and one classifier call in Chrome on the i3-1115G4 "
-        "(onnxruntime-web, wasm SIMD, 1 thread, p95; seed-0 file, fp32). The shipped file is the "
+        "(onnxruntime-web, wasm SIMD, 1 thread, p95; seed-0 file, fp32). The deployed v2 file is the "
         "hybrid in fp16 (Section~\\ref{sec:efficiency}).}",
         "\\label{tab:models}",
         "\\end{table*}",
@@ -615,10 +615,13 @@ def efficiency(m: Macros) -> None:
         "Model & Variant & Top-1 & $\\Delta$ & MB & p50 (ms) \\\\",
         "\\midrule",
     ]
+    int8_deltas = []
     for model, label in (("cnn", "CNN"), ("gru", "GRU"), ("transformer", "Transf.")):
         first = True
         for variant in ("fp32", "fp16", "int8_dynamic", "int8_static", "int8_static_full"):
             q = row(quant, model=model, variant=variant)
+            if variant.startswith("int8"):
+                int8_deltas.append(float(q["delta_vs_fp32_mean"]))
             f = f"model={model}|variant={variant}"
             key = f"q.{model}.{variant.replace('_', '')}"
             top1 = m.pct(f"{key}.top1", float(q["top1_mean"]), 1, quant_path, f"top1_mean|{f}")
@@ -655,6 +658,9 @@ def efficiency(m: Macros) -> None:
             )
             first = False
         lines.append("\\midrule")
+    field = "derived: over every int8 variant of the v1 models, delta_vs_fp32_mean"
+    m.pct("q.int8.least", max(int8_deltas), 1, quant_path, field, signed=True)
+    m.pct("q.int8.most", min(int8_deltas), 1, quant_path, field, signed=True)
     for variant, vname in (("onnx_fp32", "fp32"), ("fp16", "fp16"), ("int8_dynamic", "int8 dyn.")):
         b = row(bench2, experiment="d_hybrid_v2feat_v2recipe", variant=variant, threads="1")
         key = f"q.hybrid.{variant.replace('_', '')}"
@@ -1082,22 +1088,30 @@ def live_gap(m: Macros) -> None:
         path,
         "derived: signs with clip top-1 0 in both pipelines (c6_final)",
     )
-    top_guess = {}
+    # A sign counts only if each pipeline has one most frequent wrong guess (no tie) and it is
+    # the same guess in both.
+    counts: dict[tuple[str, str], dict[str, int]] = {}
     for c in s["confusions"]:
-        top_guess.setdefault((c["pipeline"], c["sign"]), c["predicted"])
+        counts.setdefault((c["pipeline"], c["sign"]), {})[c["predicted"]] = int(c["count"])
+    top_guess = {}
+    for unit, guesses in counts.items():
+        best = max(guesses.values())
+        tied = [g for g, n in guesses.items() if n == best]
+        if len(tied) == 1 and tied[0] != "(no segment)":
+            top_guess[unit] = tied[0]
     shared = [
         x
         for x in signs
         if top_guess.get(("python", x))
         and top_guess.get(("python", x)) == top_guess.get(("web", x))
-        and top_guess[("python", x)] != "(no segment)"
     ]
     m.num(
         "lg.sharedconf",
         len(shared),
         0,
         path,
-        "derived: signs whose most frequent wrong guess is the same in both pipelines",
+        "derived: signs whose most frequent wrong guess is the same in both pipelines, "
+        "without ties",
     )
     m.word(
         "lg.sharedconflist",
@@ -1191,7 +1205,7 @@ def live_gap(m: Macros) -> None:
     lines[-1] = "\\bottomrule"
     lines += [
         "\\end{tabular}",
-        "\\caption{Live-gap v2 in full: clip-level accuracy (\\%) with percentile bootstrap intervals "
+        "\\caption{The live study in full: clip-level accuracy (\\%) with percentile bootstrap intervals "
         "over the \\V{lg.clips} clips, and each config against the config it changes: paired "
         "bootstrap interval of the difference (points, not adjusted for multiplicity), the sign-flip "
         "$p$ before and after Holm adjustment within the pipeline (the pre-specified analysis), the "
@@ -1236,7 +1250,7 @@ def live_gap(m: Macros) -> None:
         "\\bottomrule",
         "\\end{tabular}",
         "\\caption{Per sign, final pipeline: live clip top-1 (\\%) over the two takes in Python and in "
-        "the browser (and its runs), the shipped model's top-1 (\\%, Test) on the same sign in the test split, and the "
+        "the browser (and its runs), the deployed v2 model's top-1 (\\%, Test) on the same sign in the test split, and the "
         "clip-level predictions with counts (``no segment'': no classified segment in the clip). "
         "Generated from \\cfg{results/live\\_gap\\_v2/summary.json}.}",
         "\\label{tab:persign}",
@@ -1486,7 +1500,7 @@ def test_access() -> None:
     """Every logged invocation of the test-split evaluation script."""
     logs = [
         ROOT / "results" / d / "test_access_log.json"
-        for d in ("final", "final_v2", "final_selection")
+        for d in ("final", "final_v2", "final_selection", "asl_citizen")
     ]
     entries = [(e, log) for log in logs for e in read_json(log)]
     entries.sort(key=lambda x: x[0]["timestamp_utc"])
@@ -1515,8 +1529,14 @@ def test_access() -> None:
                 names.append("v1 models")
             if any(k.startswith(("b_", "c_", "d_")) for k in kinds):
                 names.append("v2 models")
-            if any(k.startswith("onnx:") for k in kinds):
-                names.append("shipped ONNX file")
+            keys = e["runs_evaluated"]
+            if any(k.startswith("onnx:web/public/model/") for k in keys):
+                names.append("deployed v2 ONNX file")
+            if any(k.startswith("onnx:web/models/v3-citizen/") for k in keys):
+                names.append("v3 ONNX file")
+            for k in keys:
+                if k.startswith("asl-citizen-test:"):
+                    names.append(f"{k.split(':')[1]} on the ASL Citizen test split")
             what = ", ".join(names)
         if e["timestamp_utc"] >= "2026-11-16":
             what += " (saved logits for this paper)"
@@ -1525,9 +1545,12 @@ def test_access() -> None:
     lines += [
         "\\bottomrule",
         "\\end{tabular}",
-        "\\caption{Every logged run of the only script that reads the test split "
-        "(\\cfg{results/final*/test\\_access\\_log.json}); + marks a working tree with uncommitted "
-        "changes. The v2 models were designed after the v1 evaluation in the first row.}",
+        "\\caption{Every logged test-split access: \\cfg{final\\_eval.py} for the Google ISLR "
+        "test split and \\cfg{citizen\\_eval.py} for the ASL Citizen test split, the only "
+        "scripts that read them (\\cfg{results/final*/} and \\cfg{results/asl\\_citizen/"
+        "test\\_access\\_log.json}); + marks a working tree with uncommitted changes. The v2 "
+        "models were designed after the v1 evaluation in the first row; v3 was trained and "
+        "selected before either of its two accesses.}",
         "\\label{tab:testaccess}",
         "\\end{table}",
     ]
@@ -1609,6 +1632,479 @@ def power(m: Macros) -> None:
         m.pct(f"mde.{short}.pts", k / s["clips"], 0, path, "derived: k / number of clips")
 
 
+CITIZEN = ROOT / "results" / "asl_citizen"
+V3_COMPARE = ROOT / "results" / "v2_vs_v3.json"
+# The rows of the v2 vs v3 table: (key in results/v2_vs_v3.json, macro prefix, label, unit).
+V3_ROWS = [
+    ("asl-signs test", "ks", "Google ISLR", "sequences"),
+    ("ASL Citizen test", "cit", "ASL Citizen", "videos"),
+    ("test_clips_v2, browser", "web", "Live, browser", "clips"),
+    ("test_clips_v2, Python", "py", "Live, Python", "clips"),
+]
+
+
+def cross_dataset(m: Macros) -> None:
+    """The label mapping and v2 / v3 on the official ASL Citizen test split (citizen_eval.py)."""
+    meta_dir = ROOT / "data" / "asl_citizen" / "meta"
+    snapshot = DATA / "citizen_mapping.json"
+    if meta_dir.exists():
+        from edgevision.data.citizen_labels import REVIEW_STATUS, build_mapping
+
+        labels = read_json(ROOT / "web" / "public" / "model" / "meta.json")["labels"]
+        splits = {
+            split: read_csv(meta_dir / f"ASL_Citizen__splits__{split}.csv")
+            for split in ("train", "val", "test")
+        }
+        rows = [r for split_rows in splits.values() for r in split_rows]
+        snap = {
+            "source": "src/edgevision/data/citizen_labels.py build_mapping() over the glosses of "
+            "the official split files (counts only; the files are not redistributed)",
+            "review_status": REVIEW_STATUS,
+            "coverage": build_mapping(labels, [r["Gloss"] for r in rows]).coverage(),
+            "dataset": {
+                "videos": len(rows),
+                "glosses": len({r["Gloss"] for r in rows}),
+                "signers": len({r["Participant ID"] for r in rows}),
+                "signers_by_split": {
+                    split: len({r["Participant ID"] for r in split_rows})
+                    for split, split_rows in splits.items()
+                },
+            },
+        }
+        snapshot.write_text(json.dumps(snap, indent=1) + "\n", encoding="utf-8")
+    snap = read_json(snapshot)
+    cov = snap["coverage"]
+    for k in ("exact", "variant", "synonym", "mapped", "unmapped", "vocabulary"):
+        m.num(f"cit.map.{k}", cov[k], 0, snapshot, f"coverage.{k}")
+    for k in ("videos", "glosses", "signers"):
+        m.num(f"cit.all.{k}", snap["dataset"][k], 0, snapshot, f"dataset.{k}")
+    for split in ("train", "val", "test"):
+        m.num(
+            f"cit.all.{split}signers",
+            snap["dataset"]["signers_by_split"][split],
+            0,
+            snapshot,
+            f"dataset.signers_by_split.{split}",
+        )
+
+    results = {name: read_json(CITIZEN / f"{name}_test.json") for name in ("v2", "v3")}
+    v2path = CITIZEN / "v2_test.json"
+    for k in ("videos", "signers", "signs", "excluded_videos"):
+        if results["v2"][k] != results["v3"][k]:
+            raise ValueError(f"v2 and v3 were scored on different ASL Citizen items ({k})")
+    m.num("cit.videos", results["v2"]["videos"], 0, v2path, "videos")
+    m.num("cit.signers", results["v2"]["signers"], 0, v2path, "signers")
+    m.num("cit.signs", results["v2"]["signs"], 0, v2path, "signs")
+    m.num("cit.excluded", results["v2"]["excluded_videos"], 0, v2path, "excluded_videos")
+    for rule in ("exact", "variant", "synonym"):
+        m.num(
+            f"cit.rule.{rule}",
+            results["v2"]["by_rule"][rule]["videos"],
+            0,
+            v2path,
+            f"by_rule.{rule}.videos",
+        )
+    for name, r in results.items():
+        path = CITIZEN / f"{name}_test.json"
+        m.pct(f"cit.{name}.top1", r["top1"], 1, path, "top1")
+        m.ci(f"cit.{name}.top1ci", *r["top1_ci"], 1, path, "top1_ci.0,1")
+        m.ci(f"cit.{name}.top1cis", *r["top1_ci_signer"], 1, path, "top1_ci_signer.0,1")
+        m.pct(f"cit.{name}.top3", r["top3"], 1, path, "top3")
+        m.pct(f"cit.{name}.sigmin", r["top1_by_signer_min"], 1, path, "top1_by_signer_min")
+        m.pct(f"cit.{name}.sigmax", r["top1_by_signer_max"], 1, path, "top1_by_signer_max")
+        m.num(f"cit.{name}.eceraw", r["ece_raw"], 3, path, "ece_raw")
+        m.num(f"cit.{name}.ece", r["ece"], 3, path, "ece")
+        m.pct(f"cit.{name}.cov", r["coverage"], 1, path, "coverage")
+        m.pct(f"cit.{name}.sel", r["selective_accuracy"], 1, path, "selective_accuracy")
+        for rule in ("exact", "variant", "synonym"):
+            m.pct(f"cit.{name}.{rule}", r["by_rule"][rule]["top1"], 1, path, f"by_rule.{rule}.top1")
+
+    v2, v3 = results["v2"], results["v3"]
+    lines = [
+        "\\begin{table}[t]",
+        "\\centering",
+        "\\footnotesize",
+        "\\setlength{\\tabcolsep}{3pt}",
+        "\\begin{tabular}{lrrr}",
+        "\\toprule",
+        "ASL Citizen test & Videos & v2 & v3 \\\\",
+        "\\midrule",
+    ]
+    for rule, label in (
+        ("exact", "Exact name"),
+        ("variant", "Numbered variant"),
+        ("synonym", "Synonym"),
+    ):
+        lines.append(
+            f"Top-1, {label.lower()} & \\V{{cit.rule.{rule}}} & \\V{{cit.v2.{rule}}} & "
+            f"\\V{{cit.v3.{rule}}} \\\\"
+        )
+    lines += [
+        "Top-1, all & \\V{cit.videos} & \\V{cit.v2.top1} & \\V{cit.v3.top1} \\\\",
+        "Top-3, all & & \\V{cit.v2.top3} & \\V{cit.v3.top3} \\\\",
+        "Top-1, range over signers & & \\V{cit.v2.sigmin}--\\V{cit.v2.sigmax} & "
+        "\\V{cit.v3.sigmin}--\\V{cit.v3.sigmax} \\\\",
+        "\\midrule",
+        "ECE, raw softmax & & \\V{cit.v2.eceraw} & \\V{cit.v3.eceraw} \\\\",
+        "ECE, temperature from val & & \\V{cit.v2.ece} & \\V{cit.v3.ece} \\\\",
+        "Coverage at val threshold & & \\V{cit.v2.cov} & \\V{cit.v3.cov} \\\\",
+        "Selective accuracy & & \\V{cit.v2.sel} & \\V{cit.v3.sel} \\\\",
+        "\\bottomrule",
+        "\\end{tabular}",
+        "\\caption{v2 and v3 on the official ASL Citizen test split (\\%, except ECE), by how "
+        "the sign's label was mapped to an ASL Citizen gloss. Each model was evaluated once "
+        "(\\cfg{scripts/citizen\\_eval.py}); the mapping is AI-assisted and unconfirmed by a "
+        "signer. v3 trained on ASL Citizen's training signers.}",
+        "\\label{tab:citizen}",
+        "\\end{table}",
+    ]
+    if v2["videos"] != v3["videos"]:
+        raise ValueError("v2 and v3 ASL Citizen results cover different videos")
+    write_table("citizen", "\n".join(lines))
+
+
+def v3_training(m: Macros) -> None:
+    """v3's training data and selection, snapshotted from the git-ignored Kaggle bundle."""
+    work = ROOT / "artifacts" / "v3"
+    snapshot = DATA / "v3_training.json"
+    if (work / "v3_export" / "selection.json").exists():
+        selection = read_json(work / "v3_export" / "selection.json")
+        seeds = {}
+        for seed in sorted(selection["scores"]):
+            s = read_json(work / "runs" / "e_hybrid_v3citizen" / seed / "summary.json")
+            seeds[seed] = {
+                k: s[k]
+                for k in (
+                    "params",
+                    "train_sequences",
+                    "val_sequences",
+                    "best_epoch",
+                    "best_val_top1",
+                    "best_val_select",
+                    "best_val_top1_by_source",
+                    "total_train_seconds",
+                    "device_name",
+                )
+            }
+        chosen = selection["chosen"]
+        split = read_json(
+            work / "runs" / "e_hybrid_v3citizen" / chosen / "splits_signer_independent.json"
+        )
+        snap = {
+            "source": "artifacts/v3 (kaggle/train_v3.ipynb bundle): selection.json, "
+            "runs/e_hybrid_v3citizen/seed_*/summary.json and the chosen seed's split file "
+            "(counts only)",
+            "selection_rule": selection["rule"],
+            "chosen": chosen,
+            "seeds": seeds,
+            "split_counts": split["counts"],
+            "split_signers": split["participants"]
+            if isinstance(split["participants"], dict)
+            else None,
+        }
+        if snap["split_signers"] is not None:
+            snap["split_signers"] = {k: len(v) for k, v in split["participants"].items()}
+            # ASL Citizen participants carry an offset (edgevision.data.citizen).
+            snap["split_signers_by_source"] = {
+                k: {
+                    "asl-signs": sum(int(p) < 1_000_000 for p in v),
+                    "asl-citizen": sum(int(p) >= 1_000_000 for p in v),
+                }
+                for k, v in split["participants"].items()
+            }
+        commits = [
+            line.split(":", 1)[1].strip()
+            for line in (work / "train_v3.log").read_text(encoding="utf-8").splitlines()
+            if line.startswith("code commit:")
+        ]
+        snap["code_commit"] = commits[0]
+        snapshot.write_text(json.dumps(snap, indent=1) + "\n", encoding="utf-8")
+    snap = read_json(snapshot)
+    chosen = snap["chosen"]
+    c = f"seeds.{chosen}"
+    best = snap["seeds"][chosen]
+    counts, signers = snap["split_counts"], snap["split_signers"]
+    m.num("v3.train", best["train_sequences"], 0, snapshot, f"{c}.train_sequences")
+    m.num("v3.val", best["val_sequences"], 0, snapshot, f"{c}.val_sequences")
+    m.num(
+        "v3.cit.train",
+        counts["train"]["asl-citizen"],
+        0,
+        snapshot,
+        "split_counts.train.asl-citizen",
+    )
+    m.num("v3.cit.val", counts["val"]["asl-citizen"], 0, snapshot, "split_counts.val.asl-citizen")
+    m.num("v3.trainsigners", signers["train"], 0, snapshot, "split_signers.train")
+    m.num("v3.valsigners", signers["val"], 0, snapshot, "split_signers.val")
+    by_source = snap["split_signers_by_source"]["val"]
+    m.num(
+        "v3.valsigners.ks",
+        by_source["asl-signs"],
+        0,
+        snapshot,
+        "split_signers_by_source.val.asl-signs",
+    )
+    m.num(
+        "v3.valsigners.cit",
+        by_source["asl-citizen"],
+        0,
+        snapshot,
+        "split_signers_by_source.val.asl-citizen",
+    )
+    m.num("v3.seed", int(chosen.removeprefix("seed_")), 0, snapshot, "derived: chosen seed")
+    m.pct("v3.val.top1", best["best_val_top1"], 1, snapshot, f"{c}.best_val_top1")
+    m.pct(
+        "v3.val.ks",
+        best["best_val_top1_by_source"]["asl-signs"],
+        1,
+        snapshot,
+        f"{c}.best_val_top1_by_source.asl-signs",
+    )
+    m.pct(
+        "v3.val.cit",
+        best["best_val_top1_by_source"]["asl-citizen"],
+        1,
+        snapshot,
+        f"{c}.best_val_top1_by_source.asl-citizen",
+    )
+    select = [s["best_val_select"] for s in snap["seeds"].values()]
+    m.pct("v3.selmin", min(select), 1, snapshot, "derived: lowest best_val_select over seeds")
+    m.pct("v3.selmax", max(select), 1, snapshot, "derived: highest best_val_select over seeds")
+    m.num("v3.seeds", len(select), 0, snapshot, "derived: number of seeds")
+    minutes = [s["total_train_seconds"] / 60 for s in snap["seeds"].values()]
+    m.num(
+        "v3.trainmin",
+        float(np.mean(minutes)),
+        0,
+        snapshot,
+        "derived: mean total_train_seconds / 60 over seeds",
+    )
+    m.word("v3.gpu", best["device_name"], snapshot, f"{c}.device_name")
+    m.put("v3.commit", snap["code_commit"], snap["code_commit"][:7], snapshot, "code_commit")
+
+
+def v3_live(m: Macros) -> None:
+    """v2 and v3 in the live runs: segment top-1, and clip top-1 on take 2 alone (the clips
+    Teach Dex tests on), as a check on the Teach Dex harness."""
+    from live_gap import clip_outcomes  # scripts/live_gap.py, next to this file
+
+    path = ROOT / "results" / "live_gap_v3" / "summary.json"
+    rows = {(r["pipeline"], r["config"]): r for r in read_json(path)["rows"]}
+    for pipeline, short in (("web", "web"), ("python", "py")):
+        for config in ("v2_final", "v3_final"):
+            sel = f"rows[pipeline={pipeline};config={config}].segment_top1"
+            key = f"lg3.{short}.{config.removesuffix('_final')}.seg"
+            m.pct(key, rows[(pipeline, config)]["segment_top1"], 0, path, sel)
+    web = ROOT / "results" / "live_gap_v3" / "web"
+    for config in ("v2_final", "v3_final"):
+        runs = sorted(web.glob(f"{config}*.json"))
+        per_run = []
+        for run in runs:
+            take2 = [
+                o["top1"] for c, o in clip_outcomes(read_json(run)).items() if c.endswith("_2")
+            ]
+            per_run.append(sum(take2) / len(take2))
+        m.pct(
+            f"lg3.web.{config.removesuffix('_final')}.take2",
+            sum(per_run) / len(per_run),
+            0,
+            web,
+            f"derived: mean over {len(runs)} runs of clip top-1 on the take-2 clips ({config})",
+        )
+
+
+def v3_comparison(m: Macros) -> None:
+    """v2 vs v3 on the three test sets (scripts/compare_v3.py), one Holm family over top-1."""
+    data = read_json(V3_COMPARE)
+    lines = [
+        "\\begin{table}[t]",
+        "\\centering",
+        "\\footnotesize",
+        "\\setlength{\\tabcolsep}{2.5pt}",
+        "\\begin{tabular}{lrrrr}",
+        "\\toprule",
+        "Test set & v2 & v3 & v3$-$v2 [95\\% CI] & $p_{\\mathrm{Holm}}$ \\\\",
+        "\\midrule",
+    ]
+    for key, short, label, _unit in V3_ROWS:
+        one, three = data["top1"][key], data["top3"][key]
+        f = f"top1.{key}"
+        m.num(f"v3c.{short}.n", one["items"], 0, V3_COMPARE, f"{f}.items")
+        a = m.pct(f"v3c.{short}.a", one["a"], 1, V3_COMPARE, f"{f}.a")
+        b = m.pct(f"v3c.{short}.b", one["b"], 1, V3_COMPARE, f"{f}.b")
+        m.ci(f"v3c.{short}.aci", *one["a_ci"], 1, V3_COMPARE, f"{f}.a_ci.0,1")
+        m.ci(f"v3c.{short}.bci", *one["b_ci"], 1, V3_COMPARE, f"{f}.b_ci.0,1")
+        d = m.pct(f"v3c.{short}.diff", one["diff"], 1, V3_COMPARE, f"{f}.diff", signed=True)
+        dci = m.ci(f"v3c.{short}.ci", *one["ci"], 1, V3_COMPARE, f"{f}.ci.0,1")
+        m.num(f"v3c.{short}.better", one["better"], 0, V3_COMPARE, f"{f}.better")
+        m.num(f"v3c.{short}.worse", one["worse"], 0, V3_COMPARE, f"{f}.worse")
+        p = m.p(f"v3c.{short}.p", one["p_holm"], V3_COMPARE, f"{f}.p_holm")
+        m.sig(f"v3c.{short}.sig", one["p_holm"], V3_COMPARE, f"{f}.p_holm")
+        if "ci_cluster" in one:
+            m.ci(f"v3c.{short}.cci", *one["ci_cluster"], 1, V3_COMPARE, f"{f}.ci_cluster.0,1")
+        if "diff_by_cluster" in one:
+            by = list(one["diff_by_cluster"].values())
+            field = f"derived: per-signer differences ({f}.diff_by_cluster)"
+            m.pct(f"v3c.{short}.cmin", min(by), 1, V3_COMPARE, field, signed=True)
+            m.pct(f"v3c.{short}.cmax", max(by), 1, V3_COMPARE, field, signed=True)
+            m.num(f"v3c.{short}.cpos", sum(d > 0 for d in by), 0, V3_COMPARE, field)
+            m.num(f"v3c.{short}.cn", len(by), 0, V3_COMPARE, field)
+        m.pct(f"v3c.{short}.a3", three["a"], 1, V3_COMPARE, f"top3.{key}.a")
+        m.pct(f"v3c.{short}.b3", three["b"], 1, V3_COMPARE, f"top3.{key}.b")
+        lines.append(f"{label} & {a} & {b} & {d} {dci} & {p} \\\\")
+    lines += [
+        "\\bottomrule",
+        "\\end{tabular}",
+        "\\caption{v2 (Google ISLR only) against v3 (Google ISLR plus ASL Citizen train, with "
+        "webcam augmentation): top-1 (\\%) on each test set ($n$ = \\V{v3c.ks.n} sequences, "
+        "\\V{v3c.cit.n} videos and \\V{v3c.web.n} clips), each evaluated once. Differences are "
+        "paired over the same items, with a paired bootstrap interval and a sign-flip test that "
+        "treat items as independent (per-signer differences are in the text); browser scores "
+        "are means over three runs, and the four top-1 comparisons form one Holm family, which "
+        "keeps the ASL Citizen comparison although its direction was expected. v3 has "
+        "seen ASL Citizen's training signers, so its ASL Citizen score is in-domain, v2's "
+        "cross-dataset.}",
+        "\\label{tab:v3}",
+        "\\end{table}",
+    ]
+    write_table("v3", "\n".join(lines))
+    m.pct(
+        "cit.v2.drop",
+        data["top1"]["asl-signs test"]["a"] - read_json(CITIZEN / "v2_test.json")["top1"],
+        1,
+        f"{rel(V3_COMPARE)} + {rel(CITIZEN / 'v2_test.json')}",
+        "derived: v2 top-1 on the Google ISLR test split minus v2 top-1 on ASL Citizen test",
+    )
+
+    lat = ROOT / "results" / "perf" / "v2_vs_v3_classifier_latency.json"
+    data = read_json(lat)
+    for name in ("v2", "v3"):
+        one = data["models"][name]["configs"]["wasmx1"]
+        base = f"models.{name}.configs.wasmx1"
+        m.num(f"lat.{name}.p50", one["median_p50_ms"], 1, lat, f"{base}.median_p50_ms")
+        m.num(f"lat.{name}.p95", one["median_p95_ms"], 1, lat, f"{base}.median_p95_ms")
+    m.num(
+        "lat.v3.mb", data["models"]["v3"]["bytes"] / 1e6, 1, lat, "derived: models.v3.bytes / 1e6"
+    )
+    rounds = [
+        p for name in ("v2", "v3") for p in data["models"][name]["configs"]["wasmx1"]["p95_ms"]
+    ]
+    m.num("lat.p95lo", min(rounds), 1, lat, "derived: lowest wasm x1 p95 over all rounds")
+    m.num("lat.p95hi", max(rounds), 1, lat, "derived: highest wasm x1 p95 over all rounds")
+
+
+def teach_dex(m: Macros) -> None:
+    """Teach Dex record-then-test (scripts/teach_report.py), a separate personalised result."""
+    effect = "all 25 signs taught vs the model alone"
+    harm = "13 taught: the 12 untaught signs vs the model alone"
+    for name, path, cal in (
+        (
+            "v2",
+            ROOT / "results" / "teach_dex.json",
+            ROOT / "results" / "teach_dex" / "calibration.json",
+        ),
+        (
+            "v3",
+            ROOT / "results" / "teach_dex_v3.json",
+            ROOT / "results" / "teach_dex_v3" / "calibration.json",
+        ),
+    ):
+        r = read_json(path)
+        m.num(
+            f"td.{name}.n",
+            r["comparisons"][effect]["items"],
+            0,
+            path,
+            f"comparisons.{effect}.items",
+        )
+        m.pct(f"td.{name}.model", r["top1"]["model"], 0, path, "top1.model")
+        m.ci(f"td.{name}.modelci", *r["top1"]["model_ci"], 0, path, "top1.model_ci.0,1")
+        m.pct(f"td.{name}.teach", r["top1"]["teach_dex"], 0, path, "top1.teach_dex")
+        m.ci(f"td.{name}.teachci", *r["top1"]["teach_dex_ci"], 0, path, "top1.teach_dex_ci.0,1")
+        c = r["comparisons"][effect]
+        m.pct(f"td.{name}.diff", c["diff"], 0, path, f"comparisons.{effect}.diff", signed=True)
+        m.ci(f"td.{name}.ci", *c["ci"], 0, path, f"comparisons.{effect}.ci.0,1")
+        m.num(f"td.{name}.better", c["better"], 0, path, f"comparisons.{effect}.better")
+        m.num(f"td.{name}.worse", c["worse"], 0, path, f"comparisons.{effect}.worse")
+        m.p(f"td.{name}.p", c["p_holm"], path, f"comparisons.{effect}.p_holm")
+        m.sig(f"td.{name}.sig", c["p_holm"], path, f"comparisons.{effect}.p_holm")
+        h = r["comparisons"][harm]
+        m.pct(f"td.{name}.harm", h["diff"], 0, path, f"comparisons.{harm}.diff", signed=True)
+        m.pct(f"td.{name}.model3", r["top3"]["model"], 0, path, "top3.model")
+        m.pct(f"td.{name}.teach3", r["top3"]["teach_dex"], 0, path, "top3.teach_dex")
+        m.num(f"td.{name}.runs", r["runs"], 0, path, "runs")
+        m.num(
+            f"td.{name}.half",
+            len(r["half_taught_signs"]),
+            0,
+            path,
+            "derived: len(half_taught_signs)",
+        )
+        examples = r["examples_recorded_per_run"]
+        m.num(f"td.{name}.exmin", min(examples), 0, path, "derived: min(examples_recorded_per_run)")
+        m.num(f"td.{name}.exmax", max(examples), 0, path, "derived: max(examples_recorded_per_run)")
+        untaught = [len(s) for s in r["signs_without_examples_per_run"]]
+        field = "derived: number of signs without examples, per run"
+        m.num(f"td.{name}.noexmin", min(untaught), 0, path, field)
+        m.num(f"td.{name}.noexmax", max(untaught), 0, path, field)
+        segments = r["segments_per_run"]
+        m.num(f"td.{name}.segmin", min(segments), 0, path, "derived: min(segments_per_run)")
+        m.num(f"td.{name}.segmax", max(segments), 0, path, "derived: max(segments_per_run)")
+        # Each run's paired gain (both conditions are scored on that run's segments).
+        gains = []
+        for run in sorted((path.parent / path.stem / "web").glob("run*.outcomes.json")):
+            clips = read_json(run)["clips"]
+            gains.append(
+                sum(c["personalized"]["top1"] - c["base"]["top1"] for c in clips) / len(clips)
+            )
+        if len(gains) != r["runs"]:
+            raise ValueError(f"{path}: {r['runs']} runs but {len(gains)} outcome files")
+        runs_dir = path.parent / path.stem / "web"
+        field = "derived: per-run mean of personalized.top1 - base.top1"
+        m.pct(f"td.{name}.gainmin", min(gains), 0, runs_dir, field, signed=True)
+        m.pct(f"td.{name}.gainmax", max(gains), 0, runs_dir, field, signed=True)
+        k = read_json(cal)
+        sim = k["simulation"]
+        m.num(f"td.{name}.weight", k["weight"], 2, cal, "weight")
+        m.num(f"td.{name}.offset", k["offset"], 2, cal, "offset")
+        m.pct(
+            f"td.{name}.valbefore",
+            sim["top1_taught_before"],
+            1,
+            cal,
+            "simulation.top1_taught_before",
+        )
+        m.pct(
+            f"td.{name}.valafter", sim["top1_taught_after"], 1, cal, "simulation.top1_taught_after"
+        )
+        m.pct(
+            f"td.{name}.valuntaught0",
+            sim["top1_untaught_before"],
+            1,
+            cal,
+            "simulation.top1_untaught_before",
+        )
+        m.pct(
+            f"td.{name}.valuntaught1",
+            sim["top1_untaught_after"],
+            1,
+            cal,
+            "simulation.top1_untaught_after",
+        )
+    m.num(
+        "td.examples",
+        read_json(ROOT / "results" / "teach_dex" / "calibration.json")["examples_per_sign"],
+        0,
+        ROOT / "results" / "teach_dex" / "calibration.json",
+        "examples_per_sign",
+    )
+    m.num("td.draws", sim["draws"], 0, cal, "simulation.draws")
+    run1 = ROOT / "results" / "teach_dex" / "web" / "run1.outcomes.json"
+    m.num("td.leadin", read_json(run1)["lead_in_s"], 1, run1, "lead_in_s")
+    meta = ROOT / "web" / "public" / "model" / "meta.json"
+    m.num("td.embdim", read_json(meta)["embedding"]["dim"], 0, meta, "embedding.dim")
+
+
 def main() -> int:
     TABLES.mkdir(parents=True, exist_ok=True)
     DATA.mkdir(parents=True, exist_ok=True)
@@ -1627,6 +2123,11 @@ def main() -> int:
     test_access()
     per_signer(m)
     power(m)
+    cross_dataset(m)
+    v3_training(m)
+    v3_comparison(m)
+    teach_dex(m)
+    v3_live(m)
     m.write()
     print(f"{len(m.items)} macros -> paper/tables/numbers.tex; tables in paper/tables/")
     return 0

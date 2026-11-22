@@ -1,19 +1,91 @@
-\section{Hyperparameters}
+\section{Hyperparameters, Features and Model Selection}
 \label{app:hparams}
 
 \input{tables/hparams}
 
+\paragraph{Dominant-hand mirroring.}
+\label{app:mirror}
+Mirroring flips \V{data.mirroredpct}\% of the Google ISLR sequences, but it is a property of
+signers rather than sequences: \V{mir.high} of the \V{data.signers} signers have
+more than 80\% of their sequences mirrored and \V{mir.low} have under 5\%, consistent with left-handed signers or
+mirrored (selfie) recordings, which the data cannot tell apart; every test signer is at most
+\V{mir.testmax}\%.
+
+\paragraph{Model selection.} Figure~\ref{fig:acclat} shows the candidates against the shipping
+rule's latency budget (Section~\ref{sec:models}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/acc_latency}
+\caption{Test top-1 (mean $\pm$ sd over seeds) against browser latency per call (p95, Chrome on
+the i3-1115G4, wasm, one thread; selection benchmark). The hybrid ensemble is within the latency
+budget but over the size cap; the single hybrid (fp16) is the most accurate model that meets both.}
+\label{fig:acclat}
+\end{figure}
+
 \section{Test Signers and Test-Split Access}
 \label{app:testsplit}
 
-Table~\ref{tab:persigner} gives every signer-independent model's top-1 per test signer;
-Table~\ref{tab:testaccess} lists every run of the script that reads the test split.
+Table~\ref{tab:persigner} gives every signer-independent model's top-1 per Google ISLR test
+signer; Table~\ref{tab:testaccess} lists every logged access to either test split, including v3's
+single access to each.
 
 \input{tables/persigner}
 \input{tables/testaccess}
 
+\section{ASL Citizen, v3 and Teach Dex}
+\label{app:v3}
+
+\paragraph{ASL Citizen.} Table~\ref{tab:citizen} breaks the ASL Citizen test results down by how
+each label was mapped. v2 is weakest on signs mapped through a numbered variant; v3, trained on
+the same mapping, is about equally accurate under all three rules, which says nothing about
+whether the mapping is right. With each model's own validation temperature, v2's expected
+calibration error on this split is \V{cit.v2.ece} and v3's \V{cit.v3.ece}.
+
+\paragraph{v3 training.} v3 uses the v2 hybrid's architecture and recipe
+(Table~\ref{tab:hparams}) with \V{v3.train} training and \V{v3.val} validation sequences from
+\V{v3.trainsigners} and \V{v3.valsigners} signers (\V{v3.valsigners.ks} Google ISLR and
+\V{v3.valsigners.cit} ASL Citizen validation signers; one of ASL Citizen's \V{cit.all.valsigners}
+has no kept video of a mapped sign); its Google ISLR test split is the same as v2's.
+The \V{v3.seeds} seeds scored between \V{v3.selmin}\% and \V{v3.selmax}\% on the selection
+criterion, the mean of the two validation top-1 scores; a seed took about \V{v3.trainmin}
+minutes on a \V{v3.gpu}.
+
+\paragraph{Teach Dex.} The blend's weight and offset minimize the mean negative log-likelihood
+over \V{td.draws} simulated draws on validation signers: in each, one signer teaches between one
+and twenty-five signs with \V{td.examples} of their own sequences each, and every other sequence
+of that signer is a query, taught sign or not. ASL Citizen's validation signers recorded most signs
+once or twice, too few for this simulation, so v3's blend is fitted on the Google ISLR part of its
+validation split, with the same draws as v2's. The blends (weight \V{td.v2.weight}, offset
+\V{td.v2.offset} for v2; \V{td.v3.weight} and \V{td.v3.offset} for v3) raise validation top-1 on
+taught signs from \V{td.v2.valbefore}\% to \V{td.v2.valafter}\% (v2) and from \V{td.v3.valbefore}\%
+to \V{td.v3.valafter}\% (v3), and leave untaught signs where they were (\V{td.v2.valuntaught0}\%
+and \V{td.v2.valuntaught1}\%; \V{td.v3.valuntaught0}\% and \V{td.v3.valuntaught1}\%).
+
+\input{tables/citizen}
+
+\section{Calibration}
+\label{app:calib}
+
+Figure~\ref{fig:calibration} shows the deployed v2 model before and after temperature scaling.
+Before scaling the model is underconfident, as a temperature below one implies
+(Section~\ref{sec:models}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/calibration}
+\caption{The deployed v2 model on the Google ISLR test split. Left: reliability diagram before (raw)
+and after temperature scaling (bins with at least fifty sequences); after scaling the upper bins
+are slightly overconfident. Right: selective accuracy against coverage when accepting the most
+confident predictions first; the dot is the threshold chosen on validation.}
+\label{fig:calibration}
+\end{figure}
+
 \section{Quantization}
 \label{app:quant}
+
+Table~\ref{tab:quant} and Figure~\ref{fig:quant} give every post-training quantization variant of
+the v1 models (Section~\ref{sec:efficiency}).
 
 \input{tables/quant}
 
@@ -38,12 +110,30 @@ grey, the signer's right hand in orange. No camera image appears in this paper.}
 \label{fig:skeleton}
 \end{figure}
 
-Figure~\ref{fig:skeleton} shows one frame of a live clip as the pipelines see it.
+\paragraph{Segmenter.} A sign starts when a hand is present and the motion energy exceeds
+\V{seg.start}, and ends when the hands are lost for \V{seg.lostms} ms, stay below \V{seg.still} for
+\V{seg.stillms} ms, or after \V{seg.maxs} s; segments shorter than \V{seg.minms} ms are discarded and
+gaps up to \V{seg.gapms} ms are bridged. The thresholds come from the validation sequences,
+assuming their frames are \V{seg.assumedfps} fps apart: the start threshold is the
+\V{seg.startpct}th percentile of the per-sequence peak energy, and the still threshold the largest
+value at which at most \V{seg.stillpct}\% of sequences would be cut inside the sign.
+
+Figure~\ref{fig:skeleton} shows one frame of a live clip as the pipelines see it, and
+Figure~\ref{fig:livegap} plots the ablation of Table~\ref{tab:livegap}.
 Table~\ref{tab:livegapci} gives every live-gap configuration with its interval and its comparison
 against the configuration it changes; Table~\ref{tab:persign} gives the final pipeline per sign,
-next to the shipped model's accuracy on the same sign in the test split. The most frequent
+next to the deployed v2 model's accuracy on the same sign in the test split. The most frequent
 confusions of the final pipeline were, for Python + Holistic: \V{lg.py.confusions}; and for the
 browser: \V{lg.web.confusions} (counts over takes and runs).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figures/livegap}
+\caption{Clip top-1 as the fixes are added one at a time, the final pipeline with presence
+segmentation instead of the motion segmenter, and the hybrid's test top-1 (dashed); 95\%
+bootstrap intervals over the \V{lg.clips} clips; browser bars are means over runs.}
+\label{fig:livegap}
+\end{figure}
 
 \input{tables/livegap_ci}
 \input{tables/persign}
@@ -68,7 +158,8 @@ Code, configurations and every result file read by the paper's generators are in
 repository; \cfg{paper/README.md} lists the commands. The paper's tables, numbers and figures are
 written by \cfg{scripts/paper\_tables.py} and \cfg{scripts/paper\_figures.py} from those files, and
 \cfg{scripts/paper\_claims.py} re-reads every number from its source (\cfg{paper/CLAIMS.md}).
-Training ran on Kaggle (\V{m.gpu}, code at commit \V{repro.train}); the test predictions, CPU
-benchmark and live evaluations ran on the i3-1115G4 laptop from commit \V{repro.base} with the
-evaluation scripts that are committed together with this paper. The live clips and the dataset
-are not redistributed.
+Training ran on Kaggle (\V{m.gpu}, code at commit \V{repro.train}; v3 at commit \V{v3.commit},
+in private notebooks); the test predictions, CPU benchmark and live evaluations ran on the
+i3-1115G4 laptop from commit \V{repro.base} (v3's from \V{v3.commit}) with the evaluation scripts
+that are committed together with this paper. The live clips and both datasets are not
+redistributed, and neither is v3, which ASL Citizen's licence keeps private.

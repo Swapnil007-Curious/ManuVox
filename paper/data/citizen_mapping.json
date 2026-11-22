@@ -1,0 +1,22 @@
+{
+ "source": "src/edgevision/data/citizen_labels.py build_mapping() over the glosses of the official split files (counts only; the files are not redistributed)",
+ "review_status": "ai-assisted, unconfirmed",
+ "coverage": {
+  "exact": 171,
+  "variant": 35,
+  "synonym": 30,
+  "mapped": 236,
+  "unmapped": 14,
+  "vocabulary": 250
+ },
+ "dataset": {
+  "videos": 83399,
+  "glosses": 2731,
+  "signers": 52,
+  "signers_by_split": {
+   "train": 35,
+   "val": 6,
+   "test": 11
+  }
+ }
+}

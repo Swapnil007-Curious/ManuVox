@@ -28,7 +28,10 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const CLIPS = join(REPO, "data", "live_clips_v2");
 // TEACH_LIMIT=n: a smoke test on the first n signs, written to results/teach_dex/smoke/.
 const LIMIT = Number(process.env.TEACH_LIMIT ?? 0);
-const OUT = join(REPO, "results", "teach_dex", LIMIT > 0 ? "smoke" : "web");
+// TEACH_MODEL_DIR / TEACH_OUT (repo-relative) evaluate another model variant, e.g. the v3 build
+// (VITE_MODEL_VARIANT=v3-citizen) with web/models/v3-citizen and results/teach_dex_v3/web.
+const MODEL_DIR = join(REPO, process.env.TEACH_MODEL_DIR ?? join("web", "public", "model"));
+const OUT = process.env.TEACH_OUT ? join(REPO, process.env.TEACH_OUT) : join(REPO, "results", "teach_dex", LIMIT > 0 ? "smoke" : "web");
 const RUNS = Number(process.env.TEACH_RUNS ?? 3);
 const ENABLED = process.env.TEACH_EVAL === "1" && existsSync(join(CLIPS, "clips.json"));
 const SETTINGS = {
@@ -152,7 +155,7 @@ test.describe("Teach Dex record-then-test on test_clips_v2", () => {
     const every = (JSON.parse(readFileSync(join(CLIPS, "clips.json"), "utf8")) as { clips: Clip[] }).clips;
     const limited = LIMIT > 0 ? new Set([...new Set(every.map((clip) => clip.label))].sort().slice(0, LIMIT)) : null;
     const clips = limited ? every.filter((clip) => limited.has(clip.label)) : every;
-    const meta = JSON.parse(readFileSync(join(REPO, "web", "public", "model", "meta.json"), "utf8")) as WebMeta;
+    const meta = JSON.parse(readFileSync(join(MODEL_DIR, "meta.json"), "utf8")) as WebMeta;
     expect(meta.personalization, "meta.json needs the personalization block (scripts/calibrate_teach.py)").toBeTruthy();
     const params = { weight: meta.personalization!.weight, offset: meta.personalization!.offset, influenceThreshold: meta.personalization!.influence_threshold };
     const signs = [...new Set(clips.map((clip) => clip.label))].sort();
@@ -222,6 +225,8 @@ test.describe("Teach Dex record-then-test on test_clips_v2", () => {
           await openApp(page, base);
           const exported = (await ui(page, "teachExamples")) as { label: string; embedding: number[]; modelSha256: string }[];
           taught = exported.map((e, i) => ({ id: `${i}`, label: e.label, embedding: normalize(e.embedding), createdAt: 0, modelSha256: e.modelSha256 }));
+          // The build must serve the model whose meta.json scores the run.
+          expect(taught.every((e) => e.modelSha256 === meta.model_sha256), "the app's examples come from the model in MODEL_DIR").toBe(true);
           const storeMode = await ui(page, "teachStoreMode");
           await page.waitForSelector("#start:not([disabled])", { timeout: 120_000 });
           await page.click("#start");

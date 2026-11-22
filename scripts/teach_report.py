@@ -108,7 +108,8 @@ def main(argv: list[str] | None = None) -> int:
         "clip; each example is the first segment after the countdown. Take 2 was then recognised "
         "with the examples on, through the final live pipeline (installed Chrome, GPU tracker), "
         f"{len(runs)} runs. Blend weight and offset come from the validation split "
-        "(scripts/calibrate_teach.py), not from these clips. Written by scripts/teach_report.py.",
+        "(scripts/calibrate_teach.py), not from these clips. Model sha256 "
+        f"`{summary['model_sha256'][:12]}`. Written by scripts/teach_report.py.",
         "",
         "| Clip top-1 on take 2 (%) | Value | 95% CI |",
         "|---|---|---|",

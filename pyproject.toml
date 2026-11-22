@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "edgevision"
-version = "0.1.0"
+version = "1.0.0"
 description = "Landmark preprocessing and signer-independent splits for isolated sign recognition."
 readme = "README.md"
 requires-python = ">=3.11"

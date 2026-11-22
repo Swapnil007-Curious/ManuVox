@@ -1,7 +1,7 @@
 {
-  "name": "Edge-Vision: sign to speech",
-  "short_name": "Edge-Vision",
-  "description": "Recognises 250 isolated ASL signs from your webcam on this device and builds simple sentences. Not a full ASL translator.",
+  "name": "ManuVox",
+  "short_name": "ManuVox",
+  "description": "Your hands, spoken aloud. Recognises 250 isolated ASL signs from your webcam on this device and builds simple sentences. Not a full ASL translator.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

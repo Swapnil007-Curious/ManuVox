@@ -1,0 +1,104 @@
+{
+  "browser": "157.0.8103.79",
+  "measured_at": "2026-11-19T16:21:57.220Z",
+  "results": [
+    {
+      "ep": "wasm",
+      "threads": 1,
+      "backend": "wasm",
+      "crossOriginIsolated": true,
+      "webgpu": true,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+      "hardwareConcurrency": 4,
+      "model": {
+        "file": "model.onnx",
+        "sha256": "f7d79f6755498e4a935c38abc3c24b6636d54c5203c2881c2e37080d8296b1e2",
+        "variant": "fp16",
+        "bytes": 6929778
+      },
+      "sessionMs": 707.7249999642372,
+      "runs": 200,
+      "p50": 14.27999997138977,
+      "p95": 20.689999997615814,
+      "mean": 15.211775000691414,
+      "maxAbsDiffVsWasm1": null,
+      "top1AgreesWithWasm1": null,
+      "error": null,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ]
+    },
+    {
+      "ep": "wasm",
+      "threads": 2,
+      "backend": "wasm",
+      "crossOriginIsolated": true,
+      "webgpu": true,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+      "hardwareConcurrency": 4,
+      "model": {
+        "file": "model.onnx",
+        "sha256": "f7d79f6755498e4a935c38abc3c24b6636d54c5203c2881c2e37080d8296b1e2",
+        "variant": "fp16",
+        "bytes": 6929778
+      },
+      "sessionMs": 748.3349999785423,
+      "runs": 200,
+      "p50": 10.730000019073486,
+      "p95": 15.6700000166893,
+      "mean": 10.911775000095368,
+      "maxAbsDiffVsWasm1": 0,
+      "top1AgreesWithWasm1": true,
+      "error": null,
+      "consoleErrors": []
+    },
+    {
+      "ep": "wasm",
+      "threads": 4,
+      "backend": "wasm",
+      "crossOriginIsolated": true,
+      "webgpu": true,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+      "hardwareConcurrency": 4,
+      "model": {
+        "file": "model.onnx",
+        "sha256": "f7d79f6755498e4a935c38abc3c24b6636d54c5203c2881c2e37080d8296b1e2",
+        "variant": "fp16",
+        "bytes": 6929778
+      },
+      "sessionMs": 754.8500000238419,
+      "runs": 200,
+      "p50": 12.550000011920929,
+      "p95": 51.24000000953674,
+      "mean": 18.215250000357628,
+      "maxAbsDiffVsWasm1": 0,
+      "top1AgreesWithWasm1": true,
+      "error": null,
+      "consoleErrors": []
+    },
+    {
+      "ep": "webgpu",
+      "threads": 1,
+      "backend": "webgpu",
+      "crossOriginIsolated": true,
+      "webgpu": true,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36",
+      "hardwareConcurrency": 4,
+      "model": {
+        "file": "model.onnx",
+        "sha256": "f7d79f6755498e4a935c38abc3c24b6636d54c5203c2881c2e37080d8296b1e2",
+        "variant": "fp16",
+        "bytes": 6929778
+      },
+      "sessionMs": 1146.085000038147,
+      "runs": 200,
+      "p50": 25.8649999499321,
+      "p95": 29.194999992847443,
+      "mean": 26.290900000631808,
+      "maxAbsDiffVsWasm1": 0.03484916687011719,
+      "top1AgreesWithWasm1": true,
+      "error": null,
+      "consoleErrors": []
+    }
+  ]
+}

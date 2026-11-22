@@ -20,9 +20,11 @@ venv/
 /test_clips_v2/
 results/live_gap/*.log
 results/live_gap_v2/*.log
+results/live_gap_v3/*.log
 # Teach Dex evaluation: raw logits and embeddings of the personal clips stay local; the per-clip
 # outcomes (run*.outcomes.json) and the summary are committed.
-results/teach_dex/web/*.raw.json
+results/teach_dex*/web/*.raw.json
+results/teach_dex*/web/*.log
 # LaTeX build logs (paper/main.pdf itself is committed)
 paper/*.log
 paper/*.blg

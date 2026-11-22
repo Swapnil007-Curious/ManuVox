@@ -126,7 +126,7 @@ async function main() {
 
   const manifest = {
     description:
-      "Third-party files served from this origin by the Edge-Vision web demo; written by npm run fetch-assets.",
+      "Third-party files served from this origin by the ManuVox web app; written by npm run fetch-assets.",
     tasks_vision_version: version,
     assets: records,
   };

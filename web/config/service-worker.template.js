@@ -1,4 +1,4 @@
-// Edge-Vision service worker, generated at build time from config/service-worker.template.js.
+// ManuVox service worker, generated at build time from config/service-worker.template.js.
 // Precaches every built file (app shell, model, onnxruntime-web wasm, MediaPipe runtime and
 // models) so the app works offline after one complete load. Cache-first for same-origin GETs;
 // navigations get the cached index.html. Matching ignores Vary (servers may send Vary: Origin,

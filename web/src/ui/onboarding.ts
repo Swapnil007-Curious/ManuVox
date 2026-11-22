@@ -9,7 +9,7 @@ export type Step = 1 | 2 | 3;
 const COPY: Record<Step, { title: string; body: string; primary: string }> = {
   1: {
     title: "Allow the camera",
-    body: "Edge-Vision reads your hands from the camera to recognise signs. Video stays on this device and nothing is recorded. Your browser asks for permission next.",
+    body: "ManuVox reads your hands from the camera to recognise signs. Video stays on this device and nothing is recorded. Your browser asks for permission next.",
     primary: "Allow camera",
   },
   2: {

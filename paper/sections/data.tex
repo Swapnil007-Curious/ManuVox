@@ -6,37 +6,48 @@ We use the Google ISLR data \citep{kaggle2023islr} (licence CC BY 4.0): \V{data.
 of MediaPipe Holistic landmarks for \V{data.signs} isolated ASL signs, recorded by
 \V{data.signers} signers. Each frame holds \V{data.lmtotal} landmarks (\V{data.lmface} face,
 \V{data.lmpose} pose, \V{data.lmhand} per hand) with x and y normalized by the image width and
-height. We drop sequences with fewer than
-\V{data.minhand} frames in which a hand is detected (\V{data.excluded} sequences), leaving
-\V{data.kept}; each sign keeps between \V{data.signmin} and \V{data.signmax} sequences.
+height. We drop sequences with fewer than \V{data.minhand} frames in which a hand is detected
+(\V{data.excluded} sequences), leaving \V{data.kept}; each sign keeps between \V{data.signmin} and
+\V{data.signmax} sequences.
 
 \paragraph{Signer-independent split.}
 Our split assigns signers whole, by a seeded random permutation, to training
 (\V{data.trainsigners} signers, \V{data.trainseq} sequences), validation (\V{data.valsigners},
 \V{data.valseq}) and test (\V{data.testsigners}, \V{data.testseq}); it is not an official split.
 Checkpoint selection, early stopping, temperature fitting and the abstention threshold use
-validation only. A single script reads the test split and logs every run
-(Table~\ref{tab:testaccess}). The test split was not untouched during development: the v2 features,
-recipe and architecture were designed after the v1 models had been evaluated on it, and the model
-to ship was chosen by test accuracy (Section~\ref{sec:models}). The paired comparisons and test
-calibration in this paper come from logits saved after those choices were final.
+validation only, and a single script reads the test split and logs every run
+(Table~\ref{tab:testaccess}). The test split was not untouched during development: the v2
+features, recipe and architecture were designed after the v1 models had been evaluated on it, and
+the model to ship was chosen by test accuracy (Section~\ref{sec:models}). The paired comparisons
+and test calibration come from logits saved after those choices were final.
+
+\paragraph{A second dataset: ASL Citizen.}
+ASL Citizen \citep{desai2023aslcitizen} holds \V{cit.all.videos} webcam videos of
+\V{cit.all.glosses} glosses by \V{cit.all.signers} signers with official signer-disjoint splits
+(\V{cit.all.trainsigners}, \V{cit.all.valsigners} and \V{cit.all.testsigners} signers); its
+licence allows non-commercial research and forbids redistribution. Its glosses are ASL-LEX entry
+names, so \V{cit.map.mapped} of our \V{cit.map.vocabulary} labels map to them: \V{cit.map.exact} by
+name, \V{cit.map.variant} to a numbered variant and \V{cit.map.synonym} to a synonym. The variant
+and synonym choices were made with AI assistance from ASL-LEX's English translations and are not
+confirmed by a signer; they are part of the method and a possible source of error. We extract
+Holistic landmarks from the mapped videos with the training settings and preprocess them as
+below. The official test split, \V{cit.videos} videos of \V{cit.signs} signs by \V{cit.signers}
+signers (\V{cit.excluded} more had too few hand frames), is read by a second logged script once
+per model: for v2 it is a cross-dataset test. The training and validation videos
+(\V{v3.cit.train} and \V{v3.cit.val}) serve only to train v3. No ASL Citizen video, landmark or
+per-video prediction is released, and v3 is not deployed.
 
 \paragraph{Landmarks and features.}
-One JSON file, \cfg{features\_spec.json}, specifies the landmark subset, normalization,
-missing-value rules, dominant-hand mirroring and resampling, and both the Python training code and
-the browser read it. Face and lip points are not used, and z is dropped, which keeps the different
-depth scales of the Holistic and Tasks trackers out of the model. Frames without a hand are
-removed; coordinates are centered on the median shoulder midpoint and scaled by the median
-shoulder distance; a sequence whose left hand is present in more frames than its right is
-mirrored (x\,$\to$\,1$-$x with the hand blocks and left/right pose points swapped); and each
-sequence is linearly resampled to \V{data.frames} frames. Mirroring flips
-\V{data.mirroredpct}\% of sequences, but it is a property of signers rather than sequences:
-\V{mir.high} of the \V{data.signers} signers have more than 80\% of their sequences mirrored and
-\V{mir.low} have under 5\%, consistent with left-handed signers or mirrored (selfie) recordings,
-which the data cannot tell apart; every test signer is at most \V{mir.testmax}\%. The \emph{v1} input keeps both hands and \V{data.v1pose} pose points
-(nose, shoulders, elbows, wrists), \V{data.v1points} landmarks in all. The \emph{v2} input keeps
-\V{data.v2pose} pose points (adding eyes, ears and mouth corners), \V{data.v2points} landmarks,
-and computes \V{data.v2feat} features inside the model graph: coordinates, velocity and
-acceleration, the \V{data.pairdist} pairwise distances of the dominant hand, and
-\V{data.facedist} distances from its wrist and fingertips to the nose, mouth and shoulders, all
-standardized with training statistics.
+One file, \cfg{features\_spec.json}, read by both the Python code and the browser, specifies the
+preprocessing. Face and lip points and z are not used, which keeps the trackers' different depth
+scales out of the model. Frames without a hand are removed;
+coordinates are centered on the median shoulder midpoint and scaled by the median shoulder
+distance; a sequence whose left hand is present in more frames than its right is mirrored
+(x\,$\to$\,1$-$x with the hand blocks and left/right pose points swapped; Appendix~\ref{app:mirror});
+and each sequence is linearly resampled to \V{data.frames} frames. The \emph{v1} input keeps both
+hands and \V{data.v1pose} pose points (nose, shoulders, elbows, wrists), \V{data.v1points}
+landmarks in all. The \emph{v2} input keeps \V{data.v2pose} pose points (adding eyes, ears and
+mouth corners), \V{data.v2points} landmarks, and computes \V{data.v2feat} features inside the model
+graph: coordinates, velocity and acceleration, the \V{data.pairdist} pairwise distances of the
+dominant hand, and \V{data.facedist} distances from its wrist and fingertips to the nose, mouth and
+shoulders, all standardized with training statistics.

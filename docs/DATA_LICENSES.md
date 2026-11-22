@@ -28,7 +28,7 @@ Rules for this repository:
    `edge-vision-src` stay Private. Never
    pass `--public` to the Kaggle CLI or switch them to Public.
 4. **Minimise personal data.** The extraction keeps hands and pose and leaves the face points as
-   NaN unless `EV_KEEP_FACE=1`; no edge-vision model uses the face.
+   NaN unless `EV_KEEP_FACE=1`; no ManuVox model uses the face.
 5. **Delete when the research is complete.** Delete the Kaggle dataset, the notebooks' outputs and
    versions, and the local copies: `data/asl_citizen/` (landmarks, processed features, split
    files), `results/asl_citizen/predictions/`, `results/v3_eval/`, `artifacts/v3/` and

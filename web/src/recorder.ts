@@ -214,7 +214,7 @@ export class RecordingStore {
 
 export function recordingsFileName(date = new Date()): string {
   const pad = (value: number): string => String(value).padStart(2, "0");
-  return `edge-vision-recordings-${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}.json`;
+  return `manuvox-recordings-${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}.json`;
 }
 
 /** Labels containing every word of the query (case-insensitive), in label order. */

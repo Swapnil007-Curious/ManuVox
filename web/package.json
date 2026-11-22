@@ -1,7 +1,7 @@
 {
-  "name": "edge-vision-web",
+  "name": "manuvox",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Offline browser demo: isolated sign recognition from webcam landmarks, entirely on device.",
   "type": "module",
   "engines": {
@@ -10,6 +10,7 @@
   "scripts": {
     "fetch-assets": "node scripts/fetch-assets.mjs",
     "icons": "node scripts/make-icons.mjs",
+    "og-image": "node scripts/make-og-image.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --strictPort",

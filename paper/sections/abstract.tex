@@ -1,18 +1,21 @@
 \begin{abstract}
 Landmark-based sign recognizers can score well on a benchmark split and still fail on a live
 webcam, because the serving pipeline does not reproduce the training features. We audit this
-train--serve gap for isolated American Sign Language recognition in the browser on a low-power
-laptop. On our signer-independent split of the Google ISLR data, a convolution--transformer hybrid
-reaches \V{m.d.top1}\% top-1, \V{cmp.ship.diff} points above a CNN baseline and better for each of
-the \V{data.testsigners} test signers, and classifies a sign in \V{b.wasm1.p50} ms in Chrome. The
-first deployment, with the CNN, recognized \V{lg.web.c0headbuild.top1}\% of \V{lg.clips} new webcam
-clips (\V{lg.signs} signs, one signer). We audit six candidate discrepancies and share one feature
-specification, checked by golden-fixture tests, between Python and the browser. With the hybrid
-and all fixes, clip top-1 reaches \V{lg.web.c6final.top1}\% in the browser and
-\V{lg.py.c6final.top1}\% with the training tracker, recovering \V{lg.web.recover}\% and
-\V{lg.py.recover}\% of the hybrid's drop from its test accuracy. Assigning hands to slots as the training tracker did has by far the
-largest effect; removing the aspect correction and switching to a motion-based segmenter each cost
-ten to twenty points, inconclusive with fifty clips. Temperature scaling lowers the test
-calibration error from \V{cal.test.ece0} to \V{cal.test.ece1}, but live it is
-\V{lg.cal.web.ece}.
+train--serve gap for ManuVox, an in-browser recognizer of \V{data.signs} isolated American Sign
+Language signs, on a low-power laptop. On our signer-independent split of the Google ISLR data, the
+first deployment's CNN reaches \V{m.cnn.top1}\% top-1, yet it recognized
+\V{lg.web.c0headbuild.top1}\% of \V{lg.clips} new webcam clips from one signer; a
+convolution--transformer hybrid reaches \V{m.d.top1}\% and classifies a sign in \V{b.wasm1.p50} ms
+(median) in Chrome. Of six candidate discrepancies, assigning hands to slots as the training
+tracker did matters by far the most. With all pre-specified fixes, shared through one feature
+specification and a golden parity test, the hybrid's clip top-1 reaches
+\V{lg.web.c6final.top1}\% in the browser and \V{lg.py.c6final.top1}\% with the training tracker,
+closing \V{lg.web.recover}--\V{lg.py.recover}\% of the gap between its unfixed live score and its
+test accuracy; one fix, a motion segmenter, if anything hurt. The model also transfers poorly to
+ASL Citizen's unseen webcam signers (\V{cit.v2.top1}\% on \V{cit.signs} signs we mapped), where its
+calibration degrades. A second model, v3, trained on ASL Citizen as well and with webcam
+augmentation, reaches \V{cit.v3.top1}\% there, an in-domain score, and gains \V{v3c.ks.diff} points
+on Google ISLR, but live it gains \V{v3c.web.diff} and \V{v3c.py.diff} points, not significant with
+fifty clips. Separately, personal examples replayed from one recording per sign raise one signer's
+clip top-1 from \V{td.v2.model}\% to \V{td.v2.teach}\% with v2 in a best-case test.
 \end{abstract}

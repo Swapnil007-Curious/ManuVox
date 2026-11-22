@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software or its results, please cite it as below."
+type: software
+title: "ManuVox: Auditing the Train–Serve Gap of a Landmark-Based Sign Recognizer on a Laptop"
+version: 1.0.0
+authors:
+  - family-names: Shukla
+    given-names: Swapnil
+    affiliation: Independent Researcher, India
+license: MIT
+repository-code: "https://github.com/Swapnil007-Curious/manuvox"
+url: "https://swapnil007-curious.github.io/manuvox/"
+abstract: >-
+  ManuVox (research codename Edge-Vision) is an in-browser recognizer of 250 isolated American
+  Sign Language signs from MediaPipe landmarks that runs on a low-power laptop, together with the
+  code, configurations and result files of a measurement study of its train–serve gap.
+keywords:
+  - sign language recognition
+  - American Sign Language
+  - MediaPipe
+  - train-serve skew
+  - on-device inference
+  - onnxruntime-web

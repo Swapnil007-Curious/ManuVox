@@ -1,0 +1,33 @@
+{
+  "model_sha256": "a30b5b1b5bdba99e6bcf498a1c1d62d7187d86617ae2015dced164442327ddaf",
+  "computed_on": "val",
+  "method": "logits / T + weight * (max cosine similarity to the sign's examples - offset), taught signs only",
+  "weight": 5.0,
+  "offset": 0.36,
+  "examples_per_sign": 3,
+  "influence_threshold": 0.05,
+  "simulation": {
+    "split": "val",
+    "val_sequences": 12573,
+    "signers": 3,
+    "draws": 120,
+    "examples_per_sign": 3,
+    "taught_signs_per_draw": "uniform 1-25",
+    "queries": 495676,
+    "seed": 0,
+    "nll_before": 1.6364781093572547,
+    "nll_after": 1.6283314544392238,
+    "top1_taught_before": 0.668565824499136,
+    "top1_taught_after": 0.7091486480175594,
+    "top1_untaught_before": 0.6808690536685341,
+    "top1_untaught_after": 0.6801605860039682,
+    "grid": {
+      "coarse": [
+        5.0,
+        0.35000000000000003
+      ],
+      "weights": "0-20 step 1, then step 0.25",
+      "offsets": "0-1 step 0.05, then step 0.01"
+    }
+  }
+}

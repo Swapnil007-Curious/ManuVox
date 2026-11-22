@@ -861,3 +861,206 @@ limitations in the paper. Every number added is a generated macro checked by `pa
 | 35 | Fixed (paper) | Ethics discusses that Practice would mark many correct signs wrong, could discourage learners or teach distorted signs, and should show "not sure" and per-sign reliability and be evaluated with learners and Deaf teachers. The app itself was not changed in this task. |
 | 36 | Fixed (paper) | The "Translate" naming problem, the hosted model (Groq, llama-3.1-8b-instant), that only glosses are sent, and the false-authority risk are stated in §7 and the ethics statement. Renaming the UI mode is out of scope for this task. |
 | 37 | Fixed | The introduction says the vocabulary is everyday and child-oriented and that the data was released with the PopSign partners. |
+
+
+---
+
+# Second review (2026-11-22): "ManuVox: Auditing the Train–Serve Gap of a Landmark-Based Sign Recognizer on a Laptop"
+
+A fresh reviewer agent that had not seen the drafting reviewed the rebuilt PDF (`paper/main.pdf`),
+the LaTeX sources, the macro sources and the result files. It worked read-only and was told not to
+read the first review above. Its report follows, lightly condensed (wording kept; locations refer
+to the draft it reviewed); the response table is at the end.
+
+## Summary
+
+A measurement study of how a landmark-based recognizer of 250 isolated ASL signs loses accuracy
+between its offline test split and a live webcam on a low-power laptop. It trains GRU, CNN,
+Transformer and conv–transformer "hybrid" models on a signer-independent split of the Google ISLR
+landmarks with paired, Holm-corrected tests (hybrid 68.5% top-1, 18.6 ms in Chrome), then audits
+six candidate train–serve discrepancies through a cumulative add-and-undo ablation on 50 webcam
+clips from one signer (the author) through two pipelines. A hand-slot assignment bug is the one
+large and robust fault; with all changes, clip top-1 is 34% in the browser and 40% in Python.
+Further: a cross-dataset test on ASL Citizen through an AI-assisted label mapping (v2: 43.1%), a
+second model v3 trained on Google ISLR plus ASL Citizen (92.1% in-domain, +1.0 on Google ISLR,
+non-significant live gains), and a few-shot personalization feature, Teach Dex (+16 points with v2
+on 25 clips; +5 with v3, not significant). The paper is unusually transparent (every number a
+macro traced to a result file, every test access logged, power and null results discussed); its
+contribution is narrow: one bug class, one signer, and mostly inconclusive secondary effects.
+
+## Strengths
+
+- Exemplary traceability; every spot-checked number matched its source.
+- Honest test-split hygiene: every access logged; selection on test admitted and checked against
+  validation.
+- A well-designed live ablation: changes added and undone, two pipelines, repeated browser runs in
+  seeded random order, failed records kept, sign-level sensitivity analysis next to the
+  pre-specified clip-level one.
+- An explicit power statement; inconclusive effects mostly labelled as such.
+- v3's ASL Citizen score correctly framed as in-domain and as no validation of the mapping.
+- Thoughtful ethics and limitations for a non-signer author.
+
+## Issues
+
+### A. Claims vs evidence
+
+- **A1 (major).** The abstract and conclusion set the hybrid's 68.5% against the first deployment's
+  3%, but that deployment ran the v1 CNN (62.5%); with no fixes the hybrid gets 16% (browser) and
+  10% (Python). Pair 62.5% with 3%. *No new experiment.*
+- **A2 (major).** The v3 Teach Dex result comes from a degraded harness yet is presented in the
+  abstract, introduction and conclusion as "with v3 the gain is smaller". Classified segments per
+  run fell 28 → 23 → 15 (v2: 26–30) and badged segments 13 → 11 → 4; v3's model-alone baseline on
+  take 2 is 22.7%, while the reviewer's recomputation of the v3 live-gap browser records gives
+  32/40/44% (mean 38.7%) on the same take-2 clips through the same pipeline; for v2 the harnesses
+  agree (32% vs 30.7%). A clip with no segment cannot change in either condition, biasing v3's gain
+  toward zero, so the v2-vs-v3 contrast cannot be attributed to the model. Re-run with a healthy
+  harness, or drop the comparison and report the run as invalid. *New experiment, or no if dropped.*
+- **A3 (minor, must fix).** The setup is misdescribed: the "three recorded examples" are replays of
+  one recording; per run 2–4 signs got no example, so "every tested sign taught" is false; the
+  3.5 s still lead-in is not mentioned. *No.*
+- **A4 (major).** "The training tracker is therefore not what separates these clips" and "the rest
+  of the gap is shared by both pipelines" read a non-significant difference (browser − Python −6
+  points, sign-level interval [−15, 3]) as no effect; the pipelines also differ in real-time frame
+  dropping. *No.*
+- **A5 (minor).** "Mirroring … changes little (+3 points)" ignores the interval [−7, 13]; "some
+  correction is needed" contradicts calling the no-aspect-correction effect inconclusive. *No.*
+- **A6 (minor).** "With every fix" includes the motion segmenter, which lowered clip top-1; the
+  recovery percentages do not say they start from the hybrid's no-fix baseline. *No.*
+- **A7 (minor).** "Its abstention threshold accepts few predictions" (live coverage is 45%); on ASL
+  Citizen the threshold kept its precision (79.8% vs 82.0%) and coverage fell because accuracy
+  fell; what fails to transfer is ECE and coverage. *No.*
+- **A8 (minor).** v3's gains are attributed to ASL Citizen data alone, but v3 also adds webcam
+  augmentation and is a validation-selected seed compared with v2's seed-0 file. *No for wording.*
+- **A9 (minor).** "Keep the Python and browser pipelines identical" overstates the parity test,
+  which checks model inputs from identical landmarks. *No.*
+- **A10 (minor).** The 25.3-point ASL Citizen drop mixes signer/recording shift with mapping errors
+  and involves no live segmentation; use the exact-name subset (48.6%). *No.*
+- **A11 (minor).** Missed analysis: v3 reaches 92.1% on ASL Citizen's unseen signers but 44.7–46%
+  on the author's clips, pointing at segmentation or the author's productions; v3's segment-level
+  live gains (53.6% vs 40.5% browser, 53.2% vs 42.9% Python) are unreported. *No.*
+- **A12 (minor).** "The same CNN reaches 80.7% … (Table 1)": Table 1 has no signer-dependent row,
+  and the two numbers come from different test sets. *No.*
+- **A13 (minor).** The test split excludes sequences with too few hand frames while a live clip
+  without a segment counts as wrong, so "drop from test accuracy" compares unequal denominators.
+  *No for the note; one more test access to recompute.*
+- **A14 (nit).** Latency reported selectively: v3's lower median p50 is quoted while median p95
+  (21.25 vs 31.31 ms) is folded into a range. Report both medians.
+- **A15 (nit).** Some per-sign errors may be same-sign label pairs (cat→kitty, sleep→sleepy); in the
+  shared-confusion list, car and cat are ties in the browser.
+
+### B. Statistics
+
+- **B1 (minor, close to major).** The four-signer cluster bootstrap interval for v3 − v2 on Google
+  ISLR ([0.8, 1.3]) is narrower than the sequence-level one and anti-conservative; report the four
+  per-signer differences instead. *No.*
+- **B2 (minor).** The v3-vs-v2 test compares two files and ignores training randomness. *No for
+  wording; seed means need a new test access.*
+- **B3 (minor).** "The recipe's small gain is within signer-to-signer variation" compares a paired
+  effect with signer levels; the recipe gain is positive for all four signers. *No.*
+- **B4 (nit).** The Holm family includes the foregone in-domain vs cross-domain ASL Citizen
+  comparison.
+- **B5 (minor).** Clip-level scoring is not what users see; report segment-level accuracy for the
+  final pipelines. *No.*
+- **B6.** Positive: power statement, Holm step-down, sign-level sensitivity analysis.
+
+### C. Protocol
+
+- **C1 (major, same root as A2).** The Teach Dex harness is unstable and logs too little (segment
+  yield and examples recorded decay across runs; no fps). Log fps, restart the browser between
+  runs, interleave models, pre-specify an exclusion rule. *New experiment.*
+- **C2 (minor).** The live clips are not an independent test for v3 or Teach Dex: they were analysed
+  before v3's webcam augmentation was designed, which targets the discrepancies they revealed.
+- **C3 (minor).** "The analysis was written into the configuration before the first run" cannot be
+  checked: configuration and results first appear in the same commit. Soften. *No.*
+- **C4 (nit).** v3's 8 validation signers do not add up to 3 Google ISLR + 6 ASL Citizen; explain
+  (and rule out an ID collision). *No.*
+- **C5 (minor).** Have a fluent signer check the 65 non-exact mappings; use the exact-name subset as
+  the primary cross-dataset number.
+- **C6.** Positive: test reuse disclosed; ASL Citizen test read once per model after selection.
+
+### D. Clarity and structure
+
+- **D1 (minor).** "Shipped" is overloaded (first deployment, "as shipped", the v2 file).
+- **D2 (minor).** "v2" is overloaded, including "Live-gap v2 in full" in a caption.
+- **D3 (minor).** Appendices D (Calibration) and E (Quantization) have no text.
+- **D4 (minor).** The introduction cites Section 7 for the golden-fixture test, which is in §6.1.
+- **D5 (minor).** Six latency figures for one model; the abstract's 18.6 ms does not name its
+  statistic; which clip the 25.2 fps throughput run used is not said.
+- **D6–D11 (nits).** The config name "x_presence" leaks; "averaging its three seeds" means an
+  ensemble; "none of these changes is significant" vs a starred top-3 cell; quantization ranges
+  ordered inconsistently and missing the "full" static variant; "Teach Dex" used before it is
+  introduced; "an expected calibration error of 0.066 and 0.066".
+- **D12 (minor).** Much evidence sits in the appendix, acceptable as the text quotes key values.
+
+### E. Formatting
+
+- **E1.** Main text within 8 pages; no "??" references.
+- **E2.** Empty appendix sections (D3).
+- **E3 (nits).** "Muller" should be "Müller"; Starner et al. author list truncated; Fox et al. lacks
+  volume and pages; the Kaggle entry prints no URL; Holm (1979) not cited; MediaPipe papers cited as
+  preprints.
+- **E4 (venue-dependent).** The PDF is not anonymized.
+- **E5 (nit).** Figure 1 relies on colour.
+
+### F. Ethics and limitations
+
+- **F1 (minor).** Have a fluent, ideally Deaf, signer rate the 50 clips. *New (human rating).*
+- **F2 (minor).** The public site serves Practice mode although the Ethics section says it should
+  be evaluated first; state the safeguards or gate it.
+- **F3 (minor).** No Deaf involvement at any stage, including the label mapping.
+- **F4 (nit).** Say what the language-model provider retains; gloss sequences can reveal content.
+- **F5 (nit).** How the 25 test signs were chosen is not stated.
+
+## Overall assessment
+
+Careful and transparent, with the main finding (a hand-slot bug dominates; most of the gap remains,
+shared by both pipelines) supported for this one signer. Weakened by the headline pairing (A1), the
+degraded v3 Teach Dex comparison (A2/C1) and misdescribed setup (A3), and null-as-no-effect wording
+(A4) plus the four-cluster interval (B1). **Score 3/5, confidence 4/5** (a solid case study for
+Findings, a workshop or a demo track).
+
+## Response: how each issue was handled (second review)
+
+| # | Status | What changed |
+|---|---|---|
+| A1 | Fixed | Abstract and conclusion pair the 3% with the first deployment's CNN (62.5%); the hybrid's 68.5% and latency are stated separately. |
+| A2 | Fixed (paper); run not repeated | §6.4 reports the v3 run as compromised: its take-2 baseline (generated, 23%) against v3's own 39% on the same clips in the live runs (new generated macro from `results/live_gap_v3/web`), v2's agreeing pair (31%/32%), and the falling segment counts; the gain is said to be biased toward zero and to say nothing about teaching v3. The v2/v3 Teach comparison is gone from the abstract, introduction and conclusion; the README cell is marked compromised and `results/teach_dex_v3/VALIDITY.md` explains why. Repeating the run (idle laptop, fps logged, browser restarted per run, models interleaved) is an open item. |
+| A3 | Fixed | §6.4: up to three examples replayed from the one take-1 clip (one production), 2–4 signs per run got none (generated), the still lead-in (generated); "every tested sign taught" replaced by "the test vocabulary equal to the signs offered for teaching"; abstract and introduction say "examples replayed from one recording per sign". |
+| A4 | Fixed | "We see no evidence that the training tracker separates these clips … but the intervals allow a sizeable advantage for Holistic, and the pipelines also differ in real-time frame dropping"; conclusion: "with no evidence that the rest of the gap depends on the pipeline". |
+| A5 | Fixed | Mirroring gives its interval and "compatible with no effect"; aspect: "Removing aspect correction tended to hurt … so the data do not show that the shipped correction was wrong". |
+| A6 | Fixed | Abstract: "all pre-specified fixes", "one fix, a motion segmenter, if anything hurt", and the recovery as the share of "the gap between its unfixed live score and its test accuracy". |
+| A7 | Fixed | Abstract/introduction: "its calibration degrades"; §4: the threshold keeps its precision but, as accuracy falls, accepts only 31% of videos. |
+| A8 | Fixed (wording) | "v3's added data and augmentation"; §4 says the comparison is between two files, a validation-selected v3 seed and v2's seed 0, and that v3 changes data and augmentation together. No ablation. |
+| A9 | Fixed | Conclusion: the code now computes "the same model inputs from the same landmarks". |
+| A10 | Fixed | The conclusion no longer uses the ASL Citizen drop as evidence about the live gap; §4 keeps the exact-name (48.6%) vs variant breakdown. |
+| A11 | Fixed | §6.3 adds v3's segment-level gains (generated, untested) and the 92.1%-vs-under-half contrast as pointing to segmentation or the signer's productions. |
+| A12 | Fixed | "on a signer-dependent split (another test set, so not a paired comparison) … against the 62.5% on unseen signers in Table 1". |
+| A13 | Fixed (note) | Limitations: the test split excludes sequences with too few hand frames while a live clip without a segment counts as wrong, so the drop somewhat overstates the live gap. Not recomputed (would need another test access). |
+| A14 | Fixed | Both medians (p50 and p95) for v2 and v3, with "no difference beyond round-to-round variation". |
+| A15 | Fixed | The shared-confusion count now requires a single most frequent wrong guess in each pipeline (generated; 9 → 6, car, cat and sad drop out); a note says a guess such as sleepy for sleep may be the same sign. |
+| B1 | Fixed | `scripts/compare_v3.py` now also writes each signer's difference (`diff_by_cluster`; every other number unchanged); §4 reports v3 − v2 as positive for each test signer (+0.8 to +1.4, generated) instead of the four-cluster interval; the table caption says per-signer differences are in the text. |
+| B2 | Fixed (wording) | See A8. Seed means not computed (new test access). |
+| B3 | Fixed | "the recipe's small gain is positive for all four, which four signers cannot make significant". |
+| B4 | Partly | The comparison stays in the Holm family; the caption says its direction was expected. |
+| B5 | Partly | Segment top-1 of the final pipelines (40% browser, 43% Python) is in §6.3. What a clip contains beyond the clip metadata is not recorded. |
+| C1 | Open | Needs the repeated run (see A2). |
+| C2 | Fixed (Limitations) | The clips were analysed before v3's augmentation was designed, which targets what they revealed; Teach Dex reuses them. No fresh set. |
+| C3 | Fixed | "fixed in the configuration before the first run (the repository cannot show this, as configuration and results were committed together)". |
+| C4 | Explained | Not a collision (ASL Citizen IDs carry an offset): v3's validation signers are 3 Google ISLR and 5 ASL Citizen; one of ASL Citizen's six validation signers has no kept video of a mapped sign. Appendix C says so (generated from the split file). |
+| C5 | Partly | The exact-name breakdown is reported; a fluent signer's check of the mapping is an open item. |
+| D1 | Fixed | "Shipped build" now means only the first deployment; v2 is "the deployed v2 model/file" in text and generated captions. |
+| D2 | Fixed | Caption "The live study in full". |
+| D3 | Fixed | Appendices D and E have text. |
+| D4 | Fixed | The introduction points to §6.1. |
+| D5 | Partly | The abstract says "(median)"; the throughput run's camera is named (a pilot clip). No consolidated latency table (page limit). |
+| D6–D11 | Fixed | "x_presence" removed; "an ensemble of its three seeds"; "none of these top-1 changes"; one generated int8 range over every variant; Teach Dex named in the introduction; the ECE sentence reworded. |
+| D12 | Not changed | The text quotes the key values. |
+| E1–E2 | OK / Fixed | Main text ends on page 8; see D3. |
+| E3 | Partly | "Müller" fixed; the Kaggle URL is printed. Starner et al. keeps "and others" as in the source; Fox et al. keeps its DOI; Holm (1979) is not added (no verifiable record, as in the first review); MediaPipe entries stay as verified preprints. |
+| E4 | Not changed | A preprint with the author block the author chose. |
+| E5 | Fixed | The caption names the (a)–(f) labels. |
+| F1 | Open | Needs a fluent, ideally Deaf, signer. |
+| F2 | Fixed (paper) | Ethics: the public site's Practice mode does not yet report "not sure" or per-sign reliability and carries only the general note that ManuVox is not a full translator. The app was not changed in this freeze. |
+| F3 | Fixed | Ethics: no Deaf signer was consulted on the label mapping either; consultation should precede further deployment. |
+| F4 | Fixed | Ethics: the provider's retention policy has not been audited; a gloss sequence can reveal what a user said. |
+| F5 | Fixed | Limitations: how the 25 signs were chosen was not recorded, and a selection of easy-to-learn signs would bias the live estimate. |

@@ -1,0 +1,83 @@
+{
+ "source": "artifacts/v3 (kaggle/train_v3.ipynb bundle): selection.json, runs/e_hybrid_v3citizen/seed_*/summary.json and the chosen seed's split file (counts only)",
+ "selection_rule": "highest best_val_select (mean of asl-signs and ASL Citizen val top-1), lowest seed on a tie; validation only",
+ "chosen": "seed_2",
+ "seeds": {
+  "seed_0": {
+   "params": 3404538,
+   "train_sequences": 62959,
+   "val_sequences": 13656,
+   "best_epoch": 71,
+   "best_val_top1": 0.6992530755711776,
+   "best_val_select": 0.8168439251061888,
+   "best_val_top1_by_source": {
+    "asl-signs": 0.6770858188181023,
+    "asl-citizen": 0.9566020313942751
+   },
+   "total_train_seconds": 1900.3388655400001,
+   "device_name": "Tesla T4"
+  },
+  "seed_1": {
+   "params": 3404538,
+   "train_sequences": 62959,
+   "val_sequences": 13656,
+   "best_epoch": 118,
+   "best_val_top1": 0.7032806092560047,
+   "best_val_select": 0.8148120240950742,
+   "best_val_top1_by_source": {
+    "asl-signs": 0.6822556271375169,
+    "asl-citizen": 0.9473684210526315
+   },
+   "total_train_seconds": 2774.0091709989997,
+   "device_name": "Tesla T4"
+  },
+  "seed_2": {
+   "params": 3404538,
+   "train_sequences": 62959,
+   "val_sequences": 13656,
+   "best_epoch": 145,
+   "best_val_top1": 0.7019625073227885,
+   "best_val_select": 0.8183153320894068,
+   "best_val_top1_by_source": {
+    "asl-signs": 0.6800286327845383,
+    "asl-citizen": 0.9566020313942751
+   },
+   "total_train_seconds": 2806.815482932,
+   "device_name": "Tesla T4"
+  }
+ },
+ "split_counts": {
+  "train": {
+   "asl-signs": 58717,
+   "asl-citizen": 4242
+  },
+  "val": {
+   "asl-signs": 12573,
+   "asl-citizen": 1083
+  },
+  "test": {
+   "asl-signs": 16242,
+   "asl-citizen": 0
+  }
+ },
+ "split_signers": {
+  "train": 49,
+  "val": 8,
+  "test": 4
+ },
+ "split_signers_by_source": {
+  "train": {
+   "asl-signs": 14,
+   "asl-citizen": 35
+  },
+  "val": {
+   "asl-signs": 3,
+   "asl-citizen": 5
+  },
+  "test": {
+   "asl-signs": 4,
+   "asl-citizen": 0
+  }
+ },
+ "code_commit": "cd6dc790dafcc8d113f38d594325c75a2dbd426e"
+}

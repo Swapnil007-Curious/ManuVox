@@ -1,19 +1,33 @@
 \section*{Limitations}
 
 \paragraph{One signer in the live test.} The live evaluation uses \V{lg.clips} clips recorded by a
-single signer, the author (\authortodo{state your ASL experience}), in one room with one laptop
-camera. If the signer's productions differ from the dataset's signers, some live errors are
+single signer, the author, in one room with one laptop camera. The author is not a fluent signer;
+the signs in the live recordings were learned from online ASL video dictionaries. If the signer's
+productions differ from the dataset's signers, some live errors are
 production differences rather than pipeline or camera effects, and nothing in this design
 separates them; a rating of each clip by a fluent, ideally Deaf, signer would. The results show
 which pipeline discrepancies matter for this signer and camera; they do not estimate accuracy for
 Deaf signers in general. With fifty clips most effects below the detection limit stated in
 Section~\ref{sec:livegap} are inconclusive. The ten-clip pilot was recorded by the same person.
+How the \V{lg.signs} signs were chosen was not recorded; if they favour signs the author found
+easy to learn, the live estimate is biased.
 
 \paragraph{Controls we did not run.} Two controls would locate the remaining gap: running the live
 pipeline on test-split landmark sequences, which measures what the live code costs in
 distribution, and an oracle segmentation of the live clips, which separates segmentation from
 recognition. The segmenter's thresholds rest on an assumed dataset frame rate. We also did not
 disentangle architecture from model size or recipe in the v2 ablation.
+
+\paragraph{The second dataset and personalization.} The mapping between the two vocabularies is
+AI-assisted and unconfirmed by a signer. Its errors count against v2 on ASL Citizen, but v3, which
+learned the same mapping from ASL Citizen's training videos, can score as well on a consistently
+wrong mapping as on a right one, so its ASL Citizen accuracy is in-domain and does not validate
+the mapping. ASL Citizen's training split adds many signers but only a few videos per sign and
+signer. Teach Dex was taught and tested on two takes recorded by one signer in one sitting, with
+examples replayed from one production per sign, which is its best case; its v3 run is compromised
+(Section~\ref{sec:teach}) and needs repeating with a harness that logs its frame rate. The live
+clips are not an independent test of v3 either: they were analysed before v3's webcam augmentation
+was designed, that augmentation targets the discrepancies they revealed, and Teach Dex reuses them.
 
 \paragraph{Isolated signs from a closed vocabulary.} The model recognizes \V{data.signs} isolated
 signs. It does not handle continuous signing, fingerspelling, or signs outside the vocabulary,
@@ -30,8 +44,11 @@ for whom the model works less well.
 \paragraph{Test-set statistics and reuse.} With \V{data.testsigners} test signers, sequence-level
 tests treat thousands of sequences from the same person as independent; the per-signer results
 (Table~\ref{tab:persigner}) are the more conservative evidence, and a four-of-four split can never
-be significant on its own. The test split was evaluated several times during development
-(Table~\ref{tab:testaccess}), so its numbers are less clean than a single final evaluation.
+be significant on its own. The Google ISLR test split was evaluated several times during
+development (Table~\ref{tab:testaccess}), so its numbers are less clean than a single final
+evaluation; the ASL Citizen test split was read once per model. The test split also excludes
+sequences with too few hand frames, while a live clip without a segment counts as wrong, so the
+drop from test accuracy somewhat overstates the live gap.
 
 \paragraph{Hardware and trackers.} Browser timings come from one laptop and one browser version;
 the CPU fallback of MediaPipe reaches only \V{t.cpu.fps} frames per second there

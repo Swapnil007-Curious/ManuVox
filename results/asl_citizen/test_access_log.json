@@ -6,5 +6,13 @@
     "runs_evaluated": [
       "asl-citizen-test:v2:f7d79f6755498e4a935c38abc3c24b6636d54c5203c2881c2e37080d8296b1e2"
     ]
+  },
+  {
+    "timestamp_utc": "2026-11-21T22:23:14.082725+00:00",
+    "git_commit": "cd6dc790dafcc8d113f38d594325c75a2dbd426e",
+    "git_dirty": true,
+    "runs_evaluated": [
+      "asl-citizen-test:v3:a30b5b1b5bdba99e6bcf498a1c1d62d7187d86617ae2015dced164442327ddaf"
+    ]
   }
 ]

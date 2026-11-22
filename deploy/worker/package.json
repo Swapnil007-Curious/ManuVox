@@ -2,7 +2,7 @@
   "name": "edge-vision-translate",
   "private": true,
   "version": "0.1.0",
-  "description": "Translation proxy for the Edge-Vision web demo: turns a sequence of recognised ASL glosses into one English sentence through an LLM provider, holds the API key and enforces rate limits.",
+  "description": "Translation proxy for the ManuVox web app: turns a sequence of recognised ASL glosses into one English sentence through an LLM provider, holds the API key and enforces rate limits.",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",

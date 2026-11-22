@@ -52,6 +52,15 @@ def make_draws(
 ) -> list[dict[str, Any]]:
     draws = []
     signers = np.unique(signer)
+    for person in signers:
+        _, counts = np.unique(y[signer == person], return_counts=True)
+        if not (counts > EXAMPLES_PER_SIGN).any():
+            # ASL Citizen signers record each sign once or twice, so they cannot be simulated;
+            # v3's blend is fitted on the asl-signs part of its val split (data/processed_v2).
+            raise ValueError(
+                f"val signer {person} has no sign recorded more than {EXAMPLES_PER_SIGN} times; "
+                "pass a processed dir whose val signers repeat signs"
+            )
     for _ in range(DRAWS):
         person = rng.choice(signers)
         mine = np.flatnonzero(signer == person)

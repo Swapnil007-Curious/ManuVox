@@ -1,0 +1,275 @@
+{
+  "unit": "take-2 clip (n = 25, one signer); clip score = mean over runs",
+  "runs": 3,
+  "model_sha256": "a30b5b1b5bdba99e6bcf498a1c1d62d7187d86617ae2015dced164442327ddaf",
+  "params": {
+    "weight": 5,
+    "offset": 0.36,
+    "influenceThreshold": 0.05
+  },
+  "store_modes": [
+    "indexeddb"
+  ],
+  "examples_recorded_per_run": [
+    64,
+    61,
+    59
+  ],
+  "signs_without_examples_per_run": [
+    [
+      "happy",
+      "mom",
+      "thankyou"
+    ],
+    [
+      "book",
+      "happy",
+      "mom",
+      "thankyou"
+    ],
+    [
+      "happy",
+      "thankyou"
+    ]
+  ],
+  "badged_segments_per_run": [
+    13,
+    11,
+    4
+  ],
+  "segments_per_run": [
+    28,
+    23,
+    15
+  ],
+  "parity_max_abs_diff": 1.1102230246251565e-16,
+  "top1": {
+    "model": 0.22666666666666666,
+    "model_ci": [
+      0.09333333333333334,
+      0.3733333333333333
+    ],
+    "teach_dex": 0.27999999999999997,
+    "teach_dex_ci": [
+      0.13333333333333333,
+      0.43999999999999995
+    ],
+    "control_13_taught": 0.2533333333333333
+  },
+  "top3": {
+    "model": 0.38666666666666655,
+    "teach_dex": 0.42666666666666664
+  },
+  "comparisons": {
+    "all 25 signs taught vs the model alone": {
+      "items": 25,
+      "a": 0.22666666666666666,
+      "b": 0.27999999999999997,
+      "diff": 0.05333333333333333,
+      "ci": [
+        0.0,
+        0.12
+      ],
+      "better": 3,
+      "worse": 0,
+      "p": 0.25,
+      "p_holm": 0.5,
+      "significant": false
+    },
+    "13 taught: the 12 untaught signs vs the model alone": {
+      "items": 12,
+      "a": 0.25,
+      "b": 0.25,
+      "diff": 0.0,
+      "ci": [
+        0.0,
+        0.0
+      ],
+      "better": 0,
+      "worse": 0,
+      "p": 1.0,
+      "p_holm": 1.0,
+      "significant": false
+    }
+  },
+  "control_taught_signs": {
+    "items": 13,
+    "a": 0.20512820512820512,
+    "b": 0.25641025641025644,
+    "diff": 0.05128205128205129,
+    "ci": [
+      0.0,
+      0.1282051282051282
+    ],
+    "better": 2,
+    "worse": 0,
+    "p": 0.5
+  },
+  "half_taught_signs": [
+    "bird",
+    "book",
+    "dad",
+    "dog",
+    "food",
+    "go",
+    "mom",
+    "no",
+    "please",
+    "sad",
+    "sleep",
+    "water",
+    "yes"
+  ],
+  "per_clip": [
+    {
+      "clip": "bed_2",
+      "model": 0.3333333333333333,
+      "teach_dex": 0.3333333333333333,
+      "control": 0.3333333333333333
+    },
+    {
+      "clip": "bird_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "book_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "car_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "cat_2",
+      "model": 0.0,
+      "teach_dex": 0.6666666666666666,
+      "control": 0.0
+    },
+    {
+      "clip": "dad_2",
+      "model": 0.6666666666666666,
+      "teach_dex": 1.0,
+      "control": 1.0
+    },
+    {
+      "clip": "dog_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "drink_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "finish_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "food_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "go_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "happy_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "hello_2",
+      "model": 1.0,
+      "teach_dex": 1.0,
+      "control": 1.0
+    },
+    {
+      "clip": "home_2",
+      "model": 0.6666666666666666,
+      "teach_dex": 0.6666666666666666,
+      "control": 0.6666666666666666
+    },
+    {
+      "clip": "hungry_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "milk_2",
+      "model": 1.0,
+      "teach_dex": 1.0,
+      "control": 1.0
+    },
+    {
+      "clip": "mom_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "no_2",
+      "model": 1.0,
+      "teach_dex": 1.0,
+      "control": 1.0
+    },
+    {
+      "clip": "please_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "read_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "sad_2",
+      "model": 0.3333333333333333,
+      "teach_dex": 0.3333333333333333,
+      "control": 0.3333333333333333
+    },
+    {
+      "clip": "sleep_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "thank_you_2",
+      "model": 0.0,
+      "teach_dex": 0.0,
+      "control": 0.0
+    },
+    {
+      "clip": "water_2",
+      "model": 0.3333333333333333,
+      "teach_dex": 0.3333333333333333,
+      "control": 0.3333333333333333
+    },
+    {
+      "clip": "yes_2",
+      "model": 0.3333333333333333,
+      "teach_dex": 0.6666666666666666,
+      "control": 0.6666666666666666
+    }
+  ]
+}

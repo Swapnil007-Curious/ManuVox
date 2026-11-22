@@ -1,48 +1,47 @@
 \section{Introduction}
 \label{sec:intro}
 
-Most technology for communication runs on spoken and written language, and sign language users
-are served poorly by it \citep{bragg2019interdisciplinary,yin2021including}. A recognizer that runs
-in a web browser on an ordinary laptop, without sending video anywhere, could support practice
-tools and simple aids for a fixed vocabulary. Landmark-based recognizers are a natural fit: hand
-and body keypoints from MediaPipe \citep{lugaresi2019mediapipe} are small, appearance-free and
-fast to classify, and the Google ISLR data \citep{kaggle2023islr} provides landmarks for
-\V{data.signs} isolated signs. It was released with the partners behind PopSign, a game that helps
-hearing parents of young deaf children learn to sign \citep{starner2023popsign}, and the
-vocabulary is correspondingly everyday and child-oriented.
+Most communication technology runs on spoken and written language and serves sign language
+users poorly \citep{bragg2019interdisciplinary,yin2021including}. A recognizer that runs in a
+browser on an ordinary laptop, without sending video anywhere, could support practice tools and
+simple aids for a fixed vocabulary. Landmark-based recognizers fit: MediaPipe keypoints
+\citep{lugaresi2019mediapipe} are small, appearance-free and fast to classify, and the Google ISLR
+data \citep{kaggle2023islr} provides them for \V{data.signs} isolated signs, collected with the
+partners behind PopSign, a game that helps hearing parents of deaf children learn to sign
+\citep{starner2023popsign}; the vocabulary is everyday and child-oriented.
 
-A model's accuracy on its test split, however, says little about what happens when the same model
-meets a webcam. The live pipeline has to reproduce, in another language and with another tracker,
-every step that produced the training features: which hand goes in which slot, how coordinates
+Test accuracy, however, says little about the same model on a webcam. The live pipeline has to
+reproduce, in another language and with another tracker, every step that produced the training
+features: which hand goes in which slot, how coordinates
 are normalized, how time is resampled, where a sign starts and ends. Any mismatch is train--serve
 skew \citep{sculley2015debt,breck2017mltestscore}, and it is invisible to offline evaluation. Our
 first browser demo shipped a model with \V{m.cnn.top1}\% test top-1 and recognized
 \V{lg.web.c0headbuild.top1}\% of new webcam clips.
 
-This paper is a measurement study of that gap on a low-power laptop. Our contributions are:
+This paper is a measurement study of that gap for ManuVox, our in-browser recognizer, on a
+low-power laptop. Our contributions are:
 \begin{itemize}
 \item A signer-independent comparison of landmark models with paired, Holm-corrected tests
-  (Section~\ref{sec:models}). In a cumulative ablation from a CNN baseline, a
-  convolution--transformer hybrid with \V{m.d.params}\,M parameters (\V{m.paramratio} times the
-  CNN's) and a longer training recipe improve test top-1 by \V{cmp.ship.diff} points, for each of the
-  \V{data.testsigners} test signers; richer input features alone did not help measurably
-  (\V{cmp.feat.diff} points).
-\item Measurements on the deployment target, an Intel i3-1115G4 laptop (Section~\ref{sec:efficiency}):
-  the shipped hybrid classifies a sign in \V{b.wasm1.p50} ms in Chrome, tracking runs at
-  \V{t.hudon.fps} frames per second, and int8 quantization costs accuracy without a consistent
-  speed gain.
+  (Section~\ref{sec:models}): a convolution--transformer hybrid and a longer recipe improve test
+  top-1 by \V{cmp.ship.diff} points over a CNN, for each of the \V{data.testsigners} test signers,
+  while richer input features alone did not help measurably; on an Intel i3-1115G4 laptop the
+  hybrid classifies a sign in \V{b.wasm1.p50} ms in Chrome (Section~\ref{sec:efficiency}).
 \item An audit of six candidate train--serve discrepancies, with an ablation of their fixes on
   \V{lg.clips} new webcam clips through two pipelines (Section~\ref{sec:livegap}). Assigning hands
   to slots as the training tracker did has by far the largest effect (\V{lg.py.c2hands.dtop1}
-  points with the training tracker, \V{lg.web.c2hands.dtop1} in the browser). The other changes are
-  smaller or inconclusive with fifty clips from one signer; a motion-based segmenter missed whole
-  signs, and accuracy fell with it, though not significantly. The fixes recover
-  \V{lg.web.recover}--\V{lg.py.recover}\% of the
-  hybrid's drop from its test accuracy, so most of the gap remains.
-\item Calibration within the dataset and live: temperature scaling fitted on validation lowers the
-  test expected calibration error from \V{cal.test.ece0} to \V{cal.test.ece1}, but on the live
-  segments it is \V{lg.cal.web.ece}, and the abstention threshold rejects many correct words.
+  points with the training tracker, \V{lg.web.c2hands.dtop1} in the browser); the other changes
+  are smaller or inconclusive with fifty clips from one signer. The fixes recover
+  \V{lg.web.recover}--\V{lg.py.recover}\% of the hybrid's drop from its test accuracy, so most of
+  the gap remains.
+\item A cross-dataset test and a second training set. On the webcam recordings of ASL Citizen's
+  unseen test signers, v2 reaches \V{cit.v2.top1}\% on \V{cit.signs} mapped signs, and its
+  calibration degrades. v3, trained also on ASL Citizen and with webcam augmentation, reaches \V{cit.v3.top1}\% there, an in-domain score, with \V{v3c.ks.diff} points on the Google
+  ISLR test split; live, it gains \V{v3c.web.diff} points of clip top-1 in the browser and
+  \V{v3c.py.diff} in Python, neither significant with fifty clips (Section~\ref{sec:liveresults}).
+\item A personalization feature, Teach Dex, evaluated separately (Section~\ref{sec:teach}):
+  examples replayed from one recording per sign raise clip top-1 on a second take from
+  \V{td.v2.model}\% to \V{td.v2.teach}\% with v2, in the best case of one signer and one sitting; a
+  v3 run of the same test was compromised by its harness.
 \end{itemize}
-The recognizer runs as an in-browser app (Section~\ref{sec:system}); one feature specification
-shared by Python and the browser, and a golden-fixture test between them, keep the two pipelines
-from drifting apart again.
+One feature specification shared by Python and the browser, and a golden-fixture test between
+them, now keep the two pipelines from drifting apart (Section~\ref{sec:faults}).

@@ -26,7 +26,7 @@ its own notebook; see [v2](#v2).
 One command per cell, in order.
 
 ```
-!git clone https://github.com/Swapnil007-Curious/edge-vision.git /kaggle/working/edge-vision
+!git clone https://github.com/Swapnil007-Curious/manuvox.git /kaggle/working/edge-vision
 ```
 
 ```
@@ -107,7 +107,7 @@ Sign Language Recognition.
 One command per cell, in order.
 
 ```
-!git clone https://github.com/Swapnil007-Curious/edge-vision.git /kaggle/working/edge-vision
+!git clone https://github.com/Swapnil007-Curious/manuvox.git /kaggle/working/edge-vision
 ```
 
 ```

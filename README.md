@@ -1,9 +1,74 @@
-# edge-vision
+# ManuVox
 
-Landmark preprocessing, signer-independent splits and compact sequence classifiers for the
-Kaggle [Google Isolated Sign Language Recognition](https://www.kaggle.com/competitions/asl-signs)
-dataset (`asl-signs`). Three models (bidirectional GRU, temporal CNN, small transformer) are
-trained on preprocessed hand and pose landmarks and export to ONNX.
+(research codename: Edge-Vision)
+
+**Your hands, spoken aloud.** ManuVox recognises 250 isolated American Sign Language (ASL) signs
+from a webcam, entirely in the browser on a low-power laptop, and turns the recognised signs into
+a simple spoken sentence. It is a research demo, not a full ASL translator: each sign is read on
+its own, from a fixed vocabulary, and the grammar ASL carries in space, movement and the face is
+not captured.
+
+- **Live app:** <https://swapnil007-curious.github.io/manuvox/>
+- **Paper:** coming soon ("ManuVox: Auditing the Train–Serve Gap of a Landmark-Based Sign
+  Recognizer on a Laptop"; source and build instructions in [`paper/`](paper/README.md))
+- **Author:** Swapnil Shukla
+- **Licences:** code MIT ([`LICENSE`](LICENSE)); datasets in
+  [`docs/DATA_LICENSES.md`](docs/DATA_LICENSES.md); third-party software and models in
+  [`THIRD_PARTY.md`](THIRD_PARTY.md). Cite with [`CITATION.cff`](CITATION.cff).
+
+![ManuVox recognising "hello"](docs/screenshots/04-word-landing-1440x900-dark.png)
+
+## Results
+
+v2 is the shipped model, trained on the Google ISLR (Kaggle `asl-signs`) landmarks only. v3 adds
+ASL Citizen's training videos and webcam augmentation; ASL Citizen's licence allows research use
+only, so v3 stays local and the public site serves v2. Every number below is written from the
+result files by `scripts/readme_results.py`.
+
+<!-- results:start (scripts/readme_results.py) -->
+| Test set | n | v2 (public default) | v3 (research only) | v3 - v2 | Source |
+|---|---|---|---|---|---|
+| Google ISLR signer-independent test (4 unseen signers), top-1 | 16,242 | 68.4% [67.7, 69.1] | 69.4% [68.7, 70.1] | +1.0 pts, Holm p < 0.001 (significant) | `results/v2_vs_v3.md` |
+| ASL Citizen official test (236 mapped signs, 11 unseen signers), top-1 ¹ | 3,523 | 43.1% [41.5, 44.8] | 92.1% [91.2, 93.0] | +49.0 pts, Holm p < 0.001 (significant) | `results/asl_citizen/` |
+| Live webcam clips, browser (50 clips, one signer), clip top-1 ² | 50 | 34.0% [21.3, 46.7] | 44.7% [31.3, 57.3] | +10.7 pts, Holm p = 0.238 (not significant) | `results/v2_vs_v3.md` |
+| Live webcam clips, Python + Holistic, clip top-1 | 50 | 40.0% [26.0, 54.0] | 46.0% [32.0, 60.0] | +6.0 pts, Holm p = 0.508 (not significant) | `results/v2_vs_v3.md` |
+
+| Separate results | v2 | v3 | Source |
+|---|---|---|---|
+| Teach Dex, personalised (take-2 clips, model alone → up to 3 examples per sign, replays of take 1) ³ | 31% → 47% (+16 pts [5, 28], Holm p = 0.031, significant) | compromised run (see ³): 23% → 28% (+5 pts [0, 12], Holm p = 0.500, not significant) | `results/teach_dex.md`, `results/teach_dex_v3.md` |
+| Classifier in Chrome on an i3-1115G4 (wasm, 1 thread), p50 / p95, file size | 14.3 / 21.2 ms, 6.9 MB | 13.3 / 31.3 ms, 6.9 MB | `results/perf/v2_vs_v3_classifier_latency.json` |
+
+Each test set was evaluated once per model; the four top-1 comparisons are one Holm family (`scripts/compare_v3.py`). ¹ v3 trained on ASL Citizen's training signers, so its ASL Citizen score is in-domain and v2's is cross-dataset; the label mapping is AI-assisted and unconfirmed by a signer. ² Browser scores are means over 3 runs. ³ One signer, taught with take 1 and tested on take 2 of the same sitting; never pooled with the rows above. **The v3 Teach Dex run is compromised:** its model-alone score on take 2 (23%) is far below v3's own 39% on the same clips in the live-gap runs, and its classified segments per run fell (28, 23, 15, against 26, 29, 30 with v2; the harness logs no frame rate), so its gain says nothing about teaching v3 and the run needs repeating. v3 is trained on ASL Citizen (research licence) and is not deployed.
+<!-- results:end -->
+
+## How to run
+
+- **Use it:** open the live app in Chrome or Edge on a laptop with a webcam, allow the camera and
+  sign. Video never leaves the device; only the recognised words are sent if you ask for a
+  sentence.
+- **Run the app locally** (Node 20.19+), from `web/`: `npm ci`, `npm run fetch-assets`, then
+  `npm run dev` (details in [Run locally](#run-locally)).
+- **Python** (Python 3.11): [Setup](#setup) below, then the pipeline in
+  [Preprocessing](#preprocessing), [Training](#training) and [Evaluation protocol](#evaluation-protocol).
+- **Reproduce the paper's tables and figures:** [`paper/README.md`](paper/README.md).
+- **v3 / ASL Citizen** (research licence, private Kaggle notebooks):
+  [`kaggle/ASL_CITIZEN.md`](kaggle/ASL_CITIZEN.md).
+
+### Naming
+
+The project was renamed from Edge-Vision to ManuVox for v1.0.0. The Python package and module
+stay `edgevision` (`pip install -e .`, `import edgevision`) to avoid a risky refactor, and so do
+internal identifiers that users or saved data depend on: browser storage keys (`edge-vision.*`,
+so settings and taught signs survive the move), the recordings file format, the private Kaggle
+dataset `edge-vision-src`, and the translation Worker `edge-vision-translate`, whose URL is
+unchanged.
+
+## Technical documentation
+
+The sections below document the research code: landmark preprocessing, signer-independent
+splits and compact sequence classifiers (GRU, temporal CNN, transformer, convolution–transformer
+hybrid) for the Kaggle [Google Isolated Sign Language Recognition](https://www.kaggle.com/competitions/asl-signs)
+data (`asl-signs`), exported to ONNX and run in the browser.
 
 ## Setup
 
@@ -226,7 +291,7 @@ Outputs: `results/bench/bench_raw.csv` (one row per configuration and round),
 
 ## Web demo
 
-Live: <https://swapnil007-curious.github.io/edge-vision/>
+Live: <https://swapnil007-curious.github.io/manuvox/>
 
 `web/` is an installable, offline-capable sign-to-speech app (Vite and strict TypeScript, no UI
 framework). MediaPipe Tasks HandLandmarker (two hands) and PoseLandmarker lite produce landmarks
@@ -246,8 +311,6 @@ second worker. `web/src/engine.ts` holds that pipeline; the interface (`web/src/
   translation Worker's origin, a service worker serves the app, the model and the MediaPipe files
   from the device after the first load, and there is no analytics or telemetry. Sentences are
   spoken with on-device voices only.
-
-![Edge-Vision recognising "hello"](docs/screenshots/04-word-landing-1440x900-dark.png)
 
 ### The interface ("Duet")
 
@@ -321,7 +384,7 @@ contrast and the Worker vocabulary staying in sync) and, after `npm run build`,
 Chromium, offline reload through the service worker, a camera smoke test, the interface flow
 driven through the debug hook, Record test signs, and a recorded clip end to end when
 `data/live_clips/hello.y4m` exists). For a build under another base path, set `BASE_PATH` (for
-example `/edge-vision/`) for both the build and the tests. Node 22.18 or newer runs the contrast
+example `/manuvox/`) for both the build and the tests. Node 22.18 or newer runs the contrast
 script (it imports TypeScript directly).
 
 Screenshots: `docs/screenshots/` (`npm run screenshots`; the header of
@@ -661,13 +724,13 @@ r_live and r_train, and whether the hand skeleton (HUD) was drawn. The camera is
 
 ### Deployment
 
-`.github/workflows/pages.yml` builds `web/` with base `/edge-vision/` on every push to `main` and
+`.github/workflows/pages.yml` builds `web/` with base `/manuvox/` on every push to `main` and
 deploys it with `actions/upload-pages-artifact` and `actions/deploy-pages`. The translation
 Worker's URL comes from the repository variable `WORKER_URL` when it is set and non-blank, else
 from `web/site.config.json` (an unset variable expands to an empty string, which never overrides
 the file); the build prints the URL it uses and, with `REQUIRE_WORKER_URL=true`, fails when both
 are empty, so deploy the Worker first. One-time setup: Settings -> Pages -> Source "GitHub
-Actions" (or `gh api -X POST repos/Swapnil007-Curious/edge-vision/pages -f build_type=workflow`).
+Actions" (or `gh api -X POST repos/Swapnil007-Curious/manuvox/pages -f build_type=workflow`).
 The `web` job in `.github/workflows/ci.yml` runs the type check, the contrast check, unit tests,
 build and browser tests; the `worker` job type-checks and tests `deploy/worker`. The service
 worker adds the COOP/COEP headers GitHub Pages cannot send (the coi-serviceworker approach), so
@@ -718,9 +781,10 @@ To try v3 locally, run `VITE_MODEL_VARIANT=v3-citizen npm run build && npm run p
 - **Hold to record on phones.** The hold-to-record capture mode (Settings > Advanced) shows its
   button under the stage, which the full-screen phone layout does not have; phones use automatic
   capture.
-- **Small live evaluation.** The live-gap numbers come from 10 clips of one signer, two pairs of
-  which are byte-identical files (see `results/live_gap.md`); they show the direction of each
-  fix, not a precise accuracy.
+- **Small live evaluation.** The live-gap numbers come from 50 webcam clips of one signer, the
+  author (`results/live_gap_v2.md`; the earlier 10-clip pilot is `results/live_gap.md`); they
+  show the direction of each fix, not a precise accuracy, and say nothing about Deaf signers in
+  general.
 
 ## Tests
 

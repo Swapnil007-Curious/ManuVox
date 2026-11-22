@@ -52,7 +52,7 @@ test("record test signs: one segment from the fake camera, downloaded and schema
   const downloadPromise = page.waitForEvent("download");
   await page.locator("#recorder-download").click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^edge-vision-recordings-\d{8}-\d{6}\.json$/);
+  expect(download.suggestedFilename()).toMatch(/^manuvox-recordings-\d{8}-\d{6}\.json$/);
   const path = await download.path();
   await download.saveAs(test.info().outputPath("recordings.json"));
   const file = JSON.parse(readFileSync(path, "utf8")) as RecordingsFile;

@@ -1,6 +1,6 @@
 # Teach Dex: personalised result (record-then-test)
 
-Separate from every main result. One signer: take 1 of test_clips_v2 taught each sign through the app's Teach panel, up to three examples from repeated playback of the one take-1 clip. Each take-1 clip had a 3.5 s still lead-in (its first frame repeated) so the panel's countdown did not cover the recorded sign, and the listening window spanned the clip; each example is the first segment after the countdown. Take 2 was then recognised with the examples on, through the final live pipeline (installed Chrome, GPU tracker), 3 runs. Blend weight and offset come from the validation split (scripts/calibrate_teach.py), not from these clips. Written by scripts/teach_report.py.
+Separate from every main result. One signer: take 1 of test_clips_v2 taught each sign through the app's Teach panel, up to three examples from repeated playback of the one take-1 clip. Each take-1 clip had a 3.5 s still lead-in (its first frame repeated) so the panel's countdown did not cover the recorded sign, and the listening window spanned the clip; each example is the first segment after the countdown. Take 2 was then recognised with the examples on, through the final live pipeline (installed Chrome, GPU tracker), 3 runs. Blend weight and offset come from the validation split (scripts/calibrate_teach.py), not from these clips. Model sha256 `f7d79f675549`. Written by scripts/teach_report.py.
 
 | Clip top-1 on take 2 (%) | Value | 95% CI |
 |---|---|---|

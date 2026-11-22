@@ -1,4 +1,4 @@
-// Edge-Vision "Duet": the app shell. The recognition pipeline lives in src/engine.ts; this file
+// ManuVox "Duet": the app shell. The recognition pipeline lives in src/engine.ts; this file
 // wires its events to the interface (stage, transcript, practice, signs library, diagnostics),
 // sentence translation and speech, keyboard shortcuts, onboarding and the service worker.
 

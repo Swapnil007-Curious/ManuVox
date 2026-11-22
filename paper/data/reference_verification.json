@@ -219,14 +219,14 @@
   "source_first_author": "guo",
   "notes": ""
  },
- "naeini2015ece": {
+ "snell2017prototypical": {
   "status": "ok",
-  "verified_with": "https://doi.org/10.1609/aaai.v29i1.9602",
-  "source": "Crossref",
+  "verified_with": "https://arxiv.org/abs/1703.05175",
+  "source": "arXiv API",
   "title_similarity": 1.0,
-  "source_title": "Obtaining Well Calibrated Probabilities Using Bayesian Binning",
-  "source_year": "2015",
-  "source_first_author": "pakdaman naeini",
+  "source_title": "Prototypical Networks for Few-shot Learning",
+  "source_year": "2017",
+  "source_first_author": "snell",
   "notes": ""
  },
  "geifman2017selective": {

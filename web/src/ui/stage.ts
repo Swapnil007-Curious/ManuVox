@@ -45,18 +45,18 @@ const STATE_COPY: Record<StateKind, { eyebrow: string; title: string; body: stri
   insecure: {
     eyebrow: "Camera unavailable",
     title: "The camera needs a secure page",
-    body: "Open Edge-Vision over https (or on localhost) to use the camera.",
+    body: "Open ManuVox over https (or on localhost) to use the camera.",
     action: null,
   },
   unsupported: {
     eyebrow: "Browser not supported",
-    title: "This browser cannot run Edge-Vision",
+    title: "This browser cannot run ManuVox",
     body: "It needs WebAssembly, Web Workers and camera access. Use a recent Chrome, Edge, Safari or Firefox.",
     action: null,
   },
   error: {
     eyebrow: "Something went wrong",
-    title: "Edge-Vision could not start",
+    title: "ManuVox could not start",
     body: "",
     action: "Reload",
   },
