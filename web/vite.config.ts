@@ -6,7 +6,7 @@ import { CROSS_ORIGIN_ISOLATION_HEADERS, contentSecurityPolicy, modelVariantAsse
 import { MODEL_VARIANTS, describeModelVariant, privateModelFiles, resolveModelVariant } from "./model-variant.ts";
 import { assertWorkerUrl, describeWorkerUrl, resolveWorkerUrl, workerOrigin, type SiteFile } from "./site-config.ts";
 
-// GitHub Pages serves the app under /manuvox/; set BASE_PATH=/manuvox/ for that build.
+// GitHub Pages serves the app under /ManuVox/; set BASE_PATH=/ManuVox/ for that build.
 const base = process.env.BASE_PATH ?? "/";
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const site = JSON.parse(readFileSync(new URL("./site.config.json", import.meta.url), "utf8")) as SiteFile;

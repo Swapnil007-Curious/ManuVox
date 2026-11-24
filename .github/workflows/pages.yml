@@ -1,6 +1,6 @@
 name: Pages
 
-# Builds web/ and deploys it to https://swapnil007-curious.github.io/manuvox/.
+# Builds web/ and deploys it to https://swapnil007-curious.github.io/ManuVox/.
 # One-time setup: repository Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
 # The sentence translator's URL comes from the repository variable WORKER_URL (Settings -> Secrets
 # and variables -> Actions -> Variables) when it is set and non-blank, else from
@@ -42,7 +42,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          BASE_PATH: /manuvox/
+          BASE_PATH: /ManuVox/
           # "" when the repository variable is unset: site.config.json's workerUrl is used then
           VITE_WORKER_URL: ${{ vars.WORKER_URL }}
           REQUIRE_WORKER_URL: "true"

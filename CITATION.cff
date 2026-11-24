@@ -9,7 +9,7 @@ authors:
     affiliation: Independent Researcher, India
 license: MIT
 repository-code: "https://github.com/Swapnil007-Curious/ManuVox"
-url: "https://swapnil007-curious.github.io/manuvox/"
+url: "https://swapnil007-curious.github.io/ManuVox/"
 abstract: >-
   ManuVox (research codename Edge-Vision) is an in-browser recognizer of 250 isolated American
   Sign Language signs from MediaPipe landmarks that runs on a low-power laptop, together with the

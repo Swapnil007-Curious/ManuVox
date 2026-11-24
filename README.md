@@ -1,22 +1,23 @@
 # ManuVox
 
-(research codename: Edge-Vision)
+*ManuVox: Auditing the Train–Serve Gap of a Landmark-Based Sign Recognizer on a Laptop*
 
-**Your hands, spoken aloud.** ManuVox recognises 250 isolated American Sign Language (ASL) signs
-from a webcam, entirely in the browser on a low-power laptop, and turns the recognised signs into
-a simple spoken sentence. It is a research demo, not a full ASL translator: each sign is read on
-its own, from a fixed vocabulary, and the grammar ASL carries in space, movement and the face is
-not captured.
+ManuVox recognises 250 isolated American Sign Language signs from a webcam and speaks the result as a short English sentence. It runs entirely in the browser on a low-power laptop, so video never leaves the device. The research behind it measures why accuracy drops between benchmark data and live use.
 
-- **Live app:** <https://swapnil007-curious.github.io/manuvox/>
-- **Paper:** coming soon ("ManuVox: Auditing the Train–Serve Gap of a Landmark-Based Sign
-  Recognizer on a Laptop"; source and build instructions in [`paper/`](paper/README.md))
-- **Author:** Swapnil Shukla
-- **Licences:** code MIT ([`LICENSE`](LICENSE)); datasets in
+- Live demo: https://swapnil007-curious.github.io/ManuVox/
+- Code: https://github.com/Swapnil007-Curious/ManuVox
+- Paper (PDF): [paper/main.pdf](paper/main.pdf)
+- IEEE version: [paper/ieee/main_ieee.pdf](paper/ieee/main_ieee.pdf)
+- Author: Swapnil Shukla, Independent Researcher, India
+- Licences: code MIT ([`LICENSE`](LICENSE)); datasets in
   [`docs/DATA_LICENSES.md`](docs/DATA_LICENSES.md); third-party software and models in
   [`THIRD_PARTY.md`](THIRD_PARTY.md). Cite with [`CITATION.cff`](CITATION.cff).
 
 ![ManuVox recognising "hello"](docs/screenshots/04-word-landing-1440x900-dark.png)
+
+ManuVox is a research demo, not a full ASL translator: each sign is read on its own, from a fixed
+vocabulary, and the grammar ASL carries in space, movement and the face is not captured. The
+research codename was Edge-Vision (see [Naming](#naming)).
 
 ## Results
 
@@ -66,7 +67,7 @@ unchanged.
 ## Technical documentation
 
 The sections below document the research code: landmark preprocessing, signer-independent
-splits and compact sequence classifiers (GRU, temporal CNN, transformer, convolution–transformer
+splits and compact sequence classifiers (GRU, temporal CNN, transformer, convolution-transformer
 hybrid) for the Kaggle [Google Isolated Sign Language Recognition](https://www.kaggle.com/competitions/asl-signs)
 data (`asl-signs`), exported to ONNX and run in the browser.
 
@@ -291,7 +292,7 @@ Outputs: `results/bench/bench_raw.csv` (one row per configuration and round),
 
 ## Web demo
 
-Live: <https://swapnil007-curious.github.io/manuvox/>
+Live: <https://swapnil007-curious.github.io/ManuVox/>
 
 `web/` is an installable, offline-capable sign-to-speech app (Vite and strict TypeScript, no UI
 framework). MediaPipe Tasks HandLandmarker (two hands) and PoseLandmarker lite produce landmarks
@@ -384,7 +385,7 @@ contrast and the Worker vocabulary staying in sync) and, after `npm run build`,
 Chromium, offline reload through the service worker, a camera smoke test, the interface flow
 driven through the debug hook, Record test signs, and a recorded clip end to end when
 `data/live_clips/hello.y4m` exists). For a build under another base path, set `BASE_PATH` (for
-example `/manuvox/`) for both the build and the tests. Node 22.18 or newer runs the contrast
+example `/ManuVox/`) for both the build and the tests. Node 22.18 or newer runs the contrast
 script (it imports TypeScript directly).
 
 Screenshots: `docs/screenshots/` (`npm run screenshots`; the header of
@@ -724,7 +725,7 @@ r_live and r_train, and whether the hand skeleton (HUD) was drawn. The camera is
 
 ### Deployment
 
-`.github/workflows/pages.yml` builds `web/` with base `/manuvox/` on every push to `main` and
+`.github/workflows/pages.yml` builds `web/` with base `/ManuVox/` on every push to `main` and
 deploys it with `actions/upload-pages-artifact` and `actions/deploy-pages`. The translation
 Worker's URL comes from the repository variable `WORKER_URL` when it is set and non-blank, else
 from `web/site.config.json` (an unset variable expands to an empty string, which never overrides
@@ -797,7 +798,7 @@ pytest -q
 
 Tests use synthetic fixtures only; the real dataset is not needed.
 
-## Results
+## Result files
 
 Result tables are generated into `results/tables/` by `scripts/aggregate_val.py`,
 `scripts/final_eval.py`, `scripts/quantize.py` and `scripts/benchmark.py`; the v1 and v2
@@ -818,3 +819,8 @@ experiments together are in `results/tables/selection/`. For the web demo:
 
 The research paper built from these files is in [`paper/`](paper/README.md): every number in it is
 generated from the result files and audited by `scripts/paper_claims.py`.
+
+## Related projects
+
+- VeriDex is a free assistant that searches a fixed library of open textbooks and Indian statutes before answering. Every answer cites its passages, and a checker confirms that each sentence carries a citation ([live demo](https://swapnil007-curious.github.io/VeriDex/), [code](https://github.com/Swapnil007-Curious/VeriDex)).
+- KANVAS predicts whether a job on a shared GPU cluster will fail and explains each prediction as one readable curve per input. On Alibaba's public 2020 GPU trace it shows that random splits reward models for memorising a few heavy users ([live demo](https://kanvas.streamlit.app), [code](https://github.com/Swapnil007-Curious/KANVAS)).
