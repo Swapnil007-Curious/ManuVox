@@ -2,7 +2,9 @@
 
     python scripts/paper_tables.py && python scripts/paper_claims.py
 
-For every \\V{key} used in paper/main.tex, paper/sections/*.tex and the generated tables:
+Both versions are audited: the full version (paper/main.tex, paper/sections/*.tex, paper/tables/)
+and the IEEE version (paper/ieee/main_ieee.tex, paper/ieee/sections/*.tex, paper/ieee/tables/).
+For every \\V{key} used in either:
   1. the key must exist in paper/data/macro_sources.json (written by paper_tables.py);
   2. where the source can be read independently (CSV or JSON fields), the value is looked up
      again here, by a different code path, and compared with the recorded raw value;
@@ -10,9 +12,10 @@ For every \\V{key} used in paper/main.tex, paper/sections/*.tex and the generate
      interval must match both ends, "significant"/"not significant" must agree with the Holm
      p-value it reports, and "<0.001" must hold.
 It also checks that every cited key is in paper/references.bib and verified in
-paper/data/reference_verification.json (and that 20 to 35 references are cited), that no banned
-word appears, and lists every digit in the hand-written .tex outside a macro so that none is a
-result typed by hand. Exit code 1 when any check fails.
+paper/data/reference_verification.json (the author's own extended version, SELF, is exempt),
+that each version cites 20 to 35 references, that no banned word appears, and lists every digit
+in the hand-written .tex outside a macro so that none is a result typed by hand. Exit code 1
+when any check fails.
 """
 
 from __future__ import annotations
@@ -38,7 +41,22 @@ BANNED = [
     "furthermore",
     "fundamentally",
     "bespoke",
+    "crucial",
+    "pivotal",
+    "robust",
+    "showcase",
+    "underscore",
+    "highlight",
+    "intricate",
+    "meticulous",
+    "seamless",
+    "additionally",
+    "notably",
+    "moreover",
 ]
+# The author's own extended version, cited by the IEEE version: in references.bib, but not an
+# external publication that scripts/verify_references.py can check.
+SELF = {"shukla2026manuvox"}
 
 # Factual (non-numeric) claims, checked by reading the named source.
 FACTS = [
@@ -262,10 +280,37 @@ def tex_bodies(files: list[Path]) -> dict[Path, str]:
     return out
 
 
+VERSIONS = {"full": PAPER / "main.tex", "IEEE": PAPER / "ieee" / "main_ieee.tex"}
+
+
+def input_tree(main: Path) -> list[Path]:
+    """The main file and every file it \\input s, recursively (paths relative to its folder),
+    without the number macros. Inputs inside an \\if switch count whether or not it is on."""
+    seen: list[Path] = []
+
+    def visit(f: Path) -> None:
+        if f in seen or not f.exists() or f.name == "numbers.tex":
+            return
+        seen.append(f)
+        for name in re.findall(r"\\input\{([^}]+)\}", tex_bodies([f])[f]):
+            path = main.parent / name
+            visit((path if path.suffix == ".tex" else path.with_name(path.name + ".tex")).resolve())
+
+    visit(main.resolve())
+    return seen
+
+
 def main() -> int:
     macros = json.loads((PAPER / "data" / "macro_sources.json").read_text(encoding="utf-8"))
-    hand = [PAPER / "main.tex", *sorted((PAPER / "sections").glob("*.tex"))]
-    generated = sorted((PAPER / "tables").glob("*.tex"))
+    hand = [
+        PAPER / "main.tex",
+        *sorted((PAPER / "sections").glob("*.tex")),
+        PAPER / "ieee" / "main_ieee.tex",
+        *sorted((PAPER / "ieee" / "sections").glob("*.tex")),
+    ]
+    generated = sorted((PAPER / "tables").glob("*.tex")) + sorted(
+        (PAPER / "ieee" / "tables").glob("*.tex")
+    )
     bodies = tex_bodies(hand + generated)
     used: dict[str, list[str]] = {}
     for f, body in bodies.items():
@@ -302,17 +347,28 @@ def main() -> int:
     cited: set[str] = set()
     for body in bodies.values():
         for group in re.findall(r"\\cite[a-z]*\*?(?:\[[^\]]*\])*\{([^}]+)\}", body):
-            cited |= {c.strip() for c in group.split(",")}
+            cited |= {c.strip() for c in group.split(",") if not c.strip().startswith("#")}
     cite_rows = []
     for key in sorted(cited):
         status = verified.get(key, {}).get("status")
-        good = key in bib_keys and status == "ok"
-        cite_rows.append(
-            (key, verified.get(key, {}).get("verified_with", ""), "yes" if good else "no")
+        good = key in bib_keys and (status == "ok" or key in SELF)
+        source = (
+            "the author's own extended version (paper/main.tex); not an external publication"
+            if key in SELF
+            else verified.get(key, {}).get("verified_with", "")
         )
+        cite_rows.append((key, source, "yes" if good else "no"))
         failures += 0 if good else 1
-    count_ok = 20 <= len(cited) <= 35
+    per_version: dict[str, int] = {}
+    for version, main_file in VERSIONS.items():
+        keys: set[str] = set()
+        for body in tex_bodies(input_tree(main_file)).values():
+            for group in re.findall(r"\\cite[a-z]*\*?(?:\[[^\]]*\])*\{([^}]+)\}", body):
+                keys |= {c.strip() for c in group.split(",") if not c.strip().startswith("#")}
+        per_version[version] = len(keys)
+    count_ok = all(20 <= n <= 35 for n in per_version.values())
     failures += 0 if count_ok else 1
+    counts = ", ".join(f"{n} in the {v} version" for v, n in per_version.items())
     uncited = sorted(bib_keys - cited)
     # Wording.
     banned_hits = []
@@ -348,10 +404,11 @@ def main() -> int:
         "`scripts/paper_tables.py`). Every number in the paper is a `\\V{key}` macro: for each key used, the "
         "source file and field, whether an independent re-read of the source gives the same value, and whether "
         "the printed text rounds correctly (raw x scale). Then the citations, banned words and every digit "
-        "typed outside a macro.",
+        "typed outside a macro. Both versions are audited: the full version (`paper/main.tex`) and the IEEE "
+        "version (`paper/ieee/main_ieee.tex`).",
         "",
         f"**Summary:** {len(used)} macros used, {sum(1 for r in rows if r[4] == 'yes')} match; "
-        f"{len(cited)} references cited ({'within' if count_ok else 'OUTSIDE'} 20-35), "
+        f"{len(cited)} references cited ({counts}; each {'within' if count_ok else 'OUTSIDE'} 20-35), "
         f"{sum(1 for r in cite_rows if r[2] == 'yes')} verified; {len(banned_hits)} banned words; "
         f"{len(digits)} digits outside macros (listed; none is a result); **{failures} failures**.",
         "",
@@ -403,7 +460,7 @@ def main() -> int:
     for f, w in banned_hits:
         print("FAIL banned word", f, w)
     if not count_ok:
-        print(f"FAIL {len(cited)} references cited (need 20-35)")
+        print(f"FAIL references cited: {counts} (each needs 20-35)")
     return 1 if failures else 0
 
 

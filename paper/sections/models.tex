@@ -25,24 +25,24 @@ hybrid.
 Signer independence costs a lot: on a signer-dependent split (another test set, so not a
 paired comparison) the same CNN reaches \V{m.dep.cnn.top1}\% test top-1, against the
 \V{m.cnn.top1}\% on unseen signers in Table~\ref{tab:models}. Among the v1 models, the transformer's difference from the CNN is
-\V{cmp.tf.sig} and the GRU is \V{cmp.gru.diff} points lower (Table~\ref{tab:comparisons}). In the
+\V{cmp.tf.sig} and the GRU differs from it by \V{cmp.gru.diff} points (Table~\ref{tab:comparisons}). In the
 v2 ablation, the v2 features did not help measurably with the CNN and the v1 recipe
 (\V{cmp.feat.diff} points); the v2 recipe added \V{cmp.recipe.diff} points and the hybrid
 \V{cmp.arch.diff}. The hybrid step also multiplies the parameter count by \V{m.paramratio} and the
-training time by \V{m.timeratio}, so its gain is not the architecture's alone. These tests treat
-the \V{cmp.n} test sequences as independent and average over seeds, so they exclude seed and
-signer variation. Per signer, the hybrid's top-1 ranges from \V{sig.d.min}\% to \V{sig.d.max}\%
-(Table~\ref{tab:persigner}); it beats the CNN for all four test signers, weak evidence about new
-ones, and the recipe's small gain is positive for all four, which four signers cannot make
-significant.
+training time by \V{m.timeratio}, so its gain cannot be credited to the architecture alone. These
+tests treat the \V{cmp.n} test sequences as independent and average over seeds, so they exclude
+seed and signer variation. Per signer, the hybrid's top-1 ranges from \V{sig.d.min}\% to
+\V{sig.d.max}\% (Table~\ref{tab:persigner}). It beats the CNN for all four test signers, which is
+weak evidence about new ones; the recipe's small gain is also positive for all four, but four
+signers cannot make it significant.
 
 \paragraph{Choosing the model to ship.}
 The hybrid reaches \V{m.d.top1}\% top-1 and \V{m.d.top3}\% top-3; an ensemble of its three seeds reaches
 \V{m.d.ens.top1}\% at \V{m.d.ens.mb}\,MB in fp16. The shipping rule took the highest \emph{test}
 top-1 with a p95 browser latency under \V{budget.ms} ms and a file under ten megabytes
-(Figure~\ref{fig:acclat} in the appendix); the size cap, a repository convenience, alone excludes
-the ensemble. Because the rule used the test split, we note that validation top-1 selects the same
-model (\V{m.d.val}\% against at most \V{m.c.val}\% for the others).
+(Figure~\ref{fig:acclat} in the appendix). The size cap, a repository convenience, alone excludes
+the ensemble. Because the rule used the test split, we also checked validation top-1, which selects
+the same model (\V{m.d.val}\% against at most \V{m.c.val}\% for the others).
 
 \input{tables/models}
 \input{tables/comparisons}
@@ -56,24 +56,25 @@ expected calibration error (\V{cal.bins} equal-width bins) from \V{cal.test.ece0
 \V{cal.test.cov}\% of test sequences at \V{cal.test.sel}\% selective accuracy, close to its
 validation operating point (\V{cal.val.cov}\% at \V{cal.val.sel}\%), so it transfers to unseen
 signers of the same dataset. Across datasets the calibration degrades: on ASL Citizen the error
-after scaling is \V{cit.v2.ece}; the threshold keeps its precision (\V{cit.v2.sel}\% selective
+after scaling is \V{cit.v2.ece}. The threshold keeps its precision (\V{cit.v2.sel}\% selective
 accuracy) but, as accuracy falls, accepts only \V{cit.v2.cov}\% of videos.
 
-\paragraph{A second training set (v3).}
+\paragraph{Training on a second dataset (v3).}
 v3 trains the hybrid with the same recipe on the Google ISLR training split plus ASL Citizen's
 training videos of the mapped signs (\V{v3.train} sequences by \V{v3.trainsigners} signers), with
 augmentation for webcam conditions: random aspect ratio, frame rate and dropped hand frames. Epoch
 and seed are selected by the unweighted mean of the two validation top-1 scores (seed \V{v3.seed}:
 \V{v3.val.ks}\% and \V{v3.val.cit}\%); temperature and threshold are fitted on the pooled
 validation split. Each test set was evaluated once, after v3 was selected (Table~\ref{tab:v3}). On
-ASL Citizen, v2 reaches \V{cit.v2.top1}\% (signer interval \V{cit.v2.top1cis}), \V{cit.v2.drop}
+ASL Citizen, v2 reaches \V{cit.v2.top1}\% (95\% bootstrap interval over signers
+\V{cit.v2.top1cis}), \V{cit.v2.drop}
 points below its own test split, and less on signs mapped through a variant (\V{cit.v2.variant}\%)
 than on exact matches (\V{cit.v2.exact}\%), which may reflect the mapping or different sign forms.
 v3 reaches \V{cit.v3.top1}\%, but it has seen ASL Citizen's training signers, so that score is
-in-domain, not a fair contest. On the Google ISLR test split, v3 reaches \V{v3c.ks.b}\% against
-\V{v3c.ks.a}\% for the deployed v2 file, \V{v3c.ks.diff} points, positive for each test signer
-(\V{v3c.ks.cmin} to \V{v3c.ks.cmax}). This compares two files, a validation-selected v3 seed and
-v2's seed 0, not two training procedures, and v3 changes both data and augmentation: together they
-lost nothing on the first dataset and gained a little.
+in-domain and not a fair comparison with v2. On the Google ISLR test split, v3 reaches
+\V{v3c.ks.b}\% against \V{v3c.ks.a}\% for the deployed v2 file, \V{v3c.ks.diff} points, positive
+for each test signer (\V{v3c.ks.cmin} to \V{v3c.ks.cmax}). This compares two files, a
+validation-selected v3 seed and v2's seed 0, not two training procedures, and v3 changes both data
+and augmentation: together they lost nothing on the first dataset and gained a little.
 
 \input{tables/v3}

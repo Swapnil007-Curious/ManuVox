@@ -1,0 +1,29 @@
+\section{Limitations and Ethical Considerations}
+\label{sec:limitations}
+
+The live evaluation uses \V{lg.clips} clips recorded by a single signer, the author, in one room
+with one laptop camera. The author is not a fluent signer; the signs in the live recordings were
+learned from online ASL video dictionaries, and how the \V{lg.signs} signs were chosen was not
+recorded. If the signer's productions differ from the dataset's signers, some live errors are
+production differences rather than pipeline or camera effects, and nothing in this design
+separates them. The results show which pipeline discrepancies matter for this signer and camera;
+they do not estimate accuracy for Deaf signers in general. Two controls would locate the remaining
+gap: running the live pipeline on test-split landmark sequences, and an oracle segmentation of the
+live clips. The ASL Citizen label mapping is AI-assisted and unconfirmed by a signer, and v3's
+in-domain accuracy does not validate it. The live clips are not an independent test of v3 either:
+they were analyzed before v3's webcam augmentation was designed. The model recognizes
+\V{data.signs} isolated signs; it does not handle continuous signing, fingerspelling, or signs
+outside the vocabulary, and it is not a translator. The author is based in India, where Indian
+Sign Language is the relevant language; nothing here transfers to it without new data.
+
+We did not evaluate the system with Deaf or hard-of-hearing users, and no Deaf signer took part in
+its design. Sign language technology should be built with, and ideally led by, Deaf communities
+\cite{bragg2019interdisciplinary,yin2021including,fox2023bestpractices}, and Deaf researchers have
+criticized how often the field sets its agenda without them \cite{desai2024systemic}. At the live
+accuracy we measured, the app's Practice mode, which scores a sign against a target, would tell a
+learner that many correctly produced signs are wrong; it should be evaluated with learners and
+Deaf teachers before anyone relies on it. The live clips show the author, who consents to their use here; they are not
+released, and no ASL Citizen data or model trained on it is released either. When the user asks
+the app for a sentence, only the recognized glosses are sent to a third-party language model
+provider. The code, configurations and result files behind every number are in the repository of
+the extended version \cite{shukla2026manuvox}.

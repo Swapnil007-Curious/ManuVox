@@ -1,0 +1,83 @@
+% ManuVox, IEEE conference version (IEEEtran). The full version, with the appendices, is
+% ../main.tex; this version cites it as the extended version. Build: see ../README.md
+% (cd paper/ieee; tectonic main_ieee.tex).
+% Every number in the text is a macro \V{key} from ../tables/numbers.tex, written by
+% scripts/paper_tables.py from the result files; the tables in tables/ come from the same
+% generator (title above, full caption as a note below). Do not type numbers by hand.
+% The abstract, introduction, conclusion and acknowledgment are shared with the full version
+% (../sections/); the other sections are condensed versions in sections/.
+\documentclass[conference]{IEEEtran}
+\usepackage[T1]{fontenc}
+\usepackage{cite}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+% PDF metadata: title and author only.
+\hypersetup{pdftitle={ManuVox: Auditing the Train\textendash Serve Gap of a Landmark-Based Sign
+  Recognizer on a Laptop}, pdfauthor={Swapnil Shukla}, pdfcreator={}, pdfproducer={}}
+
+% ---------------------------------------------------------------- numbers
+\makeatletter
+\newcommand{\V}[1]{\ifcsname v@#1\endcsname\csname v@#1\endcsname\else
+  \PackageError{numbers}{Undefined number key #1 (rerun scripts/paper_tables.py)}{}\textbf{??#1??}\fi}
+\makeatother
+\input{../tables/numbers.tex}
+
+% ---------------------------------------------------------------- shared helpers
+\newcommand{\cfg}[1]{\texttt{#1}}
+\newcommand{\citep}[1]{\cite{#1}}   % the shared sections use natbib's \citep
+\hyphenation{web-cam web-cams}
+
+% ---------------------------------------------------------------- length controls
+% Each switch adds (true) or removes (false) one block, to fit the venue's page limit. Approximate
+% sizes in one IEEE column (about 60 lines): pipeline figure 16 lines, comparisons table 20,
+% v3 table 16, system paragraph 12, details 25 (secondary paragraphs of the live-gap results).
+% A removed block's content stays in the extended version.
+\newif\ifwithpipeline    \withpipelinetrue    % Fig.: the live pipeline (TikZ)
+\newif\ifwithcomparisons \withcomparisonsfalse % Table: paired model comparisons
+\newif\ifwithvthree      \withvthreefalse     % Table: v2 and v3 on the three test sets
+\newif\ifwithsystem      \withsystemfalse     % Paragraph: the web app (system demonstration)
+\newif\ifwithdetails     \withdetailsfalse    % Live-gap results: other changes, live abstention
+
+\begin{document}
+\bstctlcite{IEEEexample:BSTcontrol}  % reference options in ieee_control.bib
+
+\title{ManuVox: Auditing the Train--Serve Gap of a Landmark-Based Sign Recognizer on a Laptop}
+
+\author{\IEEEauthorblockN{Swapnil Shukla}
+\IEEEauthorblockA{Independent Researcher, India\\
+swapnil.shukla.usa@gmail.com}}
+
+\maketitle
+
+\input{../sections/abstract}
+
+\begin{IEEEkeywords}
+sign language recognition, train--serve skew, on-device inference, MediaPipe, calibration
+\end{IEEEkeywords}
+
+\input{../sections/introduction}
+An extended version of this paper \cite{shukla2026manuvox} adds the hyperparameters, per-signer and
+per-sign results, every quantization variant, the full live-study statistics and a pilot study.
+
+\input{sections/related}
+\input{sections/data}
+\input{sections/models}
+\input{sections/efficiency}
+\input{sections/livegap}
+\input{sections/limitations}
+\input{../sections/conclusion}
+\input{../sections/acknowledgment}
+
+\bibliographystyle{IEEEtran}
+\bibliography{ieee_control,../references}
+
+\end{document}

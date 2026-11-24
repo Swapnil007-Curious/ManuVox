@@ -4,10 +4,10 @@
 hard-of-hearing users, and no Deaf signer took part in its design. Sign language technology
 should be built with, and ideally led by, Deaf communities \citep{bragg2019interdisciplinary,
 yin2021including,fox2023bestpractices}, and Deaf researchers have criticized how often the field
-sets its agenda without them \citep{desai2024systemic}. This paper is an engineering study of one
-failure mode, the train--serve gap, and not a claim of usefulness to the people the technology is
-meant for. No Deaf signer was consulted on the ASL Citizen label mapping either; consultation
-should precede any further deployment.
+sets its agenda without them \citep{desai2024systemic}. This paper studies one engineering failure
+mode, the train--serve gap; it makes no claim that the system is useful to the people the
+technology is meant for. No Deaf signer was consulted on the ASL Citizen label mapping either;
+consultation should precede any further deployment.
 
 \paragraph{Practice mode can mislead learners.} Deaf children of hearing parents are at risk of
 language deprivation when no one around them signs \citep{humphries2012deprivation}, and practice
@@ -16,8 +16,8 @@ mode would tell a learner that many correctly produced signs are wrong, and for 
 every time; it could discourage learners or teach them to distort signs to please the model. It
 should report low-confidence results as ``not sure'' rather than ``try again'', state per-sign
 reliability, and be evaluated with learners and Deaf teachers before anyone relies on it. The
-public site's Practice mode does neither yet; it carries only the general note that ManuVox is not
-a full translator.
+public site's Practice mode does none of this yet; it carries only the general note that ManuVox
+is not a full translator.
 
 \paragraph{Overstating translation.} Calling a gloss classifier a translator misleads users about
 what it understands, and the app's main mode is still named \emph{Translate}. The app states that it
@@ -33,11 +33,11 @@ would then be told it is right. It is no substitute for training data from many 
 
 \paragraph{Data and consent.} The training data is the public Google ISLR release (CC BY 4.0) of
 landmarks, not video. ASL Citizen's videos show the people who recorded them for that dataset; we
-use them only as its licence allows, for non-commercial research, keep the landmarks we extracted
+use them only as its license allows, for non-commercial research, keep the landmarks we extracted
 and every per-video prediction private, report aggregate results only, keep the model trained on
 them off the public site, and will delete the derived data when the research ends. The live clips
 show the author of this paper, who recorded them and consents to their use here; they are not
 released, and every figure in the paper shows landmarks only, never camera pixels. The app
-processes video on the device and keeps taught examples there; when the user asks for a sentence,
+processes video on the device and keeps taught examples there. When the user asks for a sentence,
 the recognized glosses, and nothing else, are sent to a third-party language model provider,
 whose retention policy we have not audited; a gloss sequence can reveal what a user said.

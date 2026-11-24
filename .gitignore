@@ -25,10 +25,13 @@ results/live_gap_v3/*.log
 # outcomes (run*.outcomes.json) and the summary are committed.
 results/teach_dex*/web/*.raw.json
 results/teach_dex*/web/*.log
-# LaTeX build logs (paper/main.pdf itself is committed)
+# LaTeX build logs (paper/main.pdf and paper/ieee/main_ieee.pdf themselves are committed)
 paper/*.log
 paper/*.blg
 paper/*.aux
+paper/ieee/*.log
+paper/ieee/*.blg
+paper/ieee/*.aux
 results/**/artifacts
 # Quantised models; their quant_report.json files and the result CSVs stay tracked.
 results/quant/**/*.onnx

@@ -5,11 +5,11 @@ single signer, the author, in one room with one laptop camera. The author is not
 the signs in the live recordings were learned from online ASL video dictionaries. If the signer's
 productions differ from the dataset's signers, some live errors are
 production differences rather than pipeline or camera effects, and nothing in this design
-separates them; a rating of each clip by a fluent, ideally Deaf, signer would. The results show
+separates them. A rating of each clip by a fluent, ideally Deaf, signer would. The results show
 which pipeline discrepancies matter for this signer and camera; they do not estimate accuracy for
 Deaf signers in general. With fifty clips most effects below the detection limit stated in
 Section~\ref{sec:livegap} are inconclusive. The ten-clip pilot was recorded by the same person.
-How the \V{lg.signs} signs were chosen was not recorded; if they favour signs the author found
+How the \V{lg.signs} signs were chosen was not recorded; if they favor signs the author found
 easy to learn, the live estimate is biased.
 
 \paragraph{Controls we did not run.} Two controls would locate the remaining gap: running the live
@@ -24,9 +24,9 @@ learned the same mapping from ASL Citizen's training videos, can score as well o
 wrong mapping as on a right one, so its ASL Citizen accuracy is in-domain and does not validate
 the mapping. ASL Citizen's training split adds many signers but only a few videos per sign and
 signer. Teach Dex was taught and tested on two takes recorded by one signer in one sitting, with
-examples replayed from one production per sign, which is its best case; its v3 run is compromised
+examples replayed from one production per sign, which is its best case. Its v3 run is compromised
 (Section~\ref{sec:teach}) and needs repeating with a harness that logs its frame rate. The live
-clips are not an independent test of v3 either: they were analysed before v3's webcam augmentation
+clips are not an independent test of v3 either: they were analyzed before v3's webcam augmentation
 was designed, that augmentation targets the discrepancies they revealed, and Teach Dex reuses them.
 
 \paragraph{Isolated signs from a closed vocabulary.} The model recognizes \V{data.signs} isolated

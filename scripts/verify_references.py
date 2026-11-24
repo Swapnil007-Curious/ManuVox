@@ -31,6 +31,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 BIB = ROOT / "paper" / "references.bib"
 OUT = ROOT / "paper" / "data" / "reference_verification.json"
+SELF = {"shukla2026manuvox"}  # the extended version of this paper (cited by the IEEE version)
 AGENT = "paper-reference-check/1.0"
 ATOM = "{http://www.w3.org/2005/Atom}"
 
@@ -239,6 +240,8 @@ def main() -> int:
     entries = parse_bib(BIB.read_text(encoding="utf-8"))
     results: dict[str, Any] = {}
     for key, entry in entries.items():
+        if key in SELF:
+            continue  # the author's own extended version, not an external publication
         try:
             results[key] = check(key, entry)
         except (urllib.error.URLError, ValueError, KeyError, ET.ParseError, TimeoutError) as error:

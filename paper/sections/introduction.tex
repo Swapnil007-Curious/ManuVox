@@ -4,27 +4,27 @@
 Most communication technology runs on spoken and written language and serves sign language
 users poorly \citep{bragg2019interdisciplinary,yin2021including}. A recognizer that runs in a
 browser on an ordinary laptop, without sending video anywhere, could support practice tools and
-simple aids for a fixed vocabulary. Landmark-based recognizers fit: MediaPipe keypoints
-\citep{lugaresi2019mediapipe} are small, appearance-free and fast to classify, and the Google ISLR
-data \citep{kaggle2023islr} provides them for \V{data.signs} isolated signs, collected with the
-partners behind PopSign, a game that helps hearing parents of deaf children learn to sign
+simple aids for a fixed vocabulary. Landmark-based recognizers suit this setting: MediaPipe
+keypoints \citep{lugaresi2019mediapipe} are small, largely appearance-free and fast to classify. The
+Google ISLR data \citep{kaggle2023islr} provides them for \V{data.signs} isolated signs, collected
+with the partners behind PopSign, a game that helps hearing parents of deaf children learn to sign
 \citep{starner2023popsign}; the vocabulary is everyday and child-oriented.
 
 Test accuracy, however, says little about the same model on a webcam. The live pipeline has to
 reproduce, in another language and with another tracker, every step that produced the training
 features: which hand goes in which slot, how coordinates
 are normalized, how time is resampled, where a sign starts and ends. Any mismatch is train--serve
-skew \citep{sculley2015debt,breck2017mltestscore}, and it is invisible to offline evaluation. Our
+skew \citep{sculley2015debt,breck2017mltestscore}, and offline evaluation cannot see it. Our
 first browser demo shipped a model with \V{m.cnn.top1}\% test top-1 and recognized
 \V{lg.web.c0headbuild.top1}\% of new webcam clips.
 
-This paper is a measurement study of that gap for ManuVox, our in-browser recognizer, on a
-low-power laptop. Our contributions are:
+We measure that gap for ManuVox, our in-browser recognizer, on a low-power laptop. Our
+contributions are:
 \begin{itemize}
 \item A signer-independent comparison of landmark models with paired, Holm-corrected tests
   (Section~\ref{sec:models}): a convolution--transformer hybrid and a longer recipe improve test
-  top-1 by \V{cmp.ship.diff} points over a CNN, for each of the \V{data.testsigners} test signers,
-  while richer input features alone did not help measurably; on an Intel i3-1115G4 laptop the
+  top-1 by \V{cmp.ship.diff} points over a CNN, for each of the \V{data.testsigners} test signers
+  (weak evidence about new signers), while richer input features alone did not help measurably. On an Intel i3-1115G4 laptop the
   hybrid classifies a sign in \V{b.wasm1.p50} ms in Chrome (Section~\ref{sec:efficiency}).
 \item An audit of six candidate train--serve discrepancies, with an ablation of their fixes on
   \V{lg.clips} new webcam clips through two pipelines (Section~\ref{sec:livegap}). Assigning hands
@@ -35,13 +35,14 @@ low-power laptop. Our contributions are:
   the gap remains.
 \item A cross-dataset test and a second training set. On the webcam recordings of ASL Citizen's
   unseen test signers, v2 reaches \V{cit.v2.top1}\% on \V{cit.signs} mapped signs, and its
-  calibration degrades. v3, trained also on ASL Citizen and with webcam augmentation, reaches \V{cit.v3.top1}\% there, an in-domain score, with \V{v3c.ks.diff} points on the Google
-  ISLR test split; live, it gains \V{v3c.web.diff} points of clip top-1 in the browser and
+  calibration degrades. v3, trained also on ASL Citizen and with webcam augmentation, reaches
+  \V{cit.v3.top1}\% there, an in-domain score, and gains \V{v3c.ks.diff} points on the Google ISLR
+  test split. Live, it gains \V{v3c.web.diff} points of clip top-1 in the browser and
   \V{v3c.py.diff} in Python, neither significant with fifty clips (Section~\ref{sec:liveresults}).
 \item A personalization feature, Teach Dex, evaluated separately (Section~\ref{sec:teach}):
   examples replayed from one recording per sign raise clip top-1 on a second take from
-  \V{td.v2.model}\% to \V{td.v2.teach}\% with v2, in the best case of one signer and one sitting; a
-  v3 run of the same test was compromised by its harness.
+  \V{td.v2.model}\% to \V{td.v2.teach}\% with v2, in the best case of one signer and one sitting.
+  A v3 run of the same test was compromised by its harness.
 \end{itemize}
 One feature specification shared by Python and the browser, and a golden-fixture test between
-them, now keep the two pipelines from drifting apart (Section~\ref{sec:faults}).
+them, now guard against the two pipelines drifting apart (Section~\ref{sec:faults}).

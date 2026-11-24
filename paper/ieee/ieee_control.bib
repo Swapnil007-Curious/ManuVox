@@ -1,0 +1,10 @@
+% IEEEtran.bst options for the IEEE version (cited with \bstctlcite in main_ieee.tex): more than six
+% authors are shortened to the first author and "et al.", as the IEEE reference guide asks, and the
+% url field is not printed (every entry has a DOI, arXiv number or proceedings name; the two web
+% sources give their address in howpublished).
+@IEEEtranBSTCTL{IEEEexample:BSTcontrol,
+  CTLuse_forced_etal = "yes",
+  CTLmax_names_forced_etal = "6",
+  CTLnames_show_etal = "1",
+  CTLuse_url = "no"
+}

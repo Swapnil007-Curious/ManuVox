@@ -1,0 +1,27 @@
+\section{Related Work}
+\label{sec:related}
+
+Isolated sign recognition assigns one gloss to a clip that contains a single sign. Video
+benchmarks such as WLASL \cite{li2020wlasl} and ASL Citizen \cite{desai2023aslcitizen} made the
+task measurable at the scale of a few thousand signs, and INCLUDE \cite{sridhar2020include} did so
+for Indian Sign Language. ASL Citizen evaluates only on signers unseen in training and targets
+webcam-based dictionary lookup, the setting closest to ours. Pose-based models classify body and
+hand keypoints instead of pixels, which removes appearance and makes on-device inference cheap
+\cite{bohacek2022spoter,selvaraj2022openhands}. Moryossef et al.~\cite{moryossef2021pose} show
+with two pose estimators what the skeletal representation loses, so the landmarks available at
+serving time limit what a model can recognize. Segmenting signs is a task of its own
+\cite{renz2021segmentation}; our segmenter is a simple rule on hand motion. The Google ISLR
+competition \cite{kaggle2023islr} released MediaPipe Holistic landmarks rather than video. We
+found no peer-reviewed description of the top entries, and the leaderboard scored a hidden test
+set, so we compare only against baselines trained under our own protocol. In the browser we use
+MediaPipe's Tasks hand \cite{zhang2020mediapipehands} and pose \cite{bazarevsky2020blazepose}
+landmarkers.
+
+Faults accumulate unnoticed in the code around a deployed model \cite{sculley2015debt}, and
+production checklists test that training and serving compute the same features
+\cite{breck2017mltestscore}. Live input also differs in distribution from the dataset, and our
+live gap mixes skew and shift. Temperature scaling corrects miscalibration
+\cite{guo2017calibration}, selective prediction abstains below a threshold
+\cite{geifman2017selective}, as our ``not sure'' does, and calibration degrades under dataset
+shift \cite{ovadia2019shift}. Teach Dex, our personalization feature, borrows the idea of
+prototypical networks \cite{snell2017prototypical} without retraining.

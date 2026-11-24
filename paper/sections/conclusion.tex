@@ -3,12 +3,13 @@
 
 A signer-independent test accuracy of \V{m.cnn.top1}\% did not make a usable live recognizer: the
 first deployment, with that CNN, recognized \V{lg.web.c0headbuild.top1}\% of new webcam clips. Of
-six candidate train--serve discrepancies, one had a large and consistent effect, putting each hand
-in the wrong slot; a shared feature specification and a golden parity test now make Python and the
-browser compute the same model inputs from the same landmarks. With the fixes, the hybrid reaches
-\V{lg.web.c6final.top1}\% clip top-1 in the browser and \V{lg.py.c6final.top1}\% with the training
-tracker, with no evidence that the rest of the gap depends on the pipeline. Training on ASL Citizen
+six candidate train--serve discrepancies, one had a large effect in both pipelines, putting each
+hand in the wrong slot. A shared feature specification and a golden-fixture test now check that
+Python and the browser compute the same model inputs from the same landmarks. With the fixes, the
+hybrid reaches \V{lg.web.c6final.top1}\% clip top-1 in the browser and \V{lg.py.c6final.top1}\%
+with the training tracker, with no evidence that the rest of the gap depends on which of the two
+pipelines runs. Training on ASL Citizen
 as well moved the live clips by an amount fifty clips cannot resolve, while a few personal examples
 gave one signer a significant gain with v2 in a best-case test. Thresholds chosen on dataset
-sequences need live validation data; next come an oracle segmentation of these clips and live
-recordings from many Deaf signers, made with their involvement.
+sequences need live validation data. The next steps are an oracle segmentation of these clips and
+live recordings from many Deaf signers, made with their involvement.

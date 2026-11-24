@@ -1,0 +1,197 @@
+\section{The Live Gap}
+\label{sec:livegap}
+
+The first deployment (the \emph{shipped build}) ran the v1 CNN behind a browser pipeline that
+computed the same named features as training but not always the same values. We audited six
+candidate train--serve discrepancies, fixed each so that the browser reproduces Python\ifwithpipeline\
+(Fig.~\ref{fig:pipeline})\fi, and measured each fix on new recordings. Not every candidate turned
+out to be a fault. Three are parity questions, where serving must reproduce what training did:
+(a), (c) and (d). Mirroring (b) is a counterfactual, segmentation (e) has no counterpart in
+training, whose sequences each hold one sign, and calibration (f) cannot change a segment's top-1.
+
+\ifwithpipeline
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=1.6mm and 2.6mm,
+  box/.style={draw=black!55, rounded corners=1.5pt, fill=black!4, align=center, font=\scriptsize,
+              inner sep=2.2pt, minimum height=6.5mm},
+  live/.style={box, fill=orange!12, draw=orange!70!black, line width=0.9pt},
+  arr/.style={-{Stealth[length=1.6mm]}, black!70, line width=0.45pt}]
+  \node[box] (cam) {Webcam\\frame};
+  \node[box, right=of cam] (mp) {MediaPipe Tasks\\hands + pose\\(worker 1)};
+  \node[live, right=of mp] (map) {Holistic layout\\(a) hands, (b) unmirrored,\\(c) aspect};
+  \node[live, below=of map] (seg) {Segmenter (e)\\time resampling (d)};
+  \node[box, left=of seg] (cls) {Hybrid fp16\\onnxruntime-web\\(worker 2)};
+  \node[live, left=of cls] (dec) {Temperature +\\threshold (f)};
+  \node[box, below=of dec, xshift=6mm] (out) {Gloss row or\\``not sure''};
+  \draw[arr] (cam) -- (mp);
+  \draw[arr] (mp) -- (map);
+  \draw[arr] (map) -- (seg);
+  \draw[arr] (seg) -- (cls);
+  \draw[arr] (cls) -- (dec);
+  \draw[arr] (dec.south) -- (dec.south |- out.north);
+\end{tikzpicture}
+\caption{The live pipeline in the browser. The orange boxes with thick borders, marked (a)--(f),
+are the six audited steps; \emph{Holistic layout} is the landmark layout of the training tracker.
+Each step reads its constants from \cfg{features\_spec.json} or the model metadata, which the
+Python training code also reads.}
+\label{fig:pipeline}
+\end{figure}
+\fi
+
+\subsection{Six candidate discrepancies}
+\label{sec:faults}
+
+\emph{(a) Hand slots.} Holistic, which produced the training data, crops each hand from the
+pose, so its left-hand block is the hand at the signer's left wrist. The browser's
+HandLandmarker reports a handedness label instead, and the shipped build mapped that label as if
+the frame were mirrored while it ran detection on the unmirrored frame, so every hand went into the
+wrong block. The fix assigns each detected hand to the block of the nearer pose wrist, Holistic's
+own rule, and falls back to the label only when there is no pose.
+\emph{(b) Mirroring.} The shipped build already detected on the unmirrored frame. Detection on
+the mirrored frame, as a selfie pipeline would run it, is a counterfactual.
+\emph{(c) Aspect ratio.} Normalized coordinates give a body different proportions in a portrait
+phone recording and a wide webcam. The shipped build corrected this with a body-ratio estimate
+over the first two seconds; the fix estimates the training data's width-to-height ratio
+$r_{\mathrm{train}}$ from face geometry (\V{asp.train}) and rescales live y about the shoulder
+midpoint by $k = r_{\mathrm{train}} / (w/h)$, with the frame's real width and height.
+\emph{(d) Frame rate.} Training resampled by frame index (the dataset has no timestamps); the
+browser's frame rate varies, so the fix resamples on the capture-time clock.
+\emph{(e) Segmentation.} The shipped build segmented by hand presence: a segment starts after
+\V{pres.start} frames with a hand and ends after \V{pres.end} without one or after \V{pres.max} s.
+The fix is a state machine on motion energy, the speed of the wrist and fingertips on
+aspect-corrected coordinates, with thresholds from the validation sequences.
+\emph{(f) Calibration and abstention.} The shipped build showed the raw top-1 above a threshold
+set for \V{cal.targetprec}\% precision on validation. The fix divides the logits by the validation
+temperature and shows a word only above a validation threshold that maximizes the net score, in
+which a correct accepted word gains one, a wrong one costs one and ``not sure'' scores zero.
+
+Every constant above lives in \cfg{features\_spec.json}, which Python and the browser both read.
+A golden-fixture test in continuous integration runs the browser code on the raw landmarks of
+\V{par.cases} validation sequences exported from Python and requires every model input to match
+within \V{par.tol} and the top-1 class to agree. It also covers hand assignment and replays a
+stream through the segmenter.
+
+\subsection{Evaluation on new recordings}
+
+The author recorded \V{lg.clips} clips with a laptop webcam: \V{lg.signs} everyday signs from the
+vocabulary, learned from online ASL video dictionaries, two takes each (median
+\V{lg.duration}\,s), unmirrored at \V{lg.width}$\times$\V{lg.height} and about \V{lg.fps} frames
+per second. The author is both the developer and the only signer, and a pilot with the same person
+motivated the order of the fixes. No threshold or constant was fitted on these clips: every
+threshold and constant comes from the training and validation splits, and the analysis was fixed
+in the configuration before the first run (the repository cannot show this, as configuration and
+results were committed together).
+
+\emph{Python + Holistic} runs legacy MediaPipe Holistic, the tracker that produced the training
+data, on every frame and then the Python live pipeline; it is deterministic. \emph{Browser +
+Tasks} runs the web app in Chrome on the target laptop with the clip as a fake camera, in real
+time, so frames drop as they would live. One browser per clip runs every configuration in a
+seeded random order, three times each, and a clip's score is its mean over runs, so a browser clip
+can change by a third. The baselines are the \emph{shipped build} itself (inference on the page's
+main thread, \V{lg.web.c0headbuild.fps} frames per second) and \emph{as shipped}, the current app
+with the shipped build's settings. A clip's prediction is the mean probability vector of its
+classified segments; a clip without one counts as wrong, and the abstention threshold does not
+enter clip scores. We report clip top-1 and top-3 with 95\% percentile bootstrap intervals over
+clips \cite{efron1994bootstrap} and compare each configuration with the one it modifies by a
+paired sign-flip test on per-clip scores \cite{dror2018hitchhiker}, Holm-corrected within each
+pipeline and metric \cite{dror2017replicability} (\V{mde.py.family} top-1 comparisons in Python,
+\V{mde.web.family} in the browser). This clip-level analysis was specified before the runs.
+Because a sign's two takes are not independent, a sensitivity analysis added afterwards treats
+each sign as one unit. Power is low: significance at the first Holm step needs at least
+\V{mde.web.k} clips moving in one direction in the browser (\V{mde.web.pts} points if each moves
+by a whole clip) and \V{mde.py.k} in Python, so smaller effects are inconclusive rather than
+absent \cite{card2020power}.
+
+\subsection{Results}
+\label{sec:liveresults}
+
+\input{tables/livegap}
+
+Table~\ref{tab:livegap} gives the ablation. The shipped build recognized
+\V{lg.web.c0headbuild.top1}\% of the clips (top-3 \V{lg.web.c0headbuild.top3}\%). With the hybrid
+and all fixes, clip top-1 reaches \V{lg.web.c6final.top1}\% \V{lg.web.c6final.top1ci} in the
+browser and \V{lg.py.c6final.top1}\% \V{lg.py.c6final.top1ci} in Python. Measured from the hybrid
+with no fix, this recovers \V{lg.web.recover}\% (browser) and \V{lg.py.recover}\% (Python) of the
+drop from its \V{m.d.top1}\% test top-1, so most of the gap remains. The test split excludes
+sequences with too few hand frames while a clip without a segment counts as wrong, so this drop
+somewhat overstates the live gap.
+
+\paragraph*{Hand slots had by far the largest effect}
+Adding the hand fix raised clip top-1 by \V{lg.py.c2hands.dtop1} points in Python and
+\V{lg.web.c2hands.dtop1} in the browser (\V{lg.web.c2hands.dtop1better} clips better,
+\V{lg.web.c2hands.dtop1worse} worse), and undoing it in the final pipeline cost
+\V{lg.py.xhands.dtop1} and \V{lg.web.xhands.dtop1} points. In the pre-specified clip-level analysis
+all four changes are significant after correction. With signs as the unit, they remain significant
+in Python (Holm $p$ = \V{lg.py.c2hands.dtop1psign} and \V{lg.py.xhands.dtop1psign}) and for undoing
+the fix in the browser (\V{lg.web.xhands.dtop1psign}), but not for adding it in the browser
+(\V{lg.web.c2hands.dtop1psign}). Mirroring (b) was not shown to be a fault: once hands are
+assigned by the pose, detecting on the mirrored frame changes clip top-1 by
+\V{lg.web.xmirrored.dtop1} points \V{lg.web.xmirrored.dtop1ci}, compatible with no effect, and the
+old label mapping fails with or without mirroring (\V{lg.web.xhands.top1}\% and
+\V{lg.web.xmirroredlabel.top1}\%).
+
+\paragraph*{Aspect correction and segmentation (inconclusive)}
+Removing all aspect correction from the final pipeline cost \V{lg.py.xaspectoff.dtop1} points in
+Python and \V{lg.web.xaspectoff.dtop1} in the browser, and in the cumulative ablation replacing
+presence segmentation by the motion segmenter cost \V{lg.py.c5segmenter.dtop1} and
+\V{lg.web.c5segmenter.dtop1}. None of these top-1 changes is significant after correction at
+either unit. The final pipeline with presence segmentation matches or beats every other
+configuration, \V{lg.py.xpresence.top1}\% in Python and \V{lg.web.xpresence.top1}\% in the browser.
+The motion segmenter loses mostly whole signs it never segmented (\V{lg.py.c6final.noseg} clips in
+Python and \V{lg.web.c6final.noseg} per browser run without a classified segment, against
+\V{lg.py.xpresence.noseg} and \V{lg.web.xpresence.noseg}). Its thresholds assume the dataset's
+frames are \V{seg.assumedfps} fps apart; if they are not, speeds are misestimated, which would
+produce missed starts of this kind. We keep the pipeline as specified, because choosing a
+segmenter on these clips would tune on the test.
+
+\ifwithdetails
+\paragraph*{The other changes}
+Swapping in the hybrid before any fix gained \V{lg.web.c1model.dtop1} points in the browser and
+\V{lg.py.c1model.dtop1} in Python, from a floor near zero. Resampling by time (d), which cannot
+matter in Python, changed browser clip top-1 by \V{lg.web.c4time.dtop1} points, and calibration
+(f) by \V{lg.web.c6final.dtop1}. Replacing the hybrid by the v1 CNN in the final pipeline cost
+\V{lg.py.xv1model.dtop1} and \V{lg.web.xv1model.dtop1} points (\V{lg.web.xv1model.dtop1sig}), so
+the hybrid's test-set advantage shows only weakly here.
+\fi
+
+\paragraph*{What remains}
+Browser minus Python is \V{lg.pd.c6final.diff} points \V{lg.pd.c6final.ci} for the final pipeline
+(signs as the unit). We see no evidence that the training tracker does better on these clips, but
+the interval allows a sizeable advantage for Holistic, and the pipelines also differ in real-time
+frame dropping. The rest of the gap lies in what both pipelines share, above all segmentation, or
+in the clips themselves (signer, camera, room and the signer's productions), which this design
+cannot separate. In both pipelines, \V{lg.failboth} of the \V{lg.signs} signs fail in every take.
+Live, the calibration does not hold: the expected calibration error is \V{lg.cal.web.ece} in the
+browser (\V{cal.test.ece1} on test), and the threshold accepts \V{lg.cal.web.cov}\% of segments at
+\V{lg.cal.web.sel}\% selective accuracy.
+
+\paragraph*{Training on webcam data (v3)}
+Through the final pipeline, v3 reached clip top-1 \V{v3c.web.b}\% \V{v3c.web.bci} in the browser
+and \V{v3c.py.b}\% \V{v3c.py.bci} in Python, against \V{v3c.web.a}\% and \V{v3c.py.a}\% for v2 in
+the same runs: \V{v3c.web.diff} points in the browser (Holm $p$ = \V{v3c.web.p},
+\V{v3c.web.sig}) and \V{v3c.py.diff} in Python ($p$ = \V{v3c.py.p}, \V{v3c.py.sig}). Both
+differences favor v3, but neither is significant with fifty clips: v3's added data and
+augmentation narrowed this signer's gap far less than they raised its in-domain ASL Citizen score,
+if at all. v3 recognizes \V{cit.v3.top1}\% of the videos of ASL Citizen's unseen signers, trimmed
+to the sign, but under half of these clips. That is consistent with segmentation or this signer's
+productions, more than webcam conditions as such, limiting the live score, but an in-domain score
+cannot settle it.
+
+\subsection{Personalization (Teach Dex)}
+\label{sec:teach}
+
+For each sign a user has taught, Teach Dex takes the highest cosine similarity $s_c$ between a
+segment's embedding (the model's \V{td.embdim}-value penultimate layer) and the user's examples
+of sign $c$, and adds $w\,(s_c - b)$ to that sign's calibrated logit; the weight $w$
+(\V{td.v2.weight}) and offset $b$ (\V{td.v2.offset}) were fitted on validation signers, not on
+the user's clips. In a separate record-then-test evaluation, take 1 of each sign supplied up to
+\V{td.examples} examples, all from one production, and take 2 was recognized with them in
+\V{td.v2.runs} browser runs. With v2, clip top-1 on take 2
+rose from \V{td.v2.model}\% \V{td.v2.modelci} to \V{td.v2.teach}\% \V{td.v2.teachci},
+\V{td.v2.diff} points \V{td.v2.ci} (Holm $p$ = \V{td.v2.p}, \V{td.v2.sig}). In a control that
+taught only \V{td.v2.half} of the signs, the untaught signs changed by \V{td.v2.harm} points. This
+is the feature's best case: one signer, both takes recorded in one sitting, and the test
+vocabulary equal to the signs offered for teaching. A v3 run of the same test was compromised by
+its harness; the extended version reports it.

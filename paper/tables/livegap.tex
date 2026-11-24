@@ -29,6 +29,6 @@ final, presence segmenter & \V{lg.py.xpresence.top1} & \V{lg.py.xpresence.top3} 
 final, v1 CNN & \V{lg.py.xv1model.top1} & \V{lg.py.xv1model.top3} & \V{lg.web.xv1model.top1} & \V{lg.web.xv1model.top3} \\
 \bottomrule
 \end{tabular}
-\caption{Live-gap ablation on the \V{lg.clips} webcam clips (\V{lg.signs} signs $\times$ 2 takes): clip-level top-1/top-3 (\%) for Python with MediaPipe Holistic and for the browser with MediaPipe Tasks. Upper block: one fix added per row; lower block: one fix of the final pipeline undone. Browser rows are means over three real-time runs. $^{*}$: the change against the row it modifies is significant after Holm correction within the pipeline and metric (clip as unit, as pre-specified). Top-1 intervals, raw and sign-level p-values are in Table~\ref{tab:livegapci}.}
+\caption{Live-gap ablation on the \V{lg.clips} webcam clips (\V{lg.signs} signs $\times$ 2 takes): clip-level top-1/top-3 (\%) for Python with MediaPipe Holistic and for the browser with MediaPipe Tasks. Upper block: one fix added per row; lower block: one fix of the final pipeline undone. Browser rows are means over three real-time runs; a dash marks a configuration that exists only in the browser. Clip scores do not use the abstention threshold. $^{*}$: the change against the row it modifies is significant after Holm correction within the pipeline and metric (clip as unit, as pre-specified). Top-1 intervals, raw and sign-level p-values are in Table~\ref{tab:livegapci}.}
 \label{tab:livegap}
 \end{table}

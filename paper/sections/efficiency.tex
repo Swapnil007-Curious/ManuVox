@@ -9,21 +9,22 @@ in Chrome \V{b.chrome} and in Python onnxruntime.
 Post-training quantization of the v1 models (Appendix~\ref{app:quant})
 \citep{jacob2018quantization,nagel2021whitepaper} halves every file in fp16 at no measurable cost
 in accuracy. int8 always costs accuracy (\V{q.int8.least} to \V{q.int8.most} points across
-variants), and dynamic int8 speeds up the transformer but slows the
-depthwise-convolution models (hybrid p50 \V{q.hybrid.int8dynamic.p50} vs.\
-\V{q.hybrid.onnxfp32.p50} ms). Every model is fast enough in fp32, so we ship the hybrid in fp16
+variants). In Python onnxruntime, dynamic int8 speeds up the transformer but slows the
+depthwise-convolution models, the hybrid included (p50 \V{q.hybrid.int8dynamic.p50} ms against
+\V{q.hybrid.onnxfp32.p50} ms in fp32). Every model is fast enough in fp32, so we ship the hybrid in fp16
 (\V{m.ship.mb}\,MB).
 
 \paragraph{Classifier latency.}
 One hybrid call takes \V{q.hybrid.fp16.p50} ms (p50) in Python onnxruntime with one thread and
 \V{b.wasm1.p50} ms (p95 \V{b.wasm1.p95}) in onnxruntime-web with WebAssembly SIMD and one thread;
 two and four threads (\V{b.wasm2.p50} and \V{b.wasm4.p50} ms) and WebGPU on the integrated GPU
-(\V{b.webgpu1.p50} ms) are slower. v3 has the same architecture and file size (\V{lat.v3.mb}\,MB);
-in a later benchmark of three interleaved rounds per model its median p50 and p95 were
+(\V{b.webgpu1.p50} ms) are slower. v3 has the same architecture and file size (\V{lat.v3.mb}\,MB).
+In a later benchmark of three interleaved rounds per model, its median p50 and p95 were
 \V{lat.v3.p50} and \V{lat.v3.p95} ms, against \V{lat.v2.p50} and \V{lat.v2.p95} for v2. Both had
 slow rounds (p95 from \V{lat.p95lo} to \V{lat.p95hi} ms over all rounds), so we see no difference
-beyond round-to-round variation; all are inside the \V{budget.ms} ms budget. The selection benchmark behind Table~\ref{tab:models}
-(fp32, p50 \V{m.d.p50} ms for the hybrid) differs from these runs by a few milliseconds.
+beyond round-to-round variation, and all are inside the \V{budget.ms} ms budget. The selection
+benchmark behind Table~\ref{tab:models} (fp32, p50 \V{m.d.p50} ms for the hybrid) differs from
+these runs by a few milliseconds.
 
 \paragraph{Live throughput.}
 In the app, MediaPipe runs in one worker on the GPU delegate and the classifier in another, so a
@@ -31,7 +32,7 @@ classification never blocks tracking. With a pilot clip (Appendix~\ref{app:pilot
 tracking ran at
 \V{t.hudon.fps} frames per second with the hand skeleton drawn and \V{t.hudoff.fps} without it.
 The classifier took \V{t.hudon.cls1} and \V{t.hudon.cls2} ms per segment (p50, two runs), and a
-word appeared \V{t.hudon.e2e1} ms (p50) after the segmenter ended the sign; that decision comes
+word appeared \V{t.hudon.e2e1} ms (p50) after the segmenter ended the sign. That decision comes
 \V{seg.lostms}--\V{seg.stillms} ms after the hands leave or stop, so a user waits about
 \V{t.userlo}--\V{t.userhi} ms. Without a working GPU delegate the hand landmarker takes
 \V{t.cpu.hand} ms per frame and tracking drops to \V{t.cpu.fps} fps, below our \V{budget.fps} fps

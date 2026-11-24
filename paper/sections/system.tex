@@ -11,10 +11,9 @@ predictions of that sign with them (Section~\ref{sec:teach}); a badge marks a pr
 changed, and the user can switch the feature off or delete the examples. \emph{Signs} lists the
 vocabulary with a dictionary video link per sign. On request, a serverless proxy sends only the
 recognized glosses to a hosted language model (\cfg{llama-3.1-8b-instant} on Groq), instructed to
-write one short sentence without adding facts, and the browser speaks it; offline, a rule-based
-joiner produces a sentence marked as basic. \textbf{Sentence generation is not evaluated}; a fluent
+write one short sentence without adding facts, and the browser speaks it. Offline, a rule-based
+joiner produces a sentence marked as basic. Sentence generation is not evaluated. A fluent
 sentence can lend false authority to wrong glosses and omits the grammar ASL carries in space,
-movement and the face. Video and taught examples never leave the device, and a service worker
-caches the model for offline use and adds the cross-origin isolation headers that WebAssembly
-threads need on static hosting. The public site serves v2; a build option selects v3 for local
-research only, as ASL Citizen's licence requires.
+movement and the face. Video and taught examples never leave the device (Appendix~\ref{app:repro}
+describes the hosting). The public site serves v2; a build option selects v3 for local
+research only, as ASL Citizen's license requires.

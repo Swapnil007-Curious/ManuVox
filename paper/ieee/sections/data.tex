@@ -1,0 +1,37 @@
+\section{Data and Splits}
+\label{sec:data}
+
+We use the Google ISLR data \cite{kaggle2023islr} (license CC BY 4.0): \V{data.total} sequences
+of MediaPipe Holistic landmarks for \V{data.signs} isolated ASL signs, recorded by
+\V{data.signers} signers. We drop sequences with fewer than \V{data.minhand} frames in which a
+hand is detected (\V{data.excluded} sequences), leaving \V{data.kept}. Our split assigns signers
+whole, by a seeded random permutation, to training (\V{data.trainsigners} signers,
+\V{data.trainseq} sequences), validation (\V{data.valsigners}, \V{data.valseq}) and test
+(\V{data.testsigners}, \V{data.testseq}). It is not an official split. Checkpoint selection, early
+stopping, temperature fitting and the abstention threshold use validation only, and a single
+script reads the test split and logs every run. The test split was used during development: the
+v2 features, recipe and architecture were designed after the v1 models had been evaluated on it,
+and the model to ship was chosen by test accuracy (Section~\ref{sec:models}). The paired
+comparisons and test calibration come from logits saved after those choices were final.
+
+ASL Citizen \cite{desai2023aslcitizen} holds \V{cit.all.videos} webcam videos of
+\V{cit.all.glosses} glosses by \V{cit.all.signers} signers with official signer-disjoint splits.
+Its license allows non-commercial research and forbids redistribution. Its glosses are ASL-LEX
+entry names, so \V{cit.map.mapped} of our \V{cit.map.vocabulary} labels map to them:
+\V{cit.map.exact} by name, \V{cit.map.variant} to a numbered variant and \V{cit.map.synonym} to a
+synonym. We chose the variants and synonyms with AI assistance from ASL-LEX's English
+translations, and no signer has confirmed them. The official test split, \V{cit.videos} videos of
+\V{cit.signs} signs by \V{cit.signers} signers, is read by a second logged script once per model:
+for v2 it is a cross-dataset test.
+
+One file, \cfg{features\_spec.json}, read by both the Python code and the browser, specifies the
+preprocessing. Face and lip points and z are not used. Frames without a hand are removed;
+coordinates are centered on the median shoulder midpoint and scaled by the median shoulder
+distance; a sequence whose left hand is present in more frames than its right is mirrored; and
+each sequence is linearly resampled to \V{data.frames} frames. The \emph{v1} input keeps both
+hands and \V{data.v1pose} pose points, \V{data.v1points} landmarks in all. The \emph{v2} input
+keeps \V{data.v2pose} pose points (adding eyes, ears and mouth corners), \V{data.v2points}
+landmarks, and computes \V{data.v2feat}
+features inside the model graph: coordinates, velocity and acceleration, the \V{data.pairdist}
+pairwise distances of the dominant hand, and \V{data.facedist} distances from its wrist and
+fingertips to the nose, mouth and shoulders, all standardized with training statistics.

@@ -1,0 +1,64 @@
+\section{Models and Training}
+\label{sec:models}
+
+All models take a sequence of \V{data.frames} frames and output \V{data.signs} logits. The
+\emph{GRU} runs a two-layer bidirectional GRU \cite{cho2014gru}; the \emph{CNN} is a stack of
+residual depthwise-separable temporal convolutions \cite{howard2017mobilenets,bai2018tcn}; the
+\emph{Transformer} is a four-layer encoder \cite{vaswani2017attention}. The \emph{hybrid}, close
+to the Conformer \cite{gulati2020conformer}, has three stages of two depthwise-convolution blocks
+and one transformer block, then average pooling over time and a linear head. Velocity, the v2
+distance features and standardization are computed inside the network, so the exported ONNX file
+takes raw normalized landmarks. The \emph{v1 recipe} trains for up to \V{hp.v1.epochs} epochs
+with AdamW, cosine decay, label smoothing and geometric and temporal augmentation. The \emph{v2
+recipe} trains up to \V{hp.v2.epochs} epochs at a lower learning rate, with an exponential moving
+average of the weights \cite{polyak1992averaging}, frame dropout, time and landmark masking and
+hand rotation. Each configuration has \V{hp.seeds} seeds; a hybrid run took about
+\V{m.d.trainmin} minutes on a Kaggle \V{m.gpu}. The v2 grid is a cumulative ablation from the v1
+CNN: v2 features, then the v2 recipe, then the hybrid.
+
+\input{tables/models}
+\ifwithcomparisons\input{tables/comparisons}\fi
+
+\paragraph*{Results}
+Signer independence costs a lot: on a signer-dependent split (another test set, so not a
+paired comparison) the same CNN reaches \V{m.dep.cnn.top1}\% test top-1, against the
+\V{m.cnn.top1}\% on unseen signers in Table~\ref{tab:models}. In paired tests over the
+\V{cmp.n} test sequences with Holm correction\ifwithcomparisons\ (Table~\ref{tab:comparisons})\fi\
+(differences computed before rounding),
+the transformer's difference from the CNN is \V{cmp.tf.sig} and the GRU differs from it by
+\V{cmp.gru.diff} points. In the v2 ablation, the v2 features did not help measurably with the CNN and the v1
+recipe (\V{cmp.feat.diff} points); the v2 recipe added \V{cmp.recipe.diff} points and the hybrid
+\V{cmp.arch.diff}. The hybrid step also multiplies the parameter count by \V{m.paramratio} and the
+training time by \V{m.timeratio}, so its gain cannot be credited to the architecture alone. These
+tests treat the sequences as independent and average over seeds, so they exclude seed and signer
+variation. Per signer, the hybrid's top-1 ranges from \V{sig.d.min}\% to \V{sig.d.max}\%, and it
+beats the CNN for all four test signers, which is weak evidence about new ones.
+
+The shipping rule took the highest \emph{test} top-1 with a p95 browser latency under
+\V{budget.ms} ms and a file under ten megabytes; the size cap alone excludes an ensemble of the
+hybrid's three seeds (\V{m.d.ens.top1}\% at \V{m.d.ens.mb}\,MB in fp16). Because the rule used the
+test split, we also checked validation top-1, which selects the same model (\V{m.d.val}\% against
+at most \V{m.c.val}\% for the others). The fitted temperature is below one (\V{cal.T}): the raw
+model is underconfident, consistent with label smoothing. On the test split, temperature scaling
+lowers the expected calibration error (\V{cal.bins} equal-width bins) from \V{cal.test.ece0}
+\V{cal.test.ece0ci} to \V{cal.test.ece1} \V{cal.test.ece1ci}. The validation threshold
+(\V{cal.thr}\%) accepts \V{cal.test.cov}\% of test sequences at \V{cal.test.sel}\% selective
+accuracy, close to its validation operating point (\V{cal.val.cov}\% at \V{cal.val.sel}\%).
+
+\paragraph*{Training on a second dataset (v3)}
+v3 trains the hybrid with the same recipe on the Google ISLR training split plus ASL Citizen's
+training videos of the mapped signs (\V{v3.train} sequences by \V{v3.trainsigners} signers), with
+augmentation for webcam conditions: random aspect ratio, frame rate and dropped hand frames. Epoch
+and seed are selected by the unweighted mean of the two validation top-1 scores, and each test set
+was evaluated once, after v3 was selected\ifwithvthree\ (Table~\ref{tab:v3})\fi. On ASL Citizen,
+v2 reaches \V{cit.v2.top1}\% (95\% bootstrap interval over signers \V{cit.v2.top1cis}),
+\V{cit.v2.drop} points below its own test split, less on signs mapped through a variant
+(\V{cit.v2.variant}\%) than on exact matches (\V{cit.v2.exact}\%), and its calibration degrades: the error after scaling is \V{cit.v2.ece}, and
+the threshold accepts only \V{cit.v2.cov}\% of videos. v3 reaches \V{cit.v3.top1}\%, but it has
+seen ASL Citizen's training signers, so that score is in-domain and not a fair comparison with v2.
+On the Google ISLR test split, v3 reaches \V{v3c.ks.b}\% against \V{v3c.ks.a}\% for the deployed
+v2 file, \V{v3c.ks.diff} points\ifwithvthree\else\ \V{v3c.ks.ci} (Holm $p$ \V{v3c.ks.p})\fi,
+positive for each test signer. This compares two files, a
+validation-selected v3 seed and v2's seed 0, not two training procedures.
+
+\ifwithvthree\input{tables/v3}\fi

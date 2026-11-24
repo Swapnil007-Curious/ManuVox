@@ -1064,3 +1064,364 @@ Findings, a workshop or a demo track).
 | F3 | Fixed | Ethics: no Deaf signer was consulted on the label mapping either; consultation should precede further deployment. |
 | F4 | Fixed | Ethics: the provider's retention policy has not been audited; a gloss sequence can reveal what a user said. |
 | F5 | Fixed | Limitations: how the 25 signs were chosen was not recorded, and a selection of easy-to-learn signs would bias the live estimate. |
+
+# Third review (2026-11-24, IEEE version): "ManuVox: Auditing the Train–Serve Gap of a Landmark-Based Sign Recognizer on a Laptop"
+
+An independent reviewer, with no access to the sources or to the earlier reviews, read the 6-page
+IEEE version (`paper/ieee/main_ieee.pdf`) as an IEEE conference reviewer and consulted the
+extended version (`paper/main.pdf`) only where the short paper points to it. The review is
+reproduced unchanged.
+
+Reviewed file: the 6-page IEEE version (main_ieee.pdf). The extended version cited as [8] was checked only to see whether material missing from the 6-page paper is available there.
+
+## 1. Summary of the paper
+
+The paper studies why a landmark-based isolated-sign recognizer for 250 ASL signs, trained on MediaPipe Holistic landmarks from the Google ISLR Kaggle data, collapses when run live in a browser. On the author's signer-independent split of that data, the first deployed model (a depthwise-separable temporal CNN) scores 62.5% test top-1, but it got 3% of 50 webcam clips right. The author trains GRU, Transformer, CNN and a Conformer-like convolution–transformer "hybrid" (68.5% test top-1, 18.6 ms median per call in Chrome on an i3-1115G4). The paper lists six candidate train–serve discrepancies: hand-slot assignment, mirroring, aspect ratio, frame-rate resampling, segmentation, and calibration/abstention. It fixes them through a shared feature specification and a golden-fixture CI test, and ablates the fixes on 50 clips (25 signs × 2 takes) recorded by the author. The clips go through two pipelines: legacy Holistic in Python, and MediaPipe Tasks in Chrome. Only the hand-slot fix has a clearly significant effect (+36 / +25 points). With all fixes, clip top-1 reaches 40% (Python) and 34% (browser), which is 34–51% of the drop from test accuracy. The pre-specified motion segmenter appears to hurt. The paper also reports four further results. (i) A cross-dataset test on ASL Citizen gives 43.1% on 236 mapped signs, with degraded calibration. (ii) A model "v3", also trained on ASL Citizen with webcam-style augmentation, reaches 92.1% in-domain, and its live gains are not significant. (iii) "Teach Dex" adds a prototype-style personalization term that raises one signer's take-2 clip top-1 from 31% to 47%. (iv) The paper closes with limitations and ethics.
+
+## 2. Strengths
+
+- **Relevant problem.** The paper tackles a practically important problem that is rarely reported: the gap between benchmark accuracy and live accuracy in sign recognition. It also measures that gap quantitatively instead of treating it anecdotally.
+- **Two-sided ablation design.** Table II has a cumulative block (add one fix per row) and a leave-one-out block (undo one fix of the final pipeline). It is run through two trackers (Holistic, the training tracker, and Tasks, the serving tracker). This is a sound way to attribute effects.
+- **Statistical care above the norm for this kind of paper.** The analysis is described as pre-specified, uses paired sign-flip tests, applies Holm correction within each pipeline and metric, and adds a sign-level sensitivity analysis for the non-independence of the two takes. It states the minimum detectable effect explicitly ("significance at the first Holm step needs at least 10 clips ... in the browser and 9 in Python") and reports bootstrap intervals. Inconclusive and null results are labeled as such, not dressed up.
+- **Candour about weaknesses.** The paper reports problems a less careful author would have left out:
+  - the test split was reused during development ("the model to ship was chosen by test accuracy"), with a validation cross-check;
+  - the hybrid's gain is confounded with an 8.6× parameter increase;
+  - the pre-specification cannot be verified from the repository;
+  - the v3 Teach Dex run was compromised;
+  - the ASL Citizen label mapping is AI-assisted and unverified.
+- **A reusable engineering remedy.** One feature specification read by both stacks, plus a golden-fixture parity test in CI with a 10^-4 tolerance, is a concrete practice other deployed-ML projects can adopt.
+- **Realistic efficiency evaluation.** Latency is measured on genuinely low-end hardware and covers threads, WebGPU, fp16 and int8. It includes the useful negative finding that dynamic int8 slows depthwise-convolution models.
+- **Good ethics section.** Section VII is substantive: Deaf community involvement, the risk of the Practice mode misleading learners, the burden-shifting nature of personalization, data release limits. The paper also includes the IEEE-required disclosure of AI-tool use.
+
+## 3. Weaknesses and requested changes
+
+**R1 [major] The live evaluation cannot support general conclusions about the train–serve gap.** (needs new experiments)
+*Location:* Sections VI-B and VI-C, Table II, abstract.
+- All live evidence comes from 50 clips of 25 signs by one person, who is the developer and "not a fluent signer". How the 25 signs were chosen "was not recorded", and 9 of the 25 signs "fail in every take in both pipelines".
+- Section VII concedes that production differences cannot be separated from pipeline effects. This means the paper cannot say how much of the remaining 60–66% error is caused by the system rather than by the signing.
+- The headline percentages ("closing 34–51% of the gap") are therefore properties of this signer, camera and sign selection, not of the recognizer.
+
+*Suggestion:*
+- Add clips from several signers, ideally fluent or Deaf signers, even a few signs each.
+- At minimum, have a fluent signer rate each of the 50 clips as a correct or incorrect production, and report results on the clips rated correct.
+- Without either, reframe the title, abstract and contributions explicitly as a single-signer case study.
+
+**R2 [major] Cheap controls that would locate the remaining gap are named but not run.** (needs new experiments)
+*Location:* Section VII ("Two controls would locate the remaining gap: running the live pipeline on test-split landmark sequences, and an oracle segmentation of the live clips") and Section VI-C ("What remains").
+- Neither control needs new recordings. Oracle segmentation of 50 clips is a few minutes of annotation.
+- A third control is available too. ASL Citizen's test split is 3,523 webcam videos from 11 unseen signers covering 236 of the signs. Running those untrimmed videos through both live pipelines (tracker → segmenter → model) would give a multi-signer, webcam, live-like evaluation. It would also measure the Holistic-versus-Tasks difference at a scale where it can be resolved, unlike the current "−6 points [−15, 3]".
+
+*Suggestion:* run at least oracle segmentation and the live-pipeline-on-dataset control. These directly answer the paper's central open question ("The rest of the gap lies in what both pipelines share, above all segmentation, or in the clips themselves").
+
+**R3 [major] The framing as a train–serve skew audit is looser than the evidence, and the one significant finding is an implementation bug.** (needs new experiments for the sensitivity analysis; the rest is text only)
+*Location:* Section VI-A, Fig. 1, abstract, conclusion.
+- Of the six "candidate discrepancies", only (a), (c) and (d) are parity questions, where serving should reproduce what training did.
+- (b) was not present in the shipped build ("The shipped build already detected on the unmirrored frame ... is a counterfactual").
+- (e), segmentation, has no training-side counterpart, because the dataset clips are pre-segmented. It is a new serving component, not a skew fix.
+- (f) cannot change a segment's top-1. The extended version says so; the 6-page version does not.
+- The one effect that survives correction is that the shipped build "mapped that label as if the frame were mirrored ... so every hand went into the wrong block". A reader will see this as a bug whose large effect is unsurprising. The generalizable lesson is thinner than the framing suggests.
+
+*Suggestion:*
+- Separate parity discrepancies from serving-only design choices in the text and in Fig. 1.
+- Add an offline sensitivity analysis on the 16,242 test sequences. Inject each skew into the test landmarks:
+  - swap the hand blocks;
+  - apply the portrait-to-landscape aspect distortion;
+  - subsample to 15 fps with index-based resampling;
+  - crop or extend segment boundaries by realistic amounts.
+- Measure the accuracy drop for each. This would give high-powered estimates of each discrepancy's cost, which the 50-clip study cannot provide (most of its effects are "large but inconclusive").
+
+**R4 [major] Baselines are weak, and the model-comparison contribution is hard to place relative to prior work.** (needs new experiments)
+*Location:* Section II ("we compare only against baselines trained under our own protocol"), Section IV, Table I, contribution bullet 1.
+- No published pose-based isolated sign recognition model is trained under the author's split. The paper cites SPOTER [12] and the OpenHands pose models [13] but does not evaluate them.
+- Public write-ups and code of the top Kaggle ISLR entries reportedly use 1D-convolution + transformer models similar to the hybrid, and report much higher accuracies on the competition's hidden set. They are not peer-reviewed and use a different split, but the released code could be retrained under this protocol.
+- As it stands, 68.5% cannot be judged as strong or weak for signer-independent Google ISLR.
+- The paper also admits that the hybrid's +4.9 points come with "8.6" times the parameters and "3.3" times the training time, "so its gain cannot be credited to the architecture alone".
+
+*Suggestion:*
+- Add at least one external pose-based baseline, for example SPOTER, or an ST-GCN/SL-GCN from OpenHands.
+- Add one capacity-matched control: a wider CNN with about 3.4M parameters and the same training budget.
+- Briefly acknowledge the reported Kaggle accuracies and why they are not comparable.
+
+**R5 [major] The "gap closed" percentages are measured against the wrong ceiling.** (needs new experiments; re-analysis of saved predictions only)
+*Location:* abstract ("closing 34–51% of the gap"), Section VI-C ("of the drop from its 68.5% test top-1").
+The ceiling is the hybrid's mean test top-1 over all 250 signs, and it has three problems:
+- (i) It is optimistically biased, because the test split guided the v2 design and the model choice (Section III).
+- (ii) It averages over 250 signs, while the live clips cover a non-random subset of 25, and per-sign accuracy varies widely.
+- (iii) Test sequences with fewer than 3 hand frames were removed (6,945 sequences), while a live clip "without one [segment] counts as wrong". The extended version itself notes that this asymmetry "somewhat overstates the live gap"; the 6-page version omits it.
+
+*Suggestion:*
+- Report the ceiling as the hybrid's validation and test accuracy on the same 25 signs.
+- State the filtering asymmetry.
+- Recompute the 34–51% figure on that basis.
+
+**R6 [minor] Statistical details in Sections IV and VI are inconsistent or underspecified.** (text/presentation only)
+- The power statement says significance in the browser "needs at least 10 clips (20 points)". But Table II marks the browser "+ v2 hybrid model" top-1 change (1 → 16, +15 points) as significant. Fractional per-clip scores (means over 3 runs) make the "20 points" statement wrong for the browser. Rephrase it in terms of discordant clips.
+- "+25 in the browser (19 clips better, 4 worse)" will puzzle readers, because a net of 15 clips is 30 points. Explain that per-clip browser scores are fractional.
+- State the Holm family sizes. They can be inferred as about 12 tests in Python and 15 in the browser, but the paper should give them.
+- Give the family for Teach Dex ("Holm p = 0.031").
+- Say whether intervals are 95% and whether they resample clips or signs. "Signer interval [39.3, 46.6]" is never defined.
+- In Section IV, the paired tests over 16,242 sequences "treat the sequences as independent". With 4 test signers, signer-level evidence is n = 4, which the paper concedes. Even so, contribution bullet 1 presents "+6.1 points ... for each of the 4 test signers" as a finding. Add the per-signer CNN range, or a signer-level interval, next to it.
+- The v3-versus-v2 comparison "+1.0 points [0.5, 1.5] (Holm p < 0.001)" compares two single files with a sequence-level test. The paper says so, but the abstract repeats "+1.0 points" without the caveat.
+
+**R7 [minor] "Browser minus Python" confounds the tracker with real-time frame dropping and implementation.** (needs new experiments for the control; otherwise text only)
+*Location:* Section VI-B ("Browser + Tasks ... in real time, so frames drop") and VI-C ("What remains").
+- Python + Holistic processes every frame; the browser drops frames in real time. The −6 point difference therefore cannot be attributed to the tracker, which is how the sentence "We see no evidence that the training tracker separates these clips from the test split" reads.
+- The paper also never establishes that the legacy Holistic used here has the same version and settings as the one that produced the Kaggle data (model complexity, smoothing).
+
+*Suggestion:* run the browser pipeline offline on every frame to separate the tracker from frame dropping. Alternatively, state the confound explicitly and document the Holistic configuration.
+
+**R8 [minor] Live calibration and abstention are a listed "fix" and an index term, but no live result is reported.** (text/presentation only)
+*Location:* Section VI-A(f), Table II "+ calibration (f): final", Index Terms.
+- Clip top-1 ignores the "not sure" threshold, so Table II says nothing about whether (f) works live.
+- The extended version reports that live calibration fails (browser ECE 0.100, with the threshold accepting 45% of segments at 67% selective accuracy). That is a central, user-facing result for an "audit" paper.
+- Clip-level scoring by "the mean probability vector of its classified segments" also hides spurious extra segments, which a user would see as extra words.
+
+*Suggestion:*
+- Add one or two sentences on live ECE, accepted fraction and selective accuracy.
+- Report the mean number of segments per clip.
+- Explain in the Table II caption how abstention is treated.
+
+**R9 [minor] Latency numbers are inconsistent, and their precision exceeds their repeatability.** (needs new experiments: repeated timing runs only)
+*Location:* Table I, Section V.
+- The hybrid's browser p95 is given as 19.8 ms (Table I, fp32), 26.1 ms (Section V, fp16) and 21.2 ms (median p95 in interleaved rounds).
+- v3, with "the same architecture and file size", has a median p95 of 31.3 ms, about 50% higher. Yet the text concludes "we see no difference beyond round-to-round variation". If rounds vary by ±50%, the 0.1-ms-precision values in Table I, and the rankings built on them, are not meaningful.
+- The fp16 p95 (26.1) exceeds the fp32 p95 (19.8), which is not discussed.
+- "Hybrid p50 21.96 vs. 4.10 ms" does not say which runtime (4.10 ms is clearly not onnxruntime-web, where the same model takes 18.6 ms), and uses a different decimal precision.
+- "Post-training quantization of the v1 models ... halves every file" is followed by hybrid (v2) numbers.
+- The 6-page version cannot explain how "tracking ran at 25.2 frames per second" when the recorded clips are "about 15 frames per second". The extended version says a pilot clip was used.
+
+*Suggestion:*
+- Report every latency as median and spread over N rounds, with the number of calls, warm-up, runtime and precision named.
+- Fix the scope of the quantization sentence.
+
+**R10 [minor] Teach Dex is under-specified and tangential, and the compromised v3 run adds nothing.** (text/presentation only, or new experiments to repeat the v3 run)
+*Location:* Section VI-D.
+- The method is one sentence. What is the "segment's embedding"? How are up to 3 examples combined (mean, max)? What are the fitted weight and offset, and how was the fit done?
+- The evaluation is record-then-test from one sitting, and the examples "repeat one production". The paper candidly calls this the best case.
+- Reporting a run that "says nothing about teaching v3" uses scarce space in a 6-page paper.
+
+*Suggestion:* either move Teach Dex to the extended version, or give the method in two or three sentences and drop the v3 paragraph until the harness is fixed and the run repeated. The space saved could hold R2 or R3.
+
+**R11 [minor] The ASL Citizen label mapping is unverified, and the cross-dataset number depends on it.** (needs new experiments; re-analysis only)
+*Location:* Section III ("We chose the variants and synonyms with AI assistance ... no signer has confirmed them") and Section IV.
+- 65 of 236 labels (35 variants, 30 synonyms) are mapped by judgement. Mapping errors count directly against v2's 43.1%.
+- ASL-LEX is used as the gloss authority but is never cited.
+
+*Suggestion:*
+- Report v2 accuracy separately for the 171 name-matched and the 65 judgement-mapped signs.
+- Have a signer verify the 65 mappings.
+- Cite ASL-LEX.
+- Define the "signer interval".
+
+**R12 [minor] The v3 interpretation is speculative.** (text/presentation only)
+*Location:* Section VI-C, last paragraph ("v3 recognizes 92.1% ... but under half of these clips, which points to segmentation or this signer's productions rather than to webcam conditions as such").
+- The 92.1% is in-domain: ASL Citizen's test signers share its recording protocol, and v3 was trained on its training signers. It does not show that v3 handles webcam conditions in general.
+- The trimmed-versus-untrimmed difference also confounds segmentation with the domain.
+
+*Suggestion:* soften to "is consistent with", or test it directly with the R2 control (untrimmed ASL Citizen videos through the live pipeline).
+
+**R13 [minor] The conclusion contradicts Section VI-C.** (text/presentation only)
+*Location:* Section VIII.
+- Section VIII says the hybrid reaches 34%/40% "with no evidence that the rest of the gap depends on the pipeline".
+- Section VI-C says "The rest of the gap lies in what both pipelines share, above all segmentation". Table II shows the presence-segmenter variant at 48/49 against 40/34 for the final pipeline. Segmentation is part of the pipeline.
+- The intended meaning is presumably "depends on which pipeline/tracker (browser vs. Python)". Rephrase.
+- "One had a large and consistent effect" also overstates the browser result, since adding the fix is not significant at sign level (p = 0.152).
+
+**R14 [minor] Pre-specification and blinding are weaker than the wording suggests.** (text/presentation only)
+*Location:* Section VI-B ("Nothing was tuned on these clips ... the analysis was fixed in the configuration before the first run (the repository cannot show this ...)"; "a pilot with the same person motivated the order of the fixes").
+- The fixes themselves were identified with live data from the same signer and setup.
+- The pre-specification is asserted but unverifiable.
+
+*Suggestion:*
+- State which discrepancies were discovered from the pilot.
+- Soften "nothing was tuned" to "no threshold or constant was fitted on these clips".
+- For future work, recommend time-stamped preregistration.
+
+**R15 [minor] Segmenter behaviour and the deployed configuration are unclear.** (text/presentation only)
+*Location:* Section VI-A(e), Section VI-C.
+- The motion segmenter's thresholds "come from the validation sequences under an assumed frame rate", and failure is attributed to frames possibly not being "30 fps apart". If speeds are computed on capture timestamps live, it is unclear why the dataset frame-rate assumption would mis-scale them. State the units (per frame or per second) on both sides.
+- The paper keeps the motion segmenter "as specified" for analysis, which is right. It does not say which segmenter the public app now uses. Users would be better served by the one that scored higher, and the reader should know.
+
+**R16 [presentation] Model, feature and recipe names are overloaded.** (text/presentation only)
+*Location:* throughout.
+- "v1/v2" denotes feature sets, recipes, and models. "v2" also means the deployed fp16 seed-0 hybrid file (68.4%), as distinct from the hybrid's seed mean (68.5%).
+- The abstract uses "v2" without ever defining it ("from 31% to 47% with v2").
+- "Shipped build" (3%) and "As shipped" (1% browser) differ, and the 6-page version never explains why. The extended version says the shipped build ran inference on the main thread at 7 fps.
+
+*Suggestion:* introduce explicit model identifiers once (for example a short list or a column in Table I). Explain the two baselines in one sentence.
+
+**R17 [presentation] Fig. 1 under-serves the paper's thesis.** (text/presentation only)
+*Location:* Fig. 1, page 3.
+- It shows only the browser path, so the reader cannot see where training and serving diverge.
+- It omits the normalization steps (shoulder centering and scaling, dominant-hand mirroring), which interact with hand-slot errors.
+- It lists (e) before (d).
+- It relies on light-orange fill, which is barely distinguishable from grey when printed in grayscale.
+- Its text is 7 pt.
+
+*Suggestion:* draw the training path (Holistic → spec → model) and the serving path (Tasks → spec → segmenter → model → threshold) side by side, mark each discrepancy where the paths differ, and use 8 pt or larger text plus a non-colour cue.
+
+**R18 [presentation] Table II needs more support in the 6-page version.** (text/presentation only)
+*Location:* Table II, page 4.
+- The "–" entries are not explained.
+- Only significance stars are given; top-1 intervals, p-values and sign-level results are deferred to [8].
+- Because the paper's argument rests on which effects are inconclusive, at least the top-1 intervals, or the counts of better/worse clips, should be in the table.
+- The row "final, mirrored + old mapping" (7/11) is never discussed in the 6-page text. A reader would expect the old label mapping to be correct on a mirrored frame (see Q3).
+
+**R19 [minor] Derived numbers do not match the tables.** (text/presentation only)
+*Location:* contribution bullet 1 and Section IV.
+- "improve test top-1 by +6.1 points over a CNN": Table I gives 68.5 − 62.5 = 6.0.
+- "the hybrid +4.9": Table I gives 68.5 − 63.7 = 4.8.
+- "multiplies the parameter count by 8.6": Table I gives 3.40 / 0.40 = 8.5.
+- These probably come from unrounded values, but a reader checking the table finds mismatches. Compute from the displayed values or add a decimal.
+
+**R20 [minor] Citations are missing.** (text/presentation only)
+- Holm's procedure (Holm, 1979) is used throughout but never cited.
+- ASL-LEX is used as the gloss authority but not cited.
+- MediaPipe Holistic, the training tracker, and onnxruntime(-web) have no references.
+- The related work omits prior studies of cross-dataset or in-the-wild degradation in sign recognition, and any mention of public Kaggle ISLR solutions (see R4).
+
+**R21 [minor] Reproducibility and archival status.** (text/presentation only)
+- The extended version [8] is a GitHub repository URL, which is not archival. Deposit it on arXiv or Zenodo with a DOI.
+- The 6-page paper has no explicit code-availability statement.
+- The live clips cannot be released, which is understandable, so the code and the exact configuration matter more. State what is released.
+
+## 4. IEEE format compliance
+
+- **Page count and size.** 6 pages, US Letter (612 × 792 pt), two columns, references included. This meets a 6-page limit including references.
+  - The text block spans about x 48–565 pt and y 51–719 pt on every page. This is consistent with the IEEEtran conference layout, with no overflow into margins.
+  - No page numbers, headers or footers, which is correct.
+  - No copyright notice is present. That is acceptable for submission but needed for camera-ready.
+- **Author block.** One author with affiliation and email. IEEE's template asks for organization, city and country; "Independent Researcher, India" gives no city. This is minor. Check whether the venue is double-blind: the named author block, the self-citation [8] and the GitHub URL containing the author's username would all violate anonymity.
+- **Abstract.** Bold, about 246 words, which is at the top of IEEE's usual 150–250-word range. It contains undefined abbreviations ("ISLR", "CNN") and an undefined model name ("v2"). It is dense with numbers (13 distinct figures), which makes it hard to read. Cut it to the core claim and two or three numbers.
+- **Index Terms.** Present and correctly formatted. "Train–serve skew" is not an IEEE Taxonomy term; consider adding taxonomy terms (for example "gesture recognition", "edge computing").
+- **Section headings.** Roman numerals in small caps, lettered italic subsections, and italic run-in paragraph headings are all correct IEEE style. The run-in heading "Aspect correction and segmentation: large but inconclusive:" has a double colon. The acknowledgment is unnumbered and uses the American spelling "Acknowledgment", which is correct.
+- **Tables and figure.** Table titles are above the tables ("TABLE I" / small-caps title), with explanatory notes below, which is acceptable. The figure caption is below the figure ("Fig. 1."), which is correct.
+  - Fig. 1 is placed in Section V but first referenced in Section VI. Prefer placing it after its first reference.
+  - The figure is vector, with 7-pt text; IEEE recommends 8–10 pt.
+  - The figure relies on colour.
+- **References.** IEEE numeric style, numbered in order of first citation, which is correct. Problems:
+  - [4] gives the URL twice (in the note and after "[Online]. Available:"), and its title "Google - Isolated Sign Language Recognition" uses a hyphen instead of a dash.
+  - [5] and [6] carry long proceedings hash URLs. In [5] this produces badly stretched inter-word spacing ("T. Starner et al., "PopSign ASL v1.0: An isolated" with large gaps). Drop the URLs for proceedings papers.
+  - [8] is a non-archival repository link.
+  - [34] lacks volume and pages.
+  - [30] is usually dated 1993.
+  - Page numbers are given for some proceedings papers and not others.
+  - IEEE style normally abbreviates "Proceedings of the" to "in Proc."; this is optional but inconsistent with IEEE practice.
+- **PDF checks (PDF eXpress-type).** PDF 1.5 produced by xdvipdfmx (XeLaTeX). All fonts are embedded subsets: Nimbus Roman (Times-compatible), CM math, Nimbus Mono. There are no raster images. Nothing obvious would fail PDF eXpress, but run the PDF through PDF eXpress anyway, because XeLaTeX output with Nimbus fonts sometimes triggers warnings.
+- **Layout.**
+  - The columns on the last page are not balanced: the left column is full, the right ends mid-page. IEEE asks for balanced final columns.
+  - Page 5 left column has visibly stretched vertical space before "D. Personalization (Teach Dex)".
+  - The dense single-paragraph style, with almost no displayed equations or lists after page 1, makes the paper read like an extended abstract of [8].
+- **Language conventions.** IEEE uses American English, but the paper mixes spellings: "licence", "favour", "analysed" alongside "normalized", "recognizer", "center".
+- **Voice.** A single author writes "we/our" throughout, refers to "the author" in Sections VI–VII, and writes "I" in the acknowledgment. Pick one convention.
+- **AI disclosure.** The acknowledgment discloses AI-tool use, as current IEEE policy requires. This is compliant.
+
+## 5. Writing quality
+
+**Unclear sentences.**
+- "We see no evidence that the training tracker separates these clips from the test split" (VI-C). It is unclear what "separates" means. Suggest: "The tracker difference does not account for a measurable part of the gap."
+- "The baselines are the shipped build itself and as shipped, the current app with the shipped build's settings." This is hard to parse, and the difference between the two baselines is never explained.
+- "Of six candidate discrepancies, assigning hands to slots as the training tracker did matters by far the most" (abstract). "Slots" is jargon at that point.
+- "One fix, a motion segmenter, if anything hurt" (abstract). Colloquial, and it calls a component that was never a parity fix a "fix" (R3).
+- "the first deployment's CNN reaches 62.5% top-1, yet it recognized 3% of 50 new webcam clips". The tense switches mid-sentence. Also, 3% of 50 clips is 1.5 clips; say that the value is a mean over three browser runs.
+- "A second training set (v3)" is a run-in heading for a model.
+- "9 of the 25 signs fail in every take ..." starts a sentence with a numeral.
+
+**Inconsistent terms.**
+- "golden parity test" (abstract, conclusion) vs. "golden-fixture test" (introduction, VI-A).
+- "with the training tracker" vs. "Python + Holistic" vs. "in Python".
+- "hand slots" vs. "hand assignment" vs. "blocks".
+- "fix" is used for counterfactuals and new components alike.
+- "Holistic layout" in Fig. 1 is never defined.
+
+**Undefined abbreviations and symbols.**
+- ISLR is never expanded. GRU, CNN, ONNX, fp16/fp32/int8 and p50/p95 are undefined. These are common in the field, but IEEE expects first-use expansion.
+- "wasm SIMD" appears in the Table I caption before WebAssembly is introduced in Section V.
+- r_train in "k = r_train/(w/h)" is not explicitly bound to "the training data's width-to-height ratio", and the direction of the rescaling (multiply or divide y) is not stated.
+- "signer interval", "Gloss row" (Fig. 1), "Teach panel", "Practice mode" and the sentence-generation feature ("only the recognized glosses are sent to a third-party language model provider") first appear in Sections VI-D and VII without being introduced. Practice mode and sentence generation should be described briefly in the system description or removed from the ethics text.
+- "Face and lip points ... are not used" sits uneasily with distances "to the nose, mouth and shoulders". Say that the mouth comes from pose landmarks.
+
+**Numbers that look inconsistent (quoted).**
+- "+6.1 points over a CNN" vs. Table I 62.5 → 68.5 (6.0).
+- "the hybrid +4.9" vs. Table I 63.7 → 68.5 (4.8).
+- "multiplies the parameter count by 8.6" vs. 3.40/0.40 (8.5).
+- "A convolution–transformer hybrid reaches 68.5%" (abstract) vs. "68.4% for the deployed v2 file" (Section IV), which is the base for "25.3 points below its own test split". Explained, but two numbers for one model invite confusion.
+- "needs at least 10 clips (20 points) ... in the browser" vs. Table II browser "+ v2 hybrid model" 1 → 16\* (+15 points, marked significant).
+- "+25 in the browser (19 clips better, 4 worse)": a net of 15 clips would be 30 points.
+- Hybrid browser latency: "19.8" (Table I, p95), "p95 26.1" (Section V), "21.2" (median p95 over rounds); and v3 "31.3" with identical architecture.
+- "hybrid p50 21.96 vs. 4.10 ms" has an unstated runtime and two decimals where the rest of the paper uses one.
+- "replacing presence segmentation by the motion segmenter cost −10 and −13" uses the upper block of Table II. The lower block gives −8 and −15 (48→40, 49→34). Say which comparison is meant.
+
+**Claims stronger than the evidence.**
+- Abstract, first sentence: recognizers "fail on a live webcam, because the serving pipeline does not reproduce the training features". The paper's own result is that most of the gap is not explained by the pipeline fixes.
+- "one had a large and consistent effect" (conclusion). Adding the fix is not significant at sign level in the browser (p = 0.152).
+- "now make Python and the browser compute the same model inputs from the same landmarks" (conclusion). The parity test covers 20 validation sequences; say "agree to 10^-4 on the 20 fixture sequences".
+- "which points to segmentation or this signer's productions rather than to webcam conditions as such" (VI-C). This is speculative (R12).
+- "MediaPipe keypoints [3] are small, appearance-free". Landmarks still encode body proportions and hand size; "largely appearance-free" would be accurate.
+- "it beats the CNN for all four test signers" is presented in contribution bullet 1 without Section IV's own caveat ("weak evidence about new ones").
+
+## 6. Questions for the author
+
+1. What is the ceiling the 34–51% figure should be measured against: what are the hybrid's validation and test top-1 restricted to the 25 live signs?
+2. Why do "Shipped build" (browser 3/9) and "As shipped (v1 CNN)" (browser 1/7) differ, if the latter is the current app with the shipped settings?
+3. The shipped bug mapped handedness "as if the frame were mirrored". Why then does "final, mirrored + old mapping" also score only 7%? On a mirrored frame the old mapping should place hands in the correct blocks. Does the frame mirroring also flip x-coordinates, and how is that undone?
+4. How does the dominant-hand mirroring rule ("a sequence whose left hand is present in more frames than its right is mirrored") interact with swapped hand blocks? For a one-handed sign, does the bug effectively present a mirror-image hand rather than a hand in the wrong slot?
+5. In the Python + Holistic pipeline, Holistic already assigns hands by pose. How is "As shipped" / "+ hand assignment (a)" realized there? Is the old mapping simulated by swapping blocks?
+6. Is the legacy Holistic used here the same version and configuration as the one that produced the Google ISLR landmarks? What evidence supports that?
+7. Which segmenter does the publicly deployed app use now, and do you plan to change it given Table II?
+8. In what units does the motion segmenter compute speed? Why would the dataset's frame-rate assumption mis-scale speeds if live speeds use capture timestamps?
+9. How were the 25 signs chosen, and did any of them come from the pilot? What exactly did the pilot reveal, and which discrepancies were discovered from it?
+10. How is a below-threshold ("not sure") segment treated in clip top-1? What are the live ECE, accepted fraction and selective accuracy?
+11. Have you run untrimmed ASL Citizen test videos through either live pipeline? If not, is there a reason it is infeasible?
+12. Why is the fp16 hybrid's p95 (26.1 ms) higher than the fp32 file's (19.8 ms)? Does onnxruntime-web's WebAssembly backend execute fp16 natively or upcast it? How many calls and rounds underlie each latency figure?
+13. For Teach Dex: which layer gives the embedding, how are up to three examples combined, what are the fitted weight and offset, and what is the Holm family for p = 0.031?
+14. What accuracy do published ASL Citizen baselines reach on the same 236-sign subset, to put v3's 92.1% in context?
+15. Is the venue single- or double-blind? If double-blind, the self-citation [8] and its URL need to be anonymized.
+
+## 7. Overall recommendation
+
+**Recommendation:** Weak reject.
+**Reviewer confidence:** 4/5.
+
+**Justification:** The paper is unusually honest and statistically careful, and the shared-specification/parity-test practice is useful. However, its central empirical claims rest on 50 clips from one non-fluent signer who is also the developer. The only conclusive finding is a hand-slot bug whose large effect is unsurprising, and most other effects, including v3 and the segmenter, are explicitly inconclusive. Several cheap controls the paper itself names are not run: oracle segmentation, the live pipeline on dataset sequences or untrimmed ASL Citizen videos, and offline skew injection. Adding them, plus an external baseline and a tighter scope (moving Teach Dex and the compromised v3 run to the extended version), would make this a solid applied paper.
+
+## Response: how each issue was handled (third review)
+
+Fixes that needed no new experiment were made in both versions where the text is shared or
+parallel; every number is still a generated macro (claims audit: 0 failures). Item numbers refer to
+the review above, which read the IEEE PDF before these fixes.
+
+| Item | Status | What changed |
+|---|---|---|
+| R1 | Open (needs new recordings) | The single-signer scope is stated in the abstract ("from one signer"), the contributions and Section VII. Recordings from other, ideally Deaf, signers and a fluent signer's rating of the 50 clips remain open items (`paper/README.md`). |
+| R2 | Open (needs new runs) | Oracle segmentation and the live pipeline on test-split sequences are named as not run. Running the untrimmed ASL Citizen test videos through the live pipelines would be another access to that test split, which this project reads once per model. |
+| R3 | Partly | Both versions now say that (a), (c) and (d) are parity questions, (b) is a counterfactual, (e) has no counterpart in training (its sequences each hold one sign) and (f) cannot change a segment's top-1. Skew injection into the test sequences is not run (a new experiment and another test-split access). |
+| R4 | Open (needs new training) | External baselines and a capacity-matched CNN need new runs. Kaggle leaderboard accuracies are not quoted: no peer-reviewed source and a hidden test set, as the paper says. |
+| R5 | Partly | The IEEE version now states the filtering asymmetry (the test split drops sequences with too few hand frames, a clip without a segment counts as wrong), as the full version already did. Recomputing the recovered share against a 25-sign ceiling would change a reported number and is not done. The bias from test reuse is stated in Section III. |
+| R6 | Fixed (text) | The power statement counts clips, with "20 points if each moves by a whole clip"; browser clip scores move in thirds; the Holm family sizes (12 comparisons in Python, 14 in the browser) come from generated macros; intervals are named as 95% percentile bootstrap intervals over clips; the ASL Citizen "signer interval" is defined as a 95% bootstrap interval over signers; contribution 1 adds "(weak evidence about new signers)". The Teach Dex Holm family is not added (space). |
+| R7 | Fixed (text) | "What remains" again says that the pipelines also differ in real-time frame dropping (the first IEEE draft had dropped it) and now reads "no evidence that the training tracker does better on these clips". An offline every-frame browser run is not done; the Holistic configuration is not documented in the paper. |
+| R8 | Fixed (text) | The IEEE text reports live ECE, the accepted fraction and selective accuracy; the text and the live-gap table caption say that clip scores do not use the abstention threshold. Segments per clip are not added (a new number). |
+| R9 | Partly | The quantization sentence names the runtime (Python onnxruntime) and the precisions compared (dynamic int8 against fp32); the IEEE text says the selection benchmark behind Table I differs from the latency run by a few milliseconds and that the throughput run used a pilot recording, not one of the 50 clips. Repeated timing runs are not done. |
+| R10 | Fixed | The IEEE version states Teach Dex's method (the highest cosine similarity to the taught sign's examples in the model's penultimate-layer embedding, added with the fitted weight and offset, both given). The compromised v3 run is one sentence pointing to the extended version, where its details moved to Appendix C. |
+| R11 | Partly | v2's accuracy on exact and on variant mappings is in the IEEE text. ASL-LEX is not cited: each version already cites the 35 references the claims audit allows (open item). A signer's check of the mapping remains open. |
+| R12 | Fixed (text) | "which points to segmentation or this signer's productions" became "That is consistent with segmentation or this signer's productions, more than webcam conditions as such, limiting the live score, but an in-domain score cannot settle it" (both versions). |
+| R13 | Fixed (text) | Conclusion: "one had a large effect in both pipelines"; "no evidence that the rest of the gap depends on which of the two pipelines runs"; the parity test now "checks" that Python and the browser compute the same inputs. |
+| R14 | Partly | "Nothing was tuned on these clips" became "No threshold or constant was fitted on these clips". Which discrepancies the pilot revealed is not recorded beyond "motivated the fixes and their order". |
+| R15 | Open | The segmenter's speed units and the segmenter of the public app are not stated; they need a check against the code and a decision on the deployed segmenter. |
+| R16 | Partly | The abstract names the hybrid "v2" and expands ISLR; the IEEE text says that the shipped build ran inference on the page's main thread, with its frame rate. Model identifiers are otherwise unchanged. |
+| R17 | Partly | The audited boxes have thick borders (a cue that survives grayscale) and the caption defines "Holistic layout". Redrawing the training and serving paths side by side is not done (space); the figure text stays at 7 pt. |
+| R18 | Partly | The table caption explains the dashes (configurations that exist only in the browser); the text discusses the old mapping with and without mirroring. Intervals and better/worse counts stay in the extended version's table (space). |
+| R19 | Fixed (text) | The IEEE text says the paired differences are computed before rounding. |
+| R20 | Open | Holm (1979), ASL-LEX, MediaPipe Holistic and onnxruntime are not cited: both versions are at the 35-reference cap, and the earlier reviews found no verifiable record for Holm (1979) in the checked sources. |
+| R21 | Partly | Section VII now says that the code, configurations and result files are in the repository of the extended version. The extended-version reference stays the repository address until a preprint identifier exists (open item). |
+| Format | Fixed / kept | The run-in heading with a double colon was renamed; American spelling throughout both versions (license, favor, analyzed); `CTLuse_url = "no"` removes the duplicated Kaggle URL and the long proceedings URLs that stretched the reference lines; the last page's columns are balanced; the abstract is 247 words and expands ISLR. Kept: the author block (as the author specified), the voice ("we", "the author", and "I" in the Acknowledgment, whose text is fixed) and the index terms. |
+| Writing | Fixed | "golden parity test" became "golden-fixture test" everywhere; no sentence starts with a numeral; "largely appearance-free"; "in part because the serving pipeline does not reproduce the training features"; the heading "A second training set (v3)" became "Training on a second dataset (v3)"; $r_{\mathrm{train}}$ is bound to the training ratio; the v2 mouth points are named as pose points. |
+| Questions | Partly | Answered in the text: Q2 (the shipped build ran inference on the main thread), Q10 (abstention and clip scores), Q13 (Teach Dex's embedding, combination, weight and offset). The others need new analysis or experiments. |
+
+Recommendation after the fixes: the remaining major points (R1, R2, R4 and the experimental parts
+of R3 and R5) need new recordings, runs or test-split accesses, so the reviewer's weak reject
+stands until they are addressed.
+
+Earlier author TODOs: the AI-assistance disclosure that the first review listed under item 33 is
+now the Acknowledgment section of both versions (`paper/sections/acknowledgment.tex`); the paper
+sources contain no TODO or placeholder about it, and no separate AI declaration section.

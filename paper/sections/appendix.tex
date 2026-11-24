@@ -8,7 +8,7 @@
 Mirroring flips \V{data.mirroredpct}\% of the Google ISLR sequences, but it is a property of
 signers rather than sequences: \V{mir.high} of the \V{data.signers} signers have
 more than 80\% of their sequences mirrored and \V{mir.low} have under 5\%, consistent with left-handed signers or
-mirrored (selfie) recordings, which the data cannot tell apart; every test signer is at most
+mirrored (selfie) recordings, which the data cannot tell apart. Every test signer is at most
 \V{mir.testmax}\%.
 
 \paragraph{Model selection.} Figure~\ref{fig:acclat} shows the candidates against the shipping
@@ -61,6 +61,14 @@ validation split, with the same draws as v2's. The blends (weight \V{td.v2.weigh
 taught signs from \V{td.v2.valbefore}\% to \V{td.v2.valafter}\% (v2) and from \V{td.v3.valbefore}\%
 to \V{td.v3.valafter}\% (v3), and leave untaught signs where they were (\V{td.v2.valuntaught0}\%
 and \V{td.v2.valuntaught1}\%; \V{td.v3.valuntaught0}\% and \V{td.v3.valuntaught1}\%).
+
+\paragraph{The compromised v3 run of Teach Dex.} Its model-alone score on take 2,
+\V{td.v3.model}\%, is far below v3's \V{lg3.web.v3.take2}\% on the same clips in the live runs of
+Section~\ref{sec:liveresults} (for v2 the two agree, \V{td.v2.model}\% and \V{lg3.web.v2.take2}\%),
+and its runs found ever fewer segments (\V{td.v3.segmax} down to \V{td.v3.segmin}, against
+\V{td.v2.segmin}--\V{td.v2.segmax} with v2), for a reason the harness, which logs no frame rate,
+cannot show. Clips without a segment cannot change, so v3's gain (\V{td.v3.diff} points, $p$ =
+\V{td.v3.p}) is biased toward zero and says nothing about teaching v3.
 
 \input{tables/citizen}
 
@@ -118,6 +126,16 @@ assuming their frames are \V{seg.assumedfps} fps apart: the start threshold is t
 \V{seg.startpct}th percentile of the per-sequence peak energy, and the still threshold the largest
 value at which at most \V{seg.stillpct}\% of sequences would be cut inside the sign.
 
+\paragraph{Other changes.} Swapping in the hybrid before any fix gained \V{lg.web.c1model.dtop1}
+points in the browser (\V{lg.web.c1model.dtop1better} clips better, none worse;
+\V{lg.web.c1model.dtop1sig} at clip level, not at sign level, Holm $p$ =
+\V{lg.web.c1model.dtop1psign}) and \V{lg.py.c1model.dtop1} in Python, from a floor near zero.
+Resampling by time (d), which cannot matter in Python, changed browser clip top-1 by
+\V{lg.web.c4time.dtop1} points, and calibration (f), which cannot change a segment's top-1, by
+\V{lg.web.c6final.dtop1}. Replacing the hybrid by the v1 CNN in the final pipeline cost
+\V{lg.py.xv1model.dtop1} and \V{lg.web.xv1model.dtop1} points (\V{lg.web.xv1model.dtop1sig}), so
+the hybrid's test-set advantage shows only weakly here.
+
 Figure~\ref{fig:skeleton} shows one frame of a live clip as the pipelines see it, and
 Figure~\ref{fig:livegap} plots the ablation of Table~\ref{tab:livegap}.
 Table~\ref{tab:livegapci} gives every live-gap configuration with its interval and its comparison
@@ -162,4 +180,6 @@ Training ran on Kaggle (\V{m.gpu}, code at commit \V{repro.train}; v3 at commit 
 in private notebooks); the test predictions, CPU benchmark and live evaluations ran on the
 i3-1115G4 laptop from commit \V{repro.base} (v3's from \V{v3.commit}) with the evaluation scripts
 that are committed together with this paper. The live clips and both datasets are not
-redistributed, and neither is v3, which ASL Citizen's licence keeps private.
+redistributed, and neither is v3, which ASL Citizen's license keeps private. The web app is a
+static site: a service worker caches the model for offline use and adds the cross-origin isolation
+headers that WebAssembly threads need on static hosting.

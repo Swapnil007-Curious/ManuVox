@@ -1,7 +1,13 @@
 # ManuVox paper
 
-LaTeX preprint (ACL two-column style, `acl.sty` and `acl_natbib.bst` from
-https://github.com/acl-org/acl-style-files) on the live gap of the ManuVox sign recognizer (research codename Edge-Vision).
+The paper on the live gap of the ManuVox sign recognizer (research codename Edge-Vision), in two
+versions built from the same numbers and tables:
+
+- `main.tex`: the full version with appendices, a preprint in the ACL two-column style (`acl.sty`
+  and `acl_natbib.bst` from https://github.com/acl-org/acl-style-files).
+- `ieee/main_ieee.tex`: a 6-page IEEE conference version (`\documentclass[conference]{IEEEtran}`,
+  `IEEEtran.bst`), which cites the full version as its extended version.
+
 Every number in the text is a macro generated from the result files; nothing is typed by hand.
 
 ## Build
@@ -14,14 +20,30 @@ pip install -r paper/requirements.txt          # matplotlib, only needed for the
 python scripts/verify_references.py            # paper/data/reference_verification.json (network)
 python scripts/paper_tables.py                 # tables/*.tex, tables/numbers.tex, data/*.json
 python scripts/paper_figures.py                # figures/*.pdf
-python scripts/paper_claims.py                 # CLAIMS.md (exit code 1 if any check fails)
+python scripts/paper_claims.py                 # CLAIMS.md, both versions (exit code 1 if any check fails)
 cd paper
 C:\Users\Admin\.local\tectonic\tectonic.exe main.tex   # main.pdf (any tectonic or TeX Live works)
+cd ieee
+C:\Users\Admin\.local\tectonic\tectonic.exe main_ieee.tex   # ieee/main_ieee.pdf
 ```
 
 Tectonic downloads the LaTeX packages it needs on first use. `latexmk -pdf main.tex` (or
-pdflatex, bibtex, pdflatex twice) works as well. For Overleaf, upload `paper/` with `tables/` and
-`figures/` already generated.
+pdflatex, bibtex, pdflatex twice) works as well; build the IEEE version from inside `paper/ieee/`,
+because it reads `../tables/numbers.tex`, `../sections/`, `../figures/` and `../references.bib`.
+For Overleaf, upload `paper/` with `tables/`, `ieee/tables/` and `figures/` already generated.
+
+### Fitting the IEEE version to a page limit
+
+`ieee/main_ieee.tex` is exactly 6 pages including references. Its preamble has one switch per
+optional block (`\withpipelinetrue` / `\withpipelinefalse` and so on), with the approximate size of
+each block in a comment: the pipeline figure (on), the paired-comparisons table (off), the v2-v3
+table (off; when off, the Google ISLR interval and p-value appear in the text), the web-app
+paragraph (off) and secondary live-gap paragraphs (off). Turning a block on adds its content from
+the full version; everything left out is in the extended version. The abstract, introduction,
+conclusion and acknowledgment are shared with the full version (`sections/`); the other IEEE
+sections are condensed copies in `ieee/sections/`, so an edit to those parts has to be made in both
+places. `scripts/paper_tables.py` writes every table twice: `tables/` (caption below) and
+`ieee/tables/` (a short title above, as IEEE style requires, and the full caption as a note below).
 
 ## Where the numbers come from
 
@@ -57,14 +79,19 @@ cd ..; python scripts\live_gap.py report --configs experiments\live_gap_v2.json 
 
 | path | content |
 |---|---|
-| `main.tex` | preamble, title, section order |
-| `sections/*.tex` | the text |
-| `tables/` | generated: one file per table and `numbers.tex` (the `\V{key}` macros) |
+| `main.tex` | full version: preamble, title, section order |
+| `sections/*.tex` | the text of the full version (abstract, introduction, conclusion and acknowledgment shared with the IEEE version) |
+| `ieee/main_ieee.tex` | IEEE version: preamble, length switches, section order |
+| `ieee/sections/*.tex` | the condensed sections of the IEEE version |
+| `ieee/tables/` | generated: the tables in IEEE layout (title above, caption as a note below) |
+| `ieee/ieee_control.bib` | `IEEEtran.bst` options (more than six authors become "et al.") |
+| `tables/` | generated: one file per table and `numbers.tex` (the `\V{key}` macros, used by both versions) |
 | `figures/` | generated vector figures (the live-pipeline figure is TikZ in `sections/livegap.tex`) |
 | `data/` | `macro_sources.json` (key -> printed text, raw value, source file, field, scale), `reference_verification.json`, and snapshots of git-ignored inputs (dataset statistics, live-clip metadata, the skeleton frame's landmarks) |
-| `references.bib` | bibliography; every entry checked against the ACL Anthology, arXiv, Crossref or the official proceedings page |
-| `CLAIMS.md` | the claims audit |
-| `REVIEW.md` | an independent review of the draft and how each point was handled |
+| `references.bib` | bibliography; every entry checked against the ACL Anthology, arXiv, Crossref or the official proceedings page, except the extended version of this paper (`shukla2026manuvox`) |
+| `CLAIMS.md` | the claims audit of both versions |
+| `REVIEW.md` | independent reviews of the drafts and how each point was handled |
+| `EDITS.md` | every sentence changed by the writing refinement of 2026-11-24 (before and after) |
 
 ## Open items before submission
 
@@ -82,3 +109,9 @@ cd ..; python scripts\live_gap.py report --configs experiments\live_gap_v2.json 
   restarted between runs and v2 and v3 interleaved.
 - Have a fluent, ideally Deaf, signer check the 65 non-exact ASL Citizen label mappings and rate the
   50 live clips (second review, C5 and F1 in `REVIEW.md`).
+- IEEE version: set the venue's page limit with the length switches in `ieee/main_ieee.tex`, and
+  check the venue's own template (some IEEE conferences ask for a copyright notice or
+  `\IEEEoverridecommandlockouts`, or forbid hyperref).
+- The extended-version reference (`shukla2026manuvox` in `references.bib`) points to the
+  repository; replace its `url` with the arXiv (or other preprint) identifier once the full version
+  is posted, and check that the repository is public at submission time.

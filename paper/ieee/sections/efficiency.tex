@@ -1,0 +1,32 @@
+\section{Efficiency on a Low-Power Laptop}
+\label{sec:efficiency}
+
+All timings were measured on the deployment target, a laptop with an Intel Core i3-1115G4
+(\V{hw.cores} cores, \V{hw.threads} threads), integrated graphics and \V{hw.ramgib}\,GiB of memory,
+in Chrome \V{b.chrome} and in Python onnxruntime. Post-training quantization of the v1 models
+\cite{jacob2018quantization,nagel2021whitepaper} halves every file in fp16 at no measurable cost
+in accuracy. int8 always costs accuracy (\V{q.int8.least} to \V{q.int8.most} points across
+variants). In Python onnxruntime, dynamic int8 speeds up the transformer but slows the
+depthwise-convolution models, the hybrid included (p50 \V{q.hybrid.int8dynamic.p50} ms against
+\V{q.hybrid.onnxfp32.p50} ms in fp32), so we ship the hybrid in fp16 (\V{m.ship.mb}\,MB). One
+hybrid call takes \V{b.wasm1.p50} ms (p50; p95 \V{b.wasm1.p95}) in onnxruntime-web with
+WebAssembly SIMD and one thread; more threads and WebGPU on the integrated GPU are slower. The
+selection benchmark behind Table~\ref{tab:models} (fp32) differs from this run by a few
+milliseconds, and v3, with the same architecture, showed no difference from v2 beyond
+round-to-round variation.
+
+In the app, MediaPipe runs in one worker on the GPU delegate and the classifier in another, so a
+classification never blocks tracking. With a pilot recording (not one of the clips of
+Section~\ref{sec:livegap}) as camera, tracking ran at \V{t.hudon.fps} frames per second with the
+hand skeleton drawn and \V{t.hudoff.fps} without it, and a word appeared \V{t.hudon.e2e1} ms (p50)
+after the segmenter ended the sign. That decision comes \V{seg.lostms}--\V{seg.stillms} ms after
+the hands leave or stop, so a user waits about \V{t.userlo}--\V{t.userhi} ms. Without a working GPU
+delegate, tracking drops to \V{t.cpu.fps} fps, below our \V{budget.fps} fps target.
+\ifwithsystem
+ManuVox is an installable web app that runs entirely in the browser. \emph{Translate}, despite
+its name, turns a sequence of isolated signs into a row of glosses and shows ``not sure'' with the
+top three candidates below the calibrated threshold. \emph{Practice} scores the next segment
+against a target sign, and \emph{Teach} keeps a few examples of a sign in the browser's storage
+(Section~\ref{sec:teach}). On request, a serverless proxy sends only the recognized glosses to a
+hosted language model that writes one short sentence. Sentence generation is not evaluated.
+\fi

@@ -6,18 +6,18 @@ Isolated sign recognition assigns one gloss to a clip that contains a single sig
 benchmarks such as WLASL \citep{li2020wlasl} and ASL Citizen \citep{desai2023aslcitizen} made the
 task measurable at the scale of a few thousand signs, and INCLUDE \citep{sridhar2020include} did so
 for Indian Sign Language. ASL Citizen evaluates only on signers unseen in training and targets
-webcam-based dictionary lookup, the setting closest to ours; we follow its signer-disjoint
-protocol, test on its official test split, and train a second model on part of its training split.
+webcam-based dictionary lookup, the setting closest to ours. We follow its signer-disjoint
+protocol, test on its official test split and train a second model on part of its training split.
 
 \paragraph{Landmark models and the Google ISLR data.}
 Pose-based models classify body and hand keypoints instead of pixels, which removes appearance and
 makes on-device inference cheap: SPOTER uses a small transformer \citep{bohacek2022spoter}, and
 OpenHands releases such models for several sign languages \citep{selvaraj2022openhands}.
-\citet{moryossef2021pose} show what the skeletal representation loses with two pose estimators:
-a model is only as good as its serving-time landmarks. Segmenting signs is a task of its own
-\citep{renz2021segmentation}; our segmenter is a simple rule on hand motion. The Google ISLR
-competition \citep{kaggle2023islr} released MediaPipe Holistic landmarks rather than video,
-collected with the partners behind the PopSign game \citep{starner2023popsign}. We found no
+\citet{moryossef2021pose} show with two pose estimators what the skeletal representation loses,
+so the landmarks available at serving time limit what a model can recognize. Segmenting signs is a
+task of its own \citep{renz2021segmentation}; our segmenter is a simple rule on hand motion. The
+Google ISLR competition \citep{kaggle2023islr} released MediaPipe Holistic landmarks rather than
+video, collected with the partners behind the PopSign game \citep{starner2023popsign}. We found no
 peer-reviewed description of the top entries, and the leaderboard scored a hidden test set, so we
 compare only against baselines trained under our own protocol. In the browser we use MediaPipe's
 Tasks hand \citep{zhang2020mediapipehands} and pose \citep{bazarevsky2020blazepose} landmarkers.
@@ -25,11 +25,11 @@ Tasks hand \citep{zhang2020mediapipehands} and pose \citep{bazarevsky2020blazepo
 \paragraph{Train--serve skew, shift and calibration.}
 Faults accumulate unnoticed in the code around a deployed model \citep{sculley2015debt}, and
 production checklists test that training and serving compute the same features
-\citep{breck2017mltestscore}; live input also differs in distribution from the dataset, and our
-live gap mixes both. Temperature scaling corrects miscalibration, which the expected calibration
-error summarizes \citep{guo2017calibration}; selective prediction abstains below a threshold
-\citep{geifman2017selective}, as our ``not sure'' does. Calibration degrades under dataset shift
-\citep{ovadia2019shift}, as we observe across datasets and live.
+\citep{breck2017mltestscore}. Live input also differs in distribution from the dataset, and our
+live gap mixes skew and shift. Temperature scaling corrects miscalibration, which the expected
+calibration error summarizes \citep{guo2017calibration}. Selective prediction abstains below a
+threshold \citep{geifman2017selective}, as our ``not sure'' does. Calibration degrades under
+dataset shift \citep{ovadia2019shift}, as we observe across datasets and live.
 
 \paragraph{Personalization from a few examples.}
 Prototypical networks classify a query by its distance to class examples in an embedding space
