@@ -1,0 +1,18 @@
+{
+  "id": "swapnilshukla007/cnn-transformer-hybrid-for-isolated-asl-signs",
+  "title": "CNN + Transformer hybrid for isolated ASL signs",
+  "code_file": "notebook.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": [],
+  "competition_sources": [
+    "asl-signs"
+  ],
+  "kernel_sources": [],
+  "model_sources": []
+}

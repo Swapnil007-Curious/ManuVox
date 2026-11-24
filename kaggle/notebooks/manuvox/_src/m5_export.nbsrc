@@ -1,0 +1,483 @@
+%% md
+# From PyTorch to the browser: ONNX export, FP16/INT8 quantization and temperature calibration
+
+{{HEADER}}
+
+ManuVox runs its sign classifier inside a browser tab with onnxruntime-web. This notebook runs every step between a trained PyTorch model and a file a web page can load: ONNX export with the feature computation inside the graph, FP16 and INT8 versions, a comparison of size, CPU latency and accuracy, and a temperature fitted on validation data so that the app's confidence scores mean what they say. The model is the CNN + Transformer hybrid from notebook 4, trained here for 40 epochs.
+
+Data: the `asl-signs` competition files only (CC BY 4.0). Needs a GPU (T4) for training and internet for one `pip install`; about 35 minutes on Kaggle. Part 5 of a 5-notebook series.
+
+Contents
+
+1. Setup and a trained model
+2. Export to ONNX
+3. FP16 and INT8 versions
+4. Size, latency and accuracy
+5. Temperature calibration
+6. Reliability before and after
+7. Loading the model in a browser
+8. What we found
+
+%% md
+## 1. Setup and a trained model
+
+Kaggle's image ships `onnx` but not `onnxruntime`, so the first cell installs both at pinned versions (the `onnx` pin matches what Kaggle already has).
+
+%% code
+%pip install -q onnx==1.23.2 onnxruntime==1.31.1
+
+%% include setup
+
+%% include data
+
+%% include preprocess
+
+%% code
+import onnx
+import onnxruntime as ort
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # A T4 on Kaggle; CPU works for FAST runs.
+EPOCHS = 3 if FAST else 40  # Notebook 4 trains 80 epochs; this notebook is about what happens after training.
+EMA_DECAY = 0.99 if FAST else 0.999
+CALIBRATION_SEQUENCES = 1024  # Training sequences that set the INT8 activation ranges.
+LATENCY_CALLS = 50 if FAST else 300  # Timed single-sequence calls per model.
+ECE_BINS = 15
+print(f"onnx {onnx.__version__}, onnxruntime {ort.__version__}, torch {torch.__version__}")
+
+%% md
+The model, augmentation and training code is the same as in notebook 4 and is collapsed here.
+
+%% include-hide features
+
+%% include-hide hybrid
+
+%% include-hide augment
+
+%% include-hide train
+
+%% code
+DATA_DIR = find_competition_dir()
+table, sign_map = load_table(DATA_DIR)
+X, rows, _ = build_features(table, DATA_DIR)
+split, test_signers, val_signers = signer_split(rows)
+y_all = rows["label"].to_numpy()
+data = {name: (X[split == name].astype(np.float32), y_all[split == name]) for name in ("train", "val", "test")}
+print({name: len(y) for name, (_, y) in data.items()})
+
+to_gpu = lambda name: (torch.from_numpy(data[name][0]).to(DEVICE), torch.from_numpy(data[name][1]).long().to(DEVICE))  # noqa: E731
+model, history = train_model(HybridClassifier(), *to_gpu("train"), *to_gpu("val"), epochs=EPOCHS, lr=5e-4,
+                             recipe=RECIPE_V2, ema_decay=EMA_DECAY)
+model = model.cpu().eval()
+print(f"best val top-1 {history['val_top1'].max():.3f}")
+
+%% md
+## 2. Export to ONNX
+
+The export traces the model with a dummy batch and writes a graph with one input, `landmarks` (batch, 32, 120), and one output, `logits` (batch, 250). The batch axis is dynamic. Because the feature block and its standardisation statistics are part of the model, the browser feeds raw landmarks and nothing has to be reimplemented in JavaScript. The legacy TorchScript exporter (`dynamo=False`) is used because it needs no extra packages and handles this model's plain ops.
+
+%% code
+def export_onnx(model, path):
+    """Export with a dynamic batch axis at opset 17, then run the ONNX checker."""
+    example = torch.zeros(2, NUM_FRAMES, FRAME_DIM)  # Batch 2, so the tracer cannot fold the batch size.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*legacy TorchScript-based ONNX export.*")
+        warnings.filterwarnings("ignore", message=".*will be removed.*")
+        torch.onnx.export(model, (example,), str(path), input_names=["landmarks"], output_names=["logits"],
+                          dynamic_axes={"landmarks": {0: "batch"}, "logits": {0: "batch"}}, opset_version=17, dynamo=False)
+    onnx.checker.check_model(str(path))
+    return path
+
+
+def session(path, threads=1):
+    """A CPU onnxruntime session with a fixed thread count and full graph optimisation."""
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = threads
+    options.inter_op_num_threads = 1
+    options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    options.log_severity_level = 3
+    return ort.InferenceSession(str(path), options, providers=["CPUExecutionProvider"])
+
+
+def onnx_logits(path, x, batch=512):
+    """Logits from an ONNX file for a float32 array of frames."""
+    s = session(path, threads=N_WORKERS)
+    return np.concatenate([s.run(["logits"], {"landmarks": x[i : i + batch]})[0] for i in range(0, len(x), batch)])
+
+
+MODELS = {"fp32": export_onnx(model, WORK_DIR / "model_fp32.onnx")}
+x_check = data["val"][0][:256]
+with torch.no_grad():
+    reference = model(torch.from_numpy(x_check)).numpy()
+exported = onnx_logits(MODELS["fp32"], x_check)
+print(f"PyTorch vs ONNX on 256 val sequences: max |logit difference| {np.abs(reference - exported).max():.2e}, "
+      f"top-1 agreement {(reference.argmax(1) == exported.argmax(1)).mean():.1%}")
+
+%% md
+## 3. FP16 and INT8 versions
+
+Four smaller versions of the same graph:
+
+- FP16: weights and arithmetic in half precision, input and output kept in float32. If its top-1 agreement with FP32 on validation falls below 99%, it is rebuilt with the feature block kept in float32.
+- INT8 dynamic: weights stored as 8-bit integers per channel, activations quantised on the fly at run time.
+- INT8 static: weights and activations both 8-bit, with activation ranges measured on 1,024 training sequences (the calibration set; validation and test are never used). The feature block is excluded, so raw coordinates, velocity and standardisation stay float32 and quantisation starts at the first projection layer.
+- INT8 static, full: the same with nothing excluded, as an ablation. Quantising the raw input rounds coordinates onto an 8-bit grid before velocity is computed, and can turn small coordinates into exact zeros, which the feature block reads as missing points.
+
+The FP16 and static recipes follow the repository's `src/edgevision/quant/variants.py`.
+
+%% code
+from onnxruntime.quantization import CalibrationMethod, QuantFormat, QuantType, quantize_dynamic, quantize_static
+from onnxruntime.quantization.shape_inference import quant_pre_process
+from onnxruntime.transformers.float16 import convert_float_to_float16
+from onnxruntime.transformers.onnx_model import OnnxModel
+
+FEATURE_SCOPE = "/features/"  # Exporter name prefix of every node inside model.features.
+
+
+def feature_nodes(path):
+    """Names of the nodes that compute the feature block."""
+    return [n.name for n in onnx.load(str(path)).graph.node if n.name.startswith(FEATURE_SCOPE)]
+
+
+def to_fp16(src, dst, keep_features_fp32=False):
+    """Half-precision weights and compute, float32 input and output."""
+    converted = convert_float_to_float16(onnx.load(str(src)), keep_io_types=True,
+                                         node_block_list=feature_nodes(src) if keep_features_fp32 else None)
+    seen, unique = set(), []
+    for node in converted.graph.node:  # A block list can add byte-identical Cast nodes; keep one of each.
+        key = node.SerializeToString(deterministic=True)
+        if key not in seen:
+            seen.add(key)
+            unique.append(node)
+    converted.graph.ClearField("node")
+    converted.graph.node.extend(unique)
+    OnnxModel.graph_topological_sort(converted.graph)
+    onnx.save(converted, str(dst))
+    onnx.checker.check_model(str(dst))
+    return dst
+
+
+class CalibrationReader:
+    """Feeds quantize_static a fixed random sample of training sequences, 64 at a time."""
+
+    def __init__(self, x, n=CALIBRATION_SEQUENCES, batch=64, seed=SEED):
+        rows_ = np.sort(np.random.default_rng(seed).choice(len(x), size=min(n, len(x)), replace=False))
+        self.x, self.batch, self.position = x[rows_], batch, 0
+
+    def get_next(self):
+        if self.position >= len(self.x):
+            return None
+        chunk = self.x[self.position : self.position + self.batch]
+        self.position += self.batch
+        return {"landmarks": chunk}
+
+    def rewind(self):
+        self.position = 0
+
+
+def to_int8_static(src, dst, exclude_features=True):
+    """Static QDQ quantisation: uint8 activations, int8 per-channel weights, MinMax ranges."""
+    prepared = dst.with_name(dst.stem + "_prepared.onnx")
+    quant_pre_process(str(src), str(prepared))
+    quantize_static(str(prepared), str(dst), CalibrationReader(data["train"][0]),
+                    quant_format=QuantFormat.QDQ, activation_type=QuantType.QUInt8, weight_type=QuantType.QInt8,
+                    per_channel=True, reduce_range=False, calibrate_method=CalibrationMethod.MinMax,
+                    nodes_to_exclude=feature_nodes(prepared) if exclude_features else [])
+    prepared.unlink()
+    return dst
+
+%% code
+started = time.perf_counter()
+x_val, y_val = data["val"]
+fp32_val = onnx_logits(MODELS["fp32"], x_val).argmax(1)
+MODELS["fp16"] = to_fp16(MODELS["fp32"], WORK_DIR / "model_fp16.onnx")
+fp16_agreement = (onnx_logits(MODELS["fp16"], x_val).argmax(1) == fp32_val).mean()
+if fp16_agreement < 0.99:
+    print(f"FP16 agreement {fp16_agreement:.2%} < 99%: rebuilding with the feature block in float32")
+    MODELS["fp16"] = to_fp16(MODELS["fp32"], WORK_DIR / "model_fp16.onnx", keep_features_fp32=True)
+    fp16_agreement = (onnx_logits(MODELS["fp16"], x_val).argmax(1) == fp32_val).mean()
+print(f"FP16 top-1 agreement with FP32 on validation: {fp16_agreement:.2%}")
+
+import logging
+
+# The quantiser warns about shape inference on every run, and logs one line per LayerNorm weight
+# it cannot quantise per channel (those weights are 1-D and stay float). Both are expected here.
+root_logger, root_level = logging.getLogger(), logging.getLogger().level
+root_logger.setLevel(logging.ERROR)
+try:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        quantize_dynamic(str(MODELS["fp32"]), str(WORK_DIR / "model_int8_dynamic.onnx"), weight_type=QuantType.QInt8, per_channel=True)
+        MODELS["int8 dynamic"] = WORK_DIR / "model_int8_dynamic.onnx"
+        MODELS["int8 static"] = to_int8_static(MODELS["fp32"], WORK_DIR / "model_int8_static.onnx")
+        MODELS["int8 static, full"] = to_int8_static(MODELS["fp32"], WORK_DIR / "model_int8_static_full.onnx", exclude_features=False)
+finally:
+    root_logger.setLevel(root_level)
+print(f"built {len(MODELS) - 1} variants in {time.perf_counter() - started:.0f} s")
+
+%% md
+## 4. Size, latency and accuracy
+
+Latency is one sequence per call on one CPU thread, the way a browser worker calls the model: 20 warm-up calls, then timed calls with `time.perf_counter`. It is measured on whatever CPU runs the notebook (Kaggle's, when it runs there), so absolute numbers will differ on a laptop; the ratios between versions are the useful part. Accuracy is test top-1 on the four unseen signers, and agreement is the share of test clips where a version predicts the same sign as FP32.
+
+%% code
+def cpu_name():
+    """The CPU model: /proc/cpuinfo on Linux (Kaggle), the registry on Windows, else the platform module."""
+    try:
+        for line in Path("/proc/cpuinfo").read_text().splitlines():
+            if line.startswith("model name"):
+                return line.split(":", 1)[1].strip()
+    except OSError:
+        pass
+    try:
+        import winreg
+
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
+        return winreg.QueryValueEx(key, "ProcessorNameString")[0].strip()
+    except (ImportError, OSError):
+        import platform
+
+        return platform.processor() or "unknown CPU"
+
+
+def pts(value):
+    """Signed percentage points with one decimal; zero is written as 0.0, never +0.0 or -0.0."""
+    text = f"{value:+.1f}"
+    return "0.0" if text.lstrip("+-") == "0.0" else text
+
+
+CPU = cpu_name()
+print(f"latency measured on: {CPU}")
+
+
+def latency_ms(path, x, calls=LATENCY_CALLS, warmup=20):
+    """p50 and p95 milliseconds of single-sequence calls on one thread."""
+    s = session(path, threads=1)
+    times = []
+    for i in range(warmup + calls):
+        sample = x[i % len(x)][None]
+        started = time.perf_counter()
+        s.run(["logits"], {"landmarks": sample})
+        if i >= warmup:
+            times.append(1000 * (time.perf_counter() - started))
+    return np.percentile(times, 50), np.percentile(times, 95)
+
+
+x_test, y_test = data["test"]
+test_logits = {name: onnx_logits(path, x_test) for name, path in MODELS.items()}
+report = []
+for name, path in MODELS.items():
+    p50, p95 = latency_ms(path, x_val)
+    predicted = test_logits[name].argmax(1)
+    report.append({"version": name, "size_mb": path.stat().st_size / 1e6, "p50_ms": p50, "p95_ms": p95,
+                   "test_top1": (predicted == y_test).mean(), "agreement_with_fp32": (predicted == test_logits["fp32"].argmax(1)).mean()})
+report = pd.DataFrame(report).set_index("version")
+report["delta_top1_pts"] = 100 * (report["test_top1"] - report.loc["fp32", "test_top1"])
+report.round(3)
+
+%% code
+from matplotlib.ticker import PercentFormatter
+
+MARKERS = ["o", "s", "^", "D", "v"]  # One colour and one marker per version, so close points stay readable.
+
+
+def size_accuracy(ax, size=60, fontsize=9):
+    """Each version as its own point (colour + marker), identified in a legend."""
+    for (name, row), colour, marker in zip(report.iterrows(), PALETTE, MARKERS):
+        ax.scatter(row["size_mb"], row["test_top1"], color=colour, marker=marker, s=size, zorder=3,
+                   edgecolor=SURFACE, linewidth=1.5, label=name)
+    ax.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=1))
+    ax.legend(loc="best", fontsize=fontsize)
+
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.4))
+size_accuracy(ax1)
+ax1.set(title="File size against test top-1", xlabel="ONNX file size (MB)", ylabel="Test top-1 (4 unseen signers)")
+y = np.arange(len(report))
+ax2.barh(y, report["p50_ms"], color=BLUE, height=0.6, label="p50")
+ax2.scatter(report["p95_ms"], y, color=ORANGE, marker="|", s=300, linewidth=3, zorder=3, label="p95")
+ax2.set_yticks(y, report.index)
+ax2.invert_yaxis()
+ax2.set(title="Latency per sequence, 1 CPU thread", xlabel="Milliseconds", ylabel="Version")
+ax2.legend(loc="lower right")
+plt.tight_layout()
+plt.show()
+smallest = report["size_mb"].idxmin()
+takeaway(f"FP16 halves the file ({report.loc['fp32', 'size_mb']:.1f} to {report.loc['fp16', 'size_mb']:.1f} MB) and changes test top-1 "
+         f"by {pts(report.loc['fp16', 'delta_top1_pts'])} points; the smallest file, {smallest} at {report.loc[smallest, 'size_mb']:.1f} MB, "
+         f"changes it by {pts(report.loc[smallest, 'delta_top1_pts'])} points, and INT8 static with the input quantised by "
+         f"{pts(report.loc['int8 static, full', 'delta_top1_pts'])} points.")
+
+%% md
+The repository ran the same comparison on its earlier models. On its temporal CNN (mean of three seeds), FP16 had the same test top-1 as FP32, INT8 dynamic lost 3.1 points and INT8 static 6.8 points (`results/tables/test_quant_summary.csv`). It shipped the FP16 hybrid, a 6.9 MB file that runs in 18.1 ms at p50 in Chrome on an i3-1115G4 laptop (`results/model_selection.md`).
+
+## 5. Temperature calibration
+
+The app shows a sign only when the model is confident enough, so its confidence has to be honest: of all predictions made at 80% confidence, about 80% should be right. Temperature scaling divides the logits by one number T before the softmax. It never changes which sign ranks first, only how sure the model claims to be. T is fitted on the validation signers by minimising the negative log-likelihood, and judged on the test signers with the expected calibration error (ECE): the confidence-weighted gap between confidence and accuracy over 15 equal-width bins.
+
+The FP16 model is calibrated, because that is the version a browser would load.
+
+%% code
+def log_softmax(logits, t=1.0):
+    z = logits / t
+    z = z - z.max(axis=1, keepdims=True)
+    return z - np.log(np.exp(z).sum(axis=1, keepdims=True))
+
+
+def nll(logits, y, t=1.0):
+    """Mean negative log-likelihood of the true labels under softmax(logits / t)."""
+    return float(-log_softmax(logits, t)[np.arange(len(y)), y].mean())
+
+
+def fit_temperature(logits, y, low=0.05, high=20.0):
+    """The temperature minimising NLL, by golden-section search on log t."""
+    a, b = np.log(low), np.log(high)
+    ratio = (np.sqrt(5) - 1) / 2
+    for _ in range(80):
+        c, d = b - ratio * (b - a), a + ratio * (b - a)
+        if nll(logits, y, np.exp(c)) < nll(logits, y, np.exp(d)):
+            b = d
+        else:
+            a = c
+    return float(np.exp((a + b) / 2))
+
+
+def reliability(logits, y, t=1.0, bins=ECE_BINS):
+    """Per-bin (mean confidence, accuracy, count) of the top-1 prediction, and the ECE."""
+    p = np.exp(log_softmax(logits, t))
+    confidence, correct = p.max(axis=1), p.argmax(axis=1) == y
+    which = np.clip(np.digitize(confidence, np.linspace(0, 1, bins + 1)[1:-1], right=True), 0, bins - 1)
+    table = pd.DataFrame({"bin": which, "confidence": confidence, "correct": correct}).groupby("bin").agg(
+        confidence=("confidence", "mean"), accuracy=("correct", "mean"), count=("correct", "size"))
+    ece = float((table["count"] / len(y) * (table["accuracy"] - table["confidence"]).abs()).sum())
+    return table, ece
+
+
+def ece_ci(logits, y, t, n_boot=200, seed=SEED):
+    """95% bootstrap interval of the ECE, resampling test clips."""
+    rng = np.random.default_rng(seed)
+    values = [reliability(logits[i], y[i], t)[1] for i in (rng.integers(0, len(y), len(y)) for _ in range(n_boot))]
+    return np.percentile(values, [2.5, 97.5])
+
+
+val_logits = onnx_logits(MODELS["fp16"], x_val)
+T = fit_temperature(val_logits, y_val)
+fp16_test = test_logits["fp16"]
+before, ece_before = reliability(fp16_test, y_test)
+after, ece_after = reliability(fp16_test, y_test, T)
+calibration = pd.DataFrame({
+    "temperature": [1.0, T],
+    "val NLL": [nll(val_logits, y_val), nll(val_logits, y_val, T)],
+    "test NLL": [nll(fp16_test, y_test), nll(fp16_test, y_test, T)],
+    "test ECE": [ece_before, ece_after],
+    "test ECE 95% CI": [np.round(ece_ci(fp16_test, y_test, 1.0), 3), np.round(ece_ci(fp16_test, y_test, T), 3)],
+    "test top-1": [(fp16_test.argmax(1) == y_test).mean()] * 2,
+}, index=["raw logits", "temperature-scaled"])
+calibration.round(3)
+
+%% md
+## 6. Reliability before and after
+
+%% code
+fig, axes = plt.subplots(1, 2, figsize=(11, 4.6), sharey=True)
+for ax, (table_, ece, label) in zip(axes, ((before, ece_before, "raw logits (T = 1)"), (after, ece_after, f"temperature-scaled (T = {T:.2f})"))):
+    centres = (table_.index + 0.5) / ECE_BINS
+    ax.bar(centres, table_["accuracy"], width=0.9 / ECE_BINS, color=BLUE, label="accuracy in bin")
+    ax.plot([0, 1], [0, 1], color=MUTED, linewidth=1.2, label="perfect calibration")
+    ax.scatter(table_["confidence"], table_["accuracy"], color=ORANGE, s=18, zorder=3, label="mean confidence in bin")
+    ax.set(title=f"{label}: ECE {ece:.3f}", xlabel="Confidence of the top prediction", xlim=(0, 1), ylim=(0, 1))
+axes[0].set_ylabel("Accuracy of predictions in the bin")
+axes[0].legend(loc="upper left", fontsize=8)
+plt.tight_layout()
+plt.show()
+direction = "sharpens the probabilities: the raw model was under-confident" if T < 1 else "softens the probabilities: the raw model was over-confident"
+takeaway(f"T = {T:.2f} {direction}, and test ECE {'falls' if ece_after < ece_before else 'rises'} from {ece_before:.3f} to {ece_after:.3f} with top-1 unchanged at "
+         f"{(fp16_test.argmax(1) == y_test).mean():.1%}.")
+
+%% md
+The repository's shipped model went through the same step: T = 0.87 from validation, test ECE from 0.083 to 0.033 (`results/test_analysis/calibration.json`). Label smoothing (0.1 here) lowers a model's confidence during training, which is one reason a fitted T can come out below 1.
+
+The FP16 model and a small metadata file with the labels and the temperature are saved to the notebook's output.
+
+%% code
+labels = {index: sign for sign, index in sign_map.items()}
+meta = {"input": "landmarks", "input_shape": [None, NUM_FRAMES, FRAME_DIM], "output": "logits",
+        "temperature": round(T, 4), "labels": [labels[i] for i in range(len(labels))]}
+(WORK_DIR / "model_fp16_meta.json").write_text(json.dumps(meta))
+for path in MODELS.values():
+    if path.name != "model_fp16.onnx":
+        path.unlink()  # Keep only the FP16 file in the output.
+print(f"saved model_fp16.onnx ({(WORK_DIR / 'model_fp16.onnx').stat().st_size / 1e6:.1f} MB) and model_fp16_meta.json")
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.8, 7.2))
+size_accuracy(ax1, size=140, fontsize=11)
+ax1.set(title="Size against accuracy", xlabel="ONNX file size (MB)", ylabel="Test top-1 (4 unseen signers)")
+centres = (after.index + 0.5) / ECE_BINS
+ax2.bar(centres, after["accuracy"], width=0.9 / ECE_BINS, color=BLUE, label="accuracy (temperature-scaled)")
+ax2.plot([0, 1], [0, 1], color=MUTED, linewidth=1.5, label="perfect calibration")
+ax2.scatter(before["confidence"], before["accuracy"], color=ORANGE, s=40, zorder=3, label=f"raw model, ECE {ece_before:.3f}")
+ax2.set(title=f"Reliability after T = {T:.2f}: ECE {ece_after:.3f}", xlabel="Confidence", ylabel="Accuracy", xlim=(0, 1), ylim=(0, 1))
+ax2.legend(loc="upper left")
+fig.suptitle("From PyTorch to the browser: ONNX, FP16, INT8 and temperature calibration", fontweight="bold", fontsize=16, x=0.02, ha="left")
+plt.tight_layout(rect=(0, 0, 1, 0.94))
+save_cover(fig)
+plt.close(fig)
+
+%% md
+## 7. Loading the model in a browser
+
+With onnxruntime-web, the saved FP16 file runs in a web page as it is. ManuVox does this in a Web Worker so the camera loop never waits for the classifier. A minimal version:
+
+```js
+import * as ort from "onnxruntime-web";
+
+const meta = await (await fetch("model_fp16_meta.json")).json();
+const session = await ort.InferenceSession.create("model_fp16.onnx", { executionProviders: ["wasm"] });
+
+// frames: Float32Array of 32 x 120 values (59 landmarks x (x, y) + 2 hand-presence flags per frame),
+// preprocessed exactly as in this series: shoulder-centred, mirrored to the right hand, resampled to 32 frames.
+const { logits } = await session.run({ landmarks: new ort.Tensor("float32", frames, [1, 32, 120]) });
+const scaled = Array.from(logits.data, (v) => v / meta.temperature);
+const best = scaled.indexOf(Math.max(...scaled));
+const p = Math.exp(scaled[best]) / scaled.reduce((sum, v) => sum + Math.exp(v), 0);  // softmax of the top sign
+console.log(meta.labels[best], p);  // show it only when p clears a threshold chosen on validation data
+```
+
+The preprocessing has to match training exactly, which is where notebook 2's train-serve skew comes from.
+
+## 8. What we found
+
+%% code
+display(Markdown(
+    f"The exported ONNX graph matches PyTorch to within {np.abs(reference - exported).max():.1e} in the logits. "
+    f"FP16 halves the file to {report.loc['fp16', 'size_mb']:.1f} MB and agrees with FP32 on {report.loc['fp16', 'agreement_with_fp32']:.1%} "
+    f"of test clips ({pts(report.loc['fp16', 'delta_top1_pts'])} points top-1). "
+    f"INT8 dynamic gives {report.loc['int8 dynamic', 'size_mb']:.1f} MB at {pts(report.loc['int8 dynamic', 'delta_top1_pts'])} points, "
+    f"INT8 static {report.loc['int8 static', 'size_mb']:.1f} MB at {pts(report.loc['int8 static', 'delta_top1_pts'])}, and quantising "
+    f"the input as well changes top-1 by {pts(report.loc['int8 static, full', 'delta_top1_pts'])} points. "
+    f"On one thread of the {CPU}, p50 latency runs from {report['p50_ms'].min():.1f} to {report['p50_ms'].max():.1f} ms per sequence. "
+    f"A temperature of {T:.2f} fitted on validation {'cuts' if ece_after < ece_before else 'raises'} test ECE from {ece_before:.3f} to {ece_after:.3f} without changing a single prediction."
+))
+
+%% md
+### Limitations
+
+- Latency is measured on the notebook's CPU through onnxruntime for Python; a laptop browser running WebAssembly is slower in absolute terms and can rank INT8 differently.
+- The model trains for 40 epochs against notebook 4's 80; this notebook measures the differences between versions of one model.
+- INT8 calibration uses MinMax ranges on 1,024 sequences. Other calibration methods (percentile, entropy) or quantisation-aware training could close part of the INT8 gap.
+- ECE depends on the binning (15 equal-width bins here), and its bootstrap interval resamples clips, not signers.
+
+### Ideas to try
+
+- Run the same files in onnxruntime-web with the WebGPU backend and compare latency in your own browser.
+- Try percentile calibration for INT8 static, or keep only the first projection layer in float32.
+- Fit a separate temperature per signer group and see whether one global T is enough.
+
+### The series
+
+{{SERIES}}
+
+If this helped, an upvote helps other people find it, and feedback in the comments is welcome.

@@ -1,0 +1,490 @@
+%% md
+# The hand-swap bug: measuring train-serve skew in MediaPipe sign recognition
+
+{{HEADER}}
+
+A sign classifier can lose most of its accuracy in a live app while the model file stays the same, because the live pipeline feeds it slightly different numbers than training did. ManuVox hit this: its first browser build put each detected hand in the other hand's slot. On the author's 50 webcam clips, fixing that one mapping raised clip top-1 from 10% to 46% in the Python pipeline and from 16% to 41% in the browser (`results/live_gap_v2.md` in the repository). This notebook trains the model from notebook 4 on a shorter schedule, then replays six skews on four held-out signers: swapped hand slots, a mirrored camera, flipped coordinates, other camera aspect ratios, lower frame rates and dropped frames. It measures the accuracy each one costs and tests a fix for two of them.
+
+Data: the `asl-signs` competition files only (CC BY 4.0). Needs a GPU (T4), about 30 minutes on Kaggle. Part 2 of a 5-notebook series.
+
+Contents
+
+1. Setup and data
+2. Train on clean data
+3. The skews as functions
+4. What each skew costs
+5. Fixing the hand slots
+6. Aspect ratio: a sweep and a self-calibrating fix
+7. Frame rate and dropped frames
+8. What we found
+
+%% md
+## 1. Setup and data
+
+The readers and the preprocessing are the same as in notebook 1. Preprocessing drops frames without a hand, mirrors left-dominant sequences, centres on the shoulders, divides by the shoulder width and resamples 32 frames.
+
+%% include setup
+
+%% include data
+
+%% include preprocess
+
+%% code
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # A T4 on Kaggle; CPU works for FAST runs.
+EPOCHS = 4 if FAST else 30  # Notebook 4 trains 80 epochs; 30 is enough to study the skews.
+EMA_DECAY = 0.99 if FAST else 0.999  # Weight averaging; FAST runs too few steps for 0.999.
+
+%% md
+The model, augmentation and training code is identical to notebook 4 and is collapsed here. Expand the next cell to read it.
+
+%% include-hide features
+
+%% include-hide hybrid
+
+%% include-hide augment
+
+%% include-hide train
+
+%% code
+DATA_DIR = find_competition_dir()
+table, sign_map = load_table(DATA_DIR)
+split, test_signers, val_signers = signer_split(table)
+print(f"test signers {test_signers}, val signers {val_signers}")
+
+fit_rows = table[split != "test"].reset_index(drop=True)
+X_fit, fit_rows, _ = build_features(fit_rows, DATA_DIR)
+fit_split = np.where(fit_rows["participant_id"].isin(val_signers), "val", "train")
+
+started = time.perf_counter()
+test_rows = table[split == "test"].reset_index(drop=True)
+test_raw = parallel_map(read_xy, [DATA_DIR / p for p in test_rows["path"]])
+print(f"read {len(test_raw):,} raw test sequences in {time.perf_counter() - started:.0f} s")
+
+%% md
+The test signers' sequences stay raw, in frame coordinates. Each skew below is applied to those raw landmarks, and the result goes through the same preprocessing as training, just as a live frame would.
+
+## 2. Train on clean data
+
+%% code
+def to_device(X, y):
+    return torch.from_numpy(X).to(DEVICE), torch.from_numpy(y).long().to(DEVICE)
+
+
+train_mask = fit_split == "train"
+x_train, y_train = to_device(X_fit[train_mask], fit_rows["label"].to_numpy()[train_mask])
+x_val, y_val = to_device(X_fit[~train_mask], fit_rows["label"].to_numpy()[~train_mask])
+print(f"train {len(x_train):,}, val {len(x_val):,} sequences on {DEVICE}")
+model, history = train_model(HybridClassifier(), x_train, y_train, x_val, y_val, epochs=EPOCHS, lr=5e-4,
+                             recipe=RECIPE_V2, ema_decay=EMA_DECAY)
+print(f"best val top-1 {history['val_top1'].max():.3f} at epoch {history['val_top1'].idxmax() + 1}")
+
+%% md
+## 3. The skews as functions
+
+Each function takes one raw sequence, (frames, 59, 2) in frame coordinates, and returns what a live pipeline with that fault would produce.
+
+- Swapped hand slots: the left and right hand blocks trade places, coordinates untouched. This is the ManuVox bug: the browser's hand landmarker labels hands by handedness, and the first build read those labels as if the frame were mirrored.
+- Mirrored camera: the selfie view. MediaPipe would see a mirror-image person, so x becomes 1 - x and every left/right landmark is relabelled.
+- Flipped x only: x becomes 1 - x but the labels stay, which is what a pipeline gets when it mirrors coordinates after tracking.
+- Aspect ratio: x is a fraction of the frame width and y of its height, so a camera with a different width-to-height ratio stretches y relative to x by s = (new ratio) / 0.723, where 0.723 is the training videos' effective ratio estimated in the repository (`features_spec.json`). A 4:3 webcam gives s = 1.84 and a 16:9 webcam s = 2.46.
+- Frame rate: keeping every k-th frame, as a camera at 1/k of the training rate would.
+- Dropped frames: losing a random share of frames, as a browser does under load.
+
+%% code
+TRAIN_WIDTH_OVER_HEIGHT = 0.723  # Effective aspect of the training videos (repository estimate).
+
+
+def swap_hand_slots(xy, i=0):
+    """Put the left hand's points in the right-hand block and the other way round."""
+    out = xy.copy()
+    out[:, LEFT], out[:, RIGHT] = xy[:, RIGHT], xy[:, LEFT]
+    return out
+
+
+def mirror_camera(xy, i=0):
+    """A mirrored (selfie) frame: x -> 1 - x and every left/right landmark relabelled."""
+    return mirror(xy)
+
+
+def flip_x_only(xy, i=0):
+    """Mirror the coordinates but keep the left/right labels."""
+    out = xy.copy()
+    out[..., 0] = 1.0 - out[..., 0]
+    return out
+
+
+def stretch_y(xy, s):
+    """A camera whose width-to-height ratio is s times the training ratio: y scaled by s about 0.5."""
+    out = xy.copy()
+    out[..., 1] = 0.5 + (xy[..., 1] - 0.5) * s
+    return out
+
+
+def keep_every(xy, k):
+    """Every k-th frame, starting with the first: a camera at 1/k of the frame rate."""
+    return xy[::k]
+
+
+def drop_random(xy, share, i):
+    """Drop each frame with probability ``share``; seeded by the sequence index."""
+    keep = np.random.default_rng(SEED + i).random(len(xy)) >= share
+    return xy[keep]
+
+%% code
+VARIANTS = {}  # name -> function(raw sequence, index) -> raw sequence
+
+
+def preprocess_chunk(job):
+    """Preprocess test sequences start..stop under one named variant (runs in a worker)."""
+    name, start, stop = job
+    return [preprocess(VARIANTS[name](test_raw[i], i))[0] for i in range(start, stop)]
+
+
+def run_variant(name, chunk=256):
+    """Per-sequence correctness of the model on every test sequence under variant ``name``.
+
+    A sequence that the skew leaves with fewer than 3 hand frames gets no prediction and
+    counts as wrong, as a live app would show nothing.
+    """
+    jobs = [(name, s, min(s + chunk, len(test_raw))) for s in range(0, len(test_raw), chunk)]
+    features = [f for part in parallel_map(preprocess_chunk, jobs, chunksize=1) for f in part]
+    kept = np.array([f is not None for f in features])
+    batch = np.stack([f if f is not None else np.zeros((NUM_FRAMES, FRAME_DIM), np.float32) for f in features])
+    predicted = predict_logits(model, torch.from_numpy(batch).to(DEVICE)).argmax(1).cpu().numpy()
+    return (predicted == test_rows["label"].to_numpy()) & kept, kept
+
+
+VARIANTS["clean"] = lambda xy, i: xy
+clean_correct, clean_kept = run_variant("clean")
+base = clean_kept  # Score every skew on the sequences the clean pipeline keeps.
+print(f"clean test top-1 {clean_correct[base].mean():.3f} on {base.sum():,} sequences "
+      f"({(~base).sum()} dropped by preprocessing)")
+
+%% md
+## 4. What each skew costs
+
+%% code
+results, corrects = {}, {}
+
+
+def rate(correct, mask):
+    """Accuracy on the rows in ``mask``, NaN when there are none."""
+    return float(correct[mask].mean()) if mask.any() else float("nan")
+
+
+def pts(value, signed=False):
+    """Percentage points with one decimal; zero is written as 0.0, never -0.0 or +0.0."""
+    text = f"{value:+.1f}" if signed else f"{value:.1f}"
+    return "0.0" if text.lstrip("+-") == "0.0" else text
+
+
+def score(name, label):
+    """Run a variant and store its accuracy, the drop against clean with a paired 95% CI, and per-signer drops."""
+    correct, kept = run_variant(name)
+    diff = correct[base].astype(float) - clean_correct[base]
+    low, high = bootstrap_ci(diff)
+    signers = test_rows.loc[base, "participant_id"].to_numpy()
+    per_signer = {p: diff[signers == p].mean() for p in test_signers}
+    results[name] = {
+        "skew": label, "top1": correct[base].mean(), "drop_pts": -100 * diff.mean() + 0.0,  # + 0.0 turns -0.0 into 0.0.
+        "ci_low": -100 * high + 0.0, "ci_high": -100 * low + 0.0, "no_prediction": int((base & ~kept).sum()),
+        "signer_drop_min": -100 * max(per_signer.values()), "signer_drop_max": -100 * min(per_signer.values()),
+    }
+    corrects[name] = correct
+
+
+VARIANTS["swap"] = swap_hand_slots
+VARIANTS["mirror"] = mirror_camera
+VARIANTS["flip"] = flip_x_only
+VARIANTS["aspect_4x3"] = lambda xy, i: stretch_y(xy, (4 / 3) / TRAIN_WIDTH_OVER_HEIGHT)
+VARIANTS["aspect_16x9"] = lambda xy, i: stretch_y(xy, (16 / 9) / TRAIN_WIDTH_OVER_HEIGHT)
+VARIANTS["fps_half"] = lambda xy, i: keep_every(xy, 2)
+VARIANTS["fps_third"] = lambda xy, i: keep_every(xy, 3)
+VARIANTS["drop_30"] = lambda xy, i: drop_random(xy, 0.3, i)
+labels = {
+    "swap": "hand slots swapped", "mirror": "mirrored camera", "flip": "x flipped, labels kept",
+    "aspect_4x3": "4:3 webcam (s = 1.84)", "aspect_16x9": "16:9 webcam (s = 2.46)",
+    "fps_half": "half the frame rate", "fps_third": "a third of the frame rate", "drop_30": "30% of frames dropped",
+}
+results["clean"] = {"skew": "clean", "top1": clean_correct[base].mean(), "drop_pts": 0.0, "ci_low": 0.0,
+                    "ci_high": 0.0, "no_prediction": 0, "signer_drop_min": 0.0, "signer_drop_max": 0.0}
+for name, label in labels.items():
+    score(name, label)
+swap_correct = corrects["swap"]
+summary = pd.DataFrame.from_dict(results, orient="index").set_index("skew")
+summary.round({"top1": 3, "drop_pts": 1, "ci_low": 1, "ci_high": 1, "signer_drop_min": 1, "signer_drop_max": 1})
+
+%% code
+from matplotlib.ticker import PercentFormatter
+
+order = summary.sort_values("top1")
+errors = np.vstack([order["ci_high"] - order["drop_pts"], order["drop_pts"] - order["ci_low"]]) / 100  # Left, right.
+
+
+def skew_bars(ax, fontsize=8):
+    """Top-1 per skew as bars, whiskers for the drop's 95% CI, each value written past its whisker."""
+    y = np.arange(len(order))
+    right = order["top1"].to_numpy() + errors[1]
+    ax.barh(y, order["top1"], color=BLUE, height=0.7, xerr=errors, ecolor=INK_2, capsize=2)
+    ax.axvline(results["clean"]["top1"], color=INK, linewidth=1)
+    for yi, value, end in zip(y, order["top1"], right):
+        ax.annotate(f"{value:.1%}", (end, yi), xytext=(4, 0), textcoords="offset points", va="center", color=INK_2,
+                    fontsize=fontsize)
+    ax.set_yticks(y, order.index, fontsize=fontsize + 1)
+    ax.set_xlim(0, min(1.0, 1.25 * right.max()))
+    ax.xaxis.set_major_formatter(PercentFormatter(1.0, decimals=0))
+
+
+fig, ax = plt.subplots(figsize=(9, 4.6))
+skew_bars(ax)
+ax.set(title="Test top-1 on 4 unseen signers under each skew", xlabel="Top-1 accuracy (whiskers: 95% CI of the drop)",
+       ylabel="Skew applied to the raw landmarks")
+plt.tight_layout()
+plt.show()
+worst = summary.drop("clean")["drop_pts"].idxmax()
+takeaway(f"'{worst}' costs the most, {pts(summary.loc[worst, 'drop_pts'])} points (from {results['clean']['top1']:.1%} to "
+         f"{summary.loc[worst, 'top1']:.1%}), while the mirrored camera costs {pts(summary.loc['mirrored camera', 'drop_pts'])} "
+         f"and half the frame rate {pts(summary.loc['half the frame rate', 'drop_pts'])}.")
+
+%% md
+Preprocessing canonicalises handedness: a mirrored right-handed signer looks left-dominant, and preprocessing mirrors the sequence back. The exception is a tie, where both hands are visible in the same number of frames. The tie rule keeps such a sequence as it is, so with a mirrored camera it reaches the model as a mirror image. The next cell splits the mirrored-camera result by that rule.
+
+%% code
+def is_tie(xy):
+    """Both hands visible in equally many frames (frames with no hand ignored)."""
+    present = hand_presence(xy)
+    present = present[present.any(axis=1)]
+    return bool(present[:, 0].sum() == present[:, 1].sum())
+
+
+tie = np.array([is_tie(xy) for xy in test_raw])
+left_dominant = np.array([hand_presence(xy)[:, 0].sum() > hand_presence(xy)[:, 1].sum() for xy in test_raw])
+by_test_signer = pd.Series(left_dominant[base]).groupby(test_rows.loc[base, "participant_id"].to_numpy()).mean()
+print("left-dominant share per test signer:", by_test_signer.round(3).to_dict())
+groups = {"both hands in equally many frames": base & tie, "one hand in more frames": base & ~tie}
+display(pd.DataFrame({
+    "sequences": [int(m.sum()) for m in groups.values()],
+    "clean top-1": [rate(clean_correct, m) for m in groups.values()],
+    "mirrored camera top-1": [rate(corrects["mirror"], m) for m in groups.values()],
+}, index=list(groups)).round(3))
+if (base & tie).any():
+    takeaway(f"{tie[base].mean():.0%} of test sequences are ties; on them the mirrored camera scores "
+             f"{rate(corrects['mirror'], base & tie):.1%} against {rate(clean_correct, base & tie):.1%} clean, and on the rest "
+             f"{rate(corrects['mirror'], base & ~tie):.1%} against {rate(clean_correct, base & ~tie):.1%}.")
+else:
+    takeaway("No test sequence is a tie, so preprocessing mirrors every mirrored-camera sequence back.")
+
+%% md
+Swapping the hand slots is a different fault: the hands land in the wrong blocks relative to the body, and no later step can tell.
+
+The intervals come from a paired bootstrap over sequences. Sequences from one signer are not independent, and with four test signers the per-signer range in the table above is the more honest view of the spread.
+
+## 5. Fixing the hand slots
+
+Holistic, which produced the training data, crops each hand from the pose, so its left-hand block is the hand at the pose's left wrist. A live pipeline can follow the same rule: give each detected hand to the block of the nearer pose wrist, and when both hands are seen, take the pairing with the smaller total distance. That is the fix ManuVox shipped.
+
+%% code
+def assign_by_wrist(xy, i=0):
+    """Reassign hands to blocks by distance to the pose wrists (Holistic's rule).
+
+    Two hands: keep or swap, whichever pairing is closer in total. One hand: the block of the
+    nearer wrist. Frames without both pose wrists keep their blocks.
+    """
+    out = xy.copy()
+    lw, rw = xy[:, L_WRIST], xy[:, R_WRIST]
+    hand_l, hand_r = xy[:, LEFT.start], xy[:, RIGHT.start]  # Hand wrists (hand point 0).
+    dist = lambda a, b: np.hypot(*(a - b).T)  # noqa: E731
+    has_l, has_r = np.isfinite(hand_l).all(1), np.isfinite(hand_r).all(1)
+    pose_ok = np.isfinite(lw).all(1) & np.isfinite(rw).all(1)
+    keep_cost = np.where(has_l, dist(hand_l, lw), 0) + np.where(has_r, dist(hand_r, rw), 0)
+    swap_cost = np.where(has_l, dist(hand_l, rw), 0) + np.where(has_r, dist(hand_r, lw), 0)
+    swap = pose_ok & (has_l | has_r) & (swap_cost < keep_cost)
+    out[swap] = swap_hand_slots(xy[swap])
+    return out
+
+
+VARIANTS["clean_fixed"] = assign_by_wrist
+VARIANTS["swap_fixed"] = lambda xy, i: assign_by_wrist(swap_hand_slots(xy))
+clean_fixed, _ = run_variant("clean_fixed")
+swap_fixed, _ = run_variant("swap_fixed")
+fix = pd.DataFrame(
+    {"as tracked": [clean_correct[base].mean(), swap_correct[base].mean()],
+     "after nearest-wrist assignment": [clean_fixed[base].mean(), swap_fixed[base].mean()]},
+    index=["correct slots", "slots swapped"],
+)
+display(fix.round(3))
+
+fig, ax = plt.subplots(figsize=(7, 3.8))
+x = np.arange(2)
+for j, (column, colour) in enumerate(zip(fix.columns, (BLUE, ORANGE))):
+    bars = ax.bar(x + (j - 0.5) * 0.36, fix[column], width=0.34, color=colour, label=column)
+    ax.bar_label(bars, labels=[f"{v:.1%}" for v in fix[column]], padding=3, color=INK_2, fontsize=8)
+ax.set_xticks(x, fix.index)
+ax.set(title="Nearest-wrist assignment undoes the hand swap", xlabel="Input to the live pipeline",
+       ylabel="Test top-1", ylim=(0, min(1.0, 1.3 * fix.values.max())))
+ax.legend(loc="upper right")
+plt.tight_layout()
+plt.show()
+takeaway(f"With swapped slots, assigning hands by the nearer pose wrist brings top-1 from {swap_correct[base].mean():.1%} back to "
+         f"{swap_fixed[base].mean():.1%}; on correctly labelled data it changes top-1 by {pts(100 * (clean_fixed[base].mean() - clean_correct[base].mean()), signed=True)} points.")
+
+%% md
+## 6. Aspect ratio: a sweep and a self-calibrating fix
+
+If the app knows the frame's width and height, it can undo the stretch exactly: scale y by k = 0.723 / (width / height). ManuVox does this. When the frame size is unreliable, a pipeline can calibrate from the body instead: measure the body ratio r (nose height over shoulder width, see notebook 1) and scale y so that r matches the training median. The sweep below compares no correction with that body-based correction, which also removes the natural spread of r between people.
+
+%% code
+def body_ratio(xy):
+    """Median r = |nose y - shoulder-midpoint y| / |shoulder x distance| over frames with a hand and all three points."""
+    nose, ls, rs = xy[:, NOSE], xy[:, L_SHOULDER], xy[:, R_SHOULDER]
+    width = np.abs(ls[:, 0] - rs[:, 0])
+    with np.errstate(invalid="ignore", divide="ignore"):
+        r = np.abs(nose[:, 1] - 0.5 * (ls[:, 1] + rs[:, 1])) / width
+    r = r[np.isfinite(r) & (width > 0) & hand_presence(xy).any(axis=1)]  # Kept frames, as in training.
+    return float(np.median(r)) if len(r) else np.nan
+
+
+def train_body_ratio(X):
+    """The training median of r, read from preprocessed frames (r survives centring, scaling and mirroring)."""
+    pts = X[..., : 2 * N_LANDMARKS].astype(np.float32).reshape(-1, N_LANDMARKS, 2)
+    nose, ls, rs = pts[:, NOSE], pts[:, L_SHOULDER], pts[:, R_SHOULDER]
+    ok = (np.abs(nose).sum(1) > 0) & (np.abs(ls).sum(1) > 0) & (np.abs(rs).sum(1) > 0) & (ls[:, 0] != rs[:, 0])
+    return float(np.median(np.abs(nose[ok, 1] - 0.5 * (ls[ok, 1] + rs[ok, 1])) / np.abs(ls[ok, 0] - rs[ok, 0])))
+
+
+R_TRAIN = train_body_ratio(X_fit[train_mask])
+print(f"training median body ratio r = {R_TRAIN:.3f}")
+
+
+def calibrate_aspect(xy, i=0):
+    """Scale y about 0.5 so the sequence's body ratio equals the training median (k clamped to 0.25-4)."""
+    r = body_ratio(xy)
+    return xy if not np.isfinite(r) or r == 0 else stretch_y(xy, float(np.clip(R_TRAIN / r, 0.25, 4.0)))
+
+%% code
+STRETCHES = [0.5, 0.75, 1.0, 1.25, 1.5, 1.84, 2.0, 2.46, 3.0]
+sweep = []
+for s in STRETCHES:
+    VARIANTS[f"s{s}"] = lambda xy, i, s=s: stretch_y(xy, s)
+    VARIANTS[f"s{s}_cal"] = lambda xy, i, s=s: calibrate_aspect(stretch_y(xy, s))
+    sweep.append({"s": s, "no correction": run_variant(f"s{s}")[0][base].mean(),
+                  "body-ratio correction": run_variant(f"s{s}_cal")[0][base].mean()})
+sweep = pd.DataFrame(sweep).set_index("s")
+display(sweep.round(3).T)
+
+fig, ax = plt.subplots(figsize=(8.5, 4.2))
+for column, colour, marker in (("no correction", BLUE, "o"), ("body-ratio correction", ORANGE, "s")):
+    ax.plot(sweep.index, sweep[column], color=colour, marker=marker, markersize=6, linewidth=2, label=column)
+    ax.annotate(column, (sweep.index[-1], sweep[column].iloc[-1]), xytext=(6, 0), textcoords="offset points",
+                color=INK_2, fontsize=8, va="center")
+for s, name in ((1.0, "training\naspect"), ((4 / 3) / TRAIN_WIDTH_OVER_HEIGHT, "4:3"), ((16 / 9) / TRAIN_WIDTH_OVER_HEIGHT, "16:9")):
+    ax.axvline(s, color=GRID, linewidth=1, zorder=0)
+    ax.annotate(name, (s, 0.02), ha="center", color=MUTED, fontsize=8)
+ax.set_xscale("log")
+ax.set_xticks(STRETCHES, [f"{s:g}" for s in STRETCHES])
+ax.minorticks_off()
+ax.set(title="Accuracy as the camera's aspect ratio moves away from training", xlabel="Vertical stretch s (log scale)",
+       ylabel="Test top-1", ylim=(0, min(1.0, 1.25 * sweep.values.max())), xlim=(0.45, 4.2))
+ax.legend(loc="lower left")
+plt.tight_layout()
+plt.show()
+def span(values):
+    """'a% to b%' for a range of accuracies, or a single 'a%' when every value rounds the same."""
+    low, high = f"{values.min():.1%}", f"{values.max():.1%}"
+    return low if low == high else f"{low} to {high}"
+
+
+takeaway(f"Without correction, a 16:9 webcam (s = 2.46) gives {sweep.loc[2.46, 'no correction']:.1%} against "
+         f"{sweep.loc[1.0, 'no correction']:.1%} at the training aspect; with the body-ratio correction top-1 is "
+         f"{span(sweep['body-ratio correction'])} across the whole sweep, and the correction changes "
+         f"top-1 by {pts(100 * (sweep.loc[1.0, 'body-ratio correction'] - sweep.loc[1.0, 'no correction']), signed=True)} points "
+         "when nothing is wrong.")
+
+%% md
+## 7. Frame rate and dropped frames
+
+Training resamples every sequence to 32 frames by frame index, so a lower but steady frame rate mostly changes how many real frames feed the interpolation. Random drops are different: they warp time, because the index no longer advances at a steady pace. The plot compares the two at the same share of frames kept.
+
+%% code
+frame_rows = []
+for k in (1, 2, 3, 4, 6):
+    share = 1 / k
+    VARIANTS[f"every{k}"] = lambda xy, i, k=k: keep_every(xy, k)
+    VARIANTS[f"drop{k}"] = lambda xy, i, k=k: drop_random(xy, 1 - 1 / k, i)
+    steady, steady_kept = run_variant(f"every{k}")
+    random_, random_kept = run_variant(f"drop{k}")
+    frame_rows.append({"share kept": share, "steady lower rate": steady[base].mean(), "random drops": random_[base].mean(),
+                       "no prediction (steady)": int((base & ~steady_kept).sum()),
+                       "no prediction (random)": int((base & ~random_kept).sum())})
+frames_df = pd.DataFrame(frame_rows).set_index("share kept")
+display(frames_df.round(3))
+
+fig, ax = plt.subplots(figsize=(8, 4))
+for column, colour, marker in (("steady lower rate", BLUE, "o"), ("random drops", ORANGE, "s")):
+    ax.plot(frames_df.index, frames_df[column], color=colour, marker=marker, markersize=6, linewidth=2, label=column)
+ax.invert_xaxis()
+ax.set_xticks(frames_df.index, ["all", "1/2", "1/3", "1/4", "1/6"])
+ax.set(title="Fewer frames: steady rate against random drops", xlabel="Share of frames kept",
+       ylabel="Test top-1", ylim=(0, min(1.0, 1.25 * frames_df[["steady lower rate", "random drops"]].values.max())))
+ax.legend(loc="lower left")
+plt.tight_layout()
+plt.show()
+takeaway(f"Keeping a steady 1/3 of the frames gives {frames_df.loc[1 / 3, 'steady lower rate']:.1%} and dropping 2/3 at random "
+         f"{frames_df.loc[1 / 3, 'random drops']:.1%}, against {frames_df.loc[1.0, 'steady lower rate']:.1%} with every frame; at 1/6, "
+         f"{frames_df.loc[1 / 6, 'no prediction (steady)']} sequences no longer have 3 hand frames.")
+
+%% md
+The cover image of this notebook is the summary bar chart from section 4, redrawn at 1280x720.
+
+%% code
+fig, ax = plt.subplots(figsize=(12.8, 7.2))
+skew_bars(ax, fontsize=12)
+ax.set_xlabel("Test top-1 on 4 unseen signers (whiskers: 95% CI of the drop)", fontsize=12)
+ax.set_title(f"Train-serve skew in a MediaPipe sign classifier\n'{worst}' costs the most: "
+             f"{results['clean']['top1']:.1%} falls to {summary.loc[worst, 'top1']:.1%}", fontsize=16, pad=14)
+plt.tight_layout()
+save_cover(fig)
+plt.close(fig)
+
+%% md
+## 8. What we found
+
+%% code
+display(Markdown(
+    f"On four signers the model never saw, the clean pipeline scores {results['clean']['top1']:.1%} top-1, swapping the hand "
+    f"slots (the ManuVox bug) drops it to {summary.loc['hand slots swapped', 'top1']:.1%}, and assigning hands by the nearer "
+    f"pose wrist brings it back to {swap_fixed[base].mean():.1%}. "
+    f"A mirrored camera costs {pts(summary.loc['mirrored camera', 'drop_pts'])} points because preprocessing mirrors left-dominant "
+    + (f"input back; on the {tie[base].mean():.0%} of sequences where both hands are visible equally often it scores "
+       f"{rate(corrects['mirror'], base & tie):.1%} against {rate(clean_correct, base & tie):.1%} clean. "
+       if (base & tie).any() else "input back, and no test sequence is a tie. ")
+    + f"Flipping x without relabelling costs {pts(summary.loc['x flipped, labels kept', 'drop_pts'])} points and a 16:9 webcam "
+    f"without aspect correction {pts(summary.loc['16:9 webcam (s = 2.46)', 'drop_pts'])}. "
+    f"With the body-ratio correction, top-1 is {span(sweep['body-ratio correction'])} at every stretch in the sweep. "
+    f"Halving the frame rate changes top-1 by {pts(-summary.loc['half the frame rate', 'drop_pts'], signed=True)} points and "
+    f"dropping 30% of frames at random by {pts(-summary.loc['30% of frames dropped', 'drop_pts'], signed=True)}."
+))
+
+%% md
+### Limitations
+
+- These are simulations on recorded landmarks. A live tracker also adds noise, misses hands and segments signs, none of which is modelled here. The repository's live-gap study measures those on real webcam clips.
+- The model trains for 30 epochs against notebook 4's 80; every drop is measured against this model's own clean score.
+- Four test signers is a small sample, and all four are right-dominant in this split (section 4 prints the left-dominant share per signer).
+- The aspect stretch assumes the training videos' effective width-to-height ratio of 0.723 estimated in the repository; if it is off, the s values for 4:3 and 16:9 shift.
+
+### Ideas to try
+
+- Train with aspect and frame-rate augmentation and rerun the sweeps to see how much of each gap training can close.
+- Add tracker-style hand dropout (random frames where one hand disappears) and measure it the same way.
+- Swap the hands in only some frames, as a flickering handedness label would, instead of all of them.
+
+### The series
+
+{{SERIES}}
+
+If this helped, an upvote helps other people find it, and feedback in the comments is welcome.

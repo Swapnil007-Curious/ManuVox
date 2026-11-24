@@ -1,0 +1,18 @@
+{
+  "id": "swapnilshukla007/asl-signs-eda-animating-94k-landmark-sequences",
+  "title": "ASL Signs EDA: animating 94k landmark sequences",
+  "code_file": "notebook.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "machine_shape": "",
+  "dataset_sources": [],
+  "competition_sources": [
+    "asl-signs"
+  ],
+  "kernel_sources": [],
+  "model_sources": []
+}

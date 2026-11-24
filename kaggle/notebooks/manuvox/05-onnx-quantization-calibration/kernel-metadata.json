@@ -1,0 +1,18 @@
+{
+  "id": "swapnilshukla007/pytorch-to-browser-onnx-fp16-int8-calibration",
+  "title": "PyTorch to browser: ONNX, FP16, INT8, calibration",
+  "code_file": "notebook.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "machine_shape": "NvidiaTeslaT4",
+  "dataset_sources": [],
+  "competition_sources": [
+    "asl-signs"
+  ],
+  "kernel_sources": [],
+  "model_sources": []
+}

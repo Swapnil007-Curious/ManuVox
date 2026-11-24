@@ -1,0 +1,261 @@
+%% md
+# Why random splits overstate sign recognition accuracy
+
+{{HEADER}}
+
+The 94,477 `asl-signs` sequences come from only 21 signers, and each signer repeats each sign several times. Split them at random and the test set fills with near-copies of training clips by the same person, so the model is partly graded on recognising people. This notebook trains one small model on the same data under two 5-fold cross-validations, one with random folds and one with folds grouped by signer, and compares the accuracy each reports. Then it traces where the gap comes from.
+
+Data: the `asl-signs` competition files only (CC BY 4.0). Needs a GPU (T4), about 35 minutes on Kaggle. Part 3 of a 5-notebook series.
+
+Contents
+
+1. Setup and data
+2. Two ways to make five folds
+3. The same model, ten times
+4. How far apart the two estimates are
+5. Signer by signer
+6. Where the gap comes from
+7. What we found
+
+%% md
+## 1. Setup and data
+
+Preprocessing is the same as in notebooks 1 and 2: frames without a hand dropped, left-dominant sequences mirrored, coordinates centred on the shoulders and scaled by the shoulder width, 32 frames resampled.
+
+%% include setup
+
+%% include data
+
+%% include preprocess
+
+%% code
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # A T4 on Kaggle; CPU works for FAST runs.
+N_FOLDS = 5
+EPOCHS = 2 if FAST else 25  # Fixed for every fold; no early stopping, so both schemes train identically.
+LR = 1e-3
+
+%% md
+The model is the repository's temporal CNN: coordinates and velocity in, six depthwise-separable convolution blocks over time, about 330k parameters. It trains in seconds per epoch on a T4, which is what makes ten runs affordable. The model and training code is shared with the rest of the series and collapsed here.
+
+%% include-hide features
+
+%% include-hide cnn
+
+%% include-hide augment
+
+%% include-hide train
+
+%% code
+DATA_DIR = find_competition_dir()
+table, sign_map = load_table(DATA_DIR)
+X, rows, _ = build_features(table, DATA_DIR)
+x_all = torch.from_numpy(X).to(DEVICE)
+y_all = torch.from_numpy(rows["label"].to_numpy()).long().to(DEVICE)
+print(f"{len(rows):,} sequences from {rows['participant_id'].nunique()} signers on {DEVICE}")
+
+%% md
+## 2. Two ways to make five folds
+
+Random folds deal each sign's sequences out to the five folds in turn, so every fold has every sign and every signer. Grouped folds put each signer's sequences in one fold only, balancing the folds' sizes, so a test fold always holds people the model has never seen.
+
+%% code
+def random_folds(rows, k=N_FOLDS, seed=SEED):
+    """Stratified by sign: each sign's sequences are shuffled and dealt round-robin to k folds."""
+    fold = np.empty(len(rows), dtype=int)
+    rng = np.random.default_rng(seed)
+    for positions in rows.groupby("label").indices.values():
+        shuffled = rng.permutation(positions)
+        fold[shuffled] = np.arange(len(shuffled)) % k
+    return fold
+
+
+def grouped_folds(rows, k=N_FOLDS, seed=SEED):
+    """By signer: whole signers go to one fold, largest signer first into the emptiest fold."""
+    sizes = rows.groupby("participant_id").size().sample(frac=1, random_state=seed)
+    sizes = sizes.sort_values(ascending=False, kind="stable")
+    load, owner = np.zeros(k), {}
+    for participant, n in sizes.items():
+        owner[participant] = int(np.argmin(load))
+        load[owner[participant]] += n
+    return rows["participant_id"].map(owner).to_numpy()
+
+
+folds = {"random": random_folds(rows), "grouped by signer": grouped_folds(rows)}
+signers = rows["participant_id"].to_numpy()
+overview = []
+for scheme, fold in folds.items():
+    for f in range(N_FOLDS):
+        test = fold == f
+        overview.append({"scheme": scheme, "fold": f, "test sequences": int(test.sum()),
+                         "test signers": len(set(signers[test])),
+                         "test signers also in training": len(set(signers[test]) & set(signers[~test]))})
+pd.DataFrame(overview).set_index(["scheme", "fold"])
+
+%% md
+## 3. The same model, ten times
+
+Each run trains a fresh model on four folds for the same number of epochs with the same seed and recipe, then predicts the fifth. Every sequence gets exactly one out-of-fold prediction per scheme.
+
+%% code
+runs, predictions = [], {}
+for scheme, fold in folds.items():
+    predicted = np.full(len(rows), -1)
+    for f in range(N_FOLDS):
+        test = torch.from_numpy(fold == f).to(DEVICE)
+        started = time.perf_counter()
+        model, _ = train_model(TemporalCNN(), x_all[~test], y_all[~test], epochs=EPOCHS, lr=LR, recipe=RECIPE_V1, quiet=True)
+        logits = predict_logits(model, x_all[test])
+        predicted[fold == f] = logits.argmax(1).cpu().numpy()
+        runs.append({"scheme": scheme, "fold": f, "top1": top_k(logits, y_all[test]), "top5": top_k(logits, y_all[test], 5),
+                     "seconds": time.perf_counter() - started})
+        print(f"{scheme:>17}, fold {f}: top-1 {runs[-1]['top1']:.3f}, top-5 {runs[-1]['top5']:.3f} ({runs[-1]['seconds']:.0f} s)")
+    predictions[scheme] = predicted
+runs = pd.DataFrame(runs)
+
+%% md
+## 4. How far apart the two estimates are
+
+%% code
+summary = runs.groupby("scheme")[["top1", "top5"]].agg(["mean", "std"])
+display(summary.round(3))
+gap = 100 * (summary.loc["random", ("top1", "mean")] - summary.loc["grouped by signer", ("top1", "mean")])
+
+fig, ax = plt.subplots(figsize=(7, 4.2))
+for i, (scheme, colour) in enumerate(zip(folds, (BLUE, ORANGE))):
+    values = runs.loc[runs["scheme"] == scheme, "top1"]
+    ax.scatter(np.full(len(values), i) + np.linspace(-0.08, 0.08, len(values)), values, color=colour, s=50, zorder=3,
+               edgecolor=SURFACE, linewidth=1.5, label=f"{scheme} (one dot per fold)")
+    ax.hlines(values.mean(), i - 0.25, i + 0.25, color=INK, linewidth=2)
+    ax.annotate(f"mean {values.mean():.1%}", (i + 0.27, values.mean()), va="center", color=INK_2)
+ax.set_xticks([0, 1], list(folds))
+ax.set(title="5-fold cross-validated top-1, same model and data", xlabel="How the folds were made", ylabel="Top-1 on the held-out fold",
+       xlim=(-0.5, 1.9))
+ax.legend(loc="lower left")
+plt.tight_layout()
+plt.show()
+takeaway(f"Random folds report {summary.loc['random', ('top1', 'mean')]:.1%} top-1 and signer-grouped folds "
+         f"{summary.loc['grouped by signer', ('top1', 'mean')]:.1%}: the same model looks {abs(gap):.1f} points "
+         f"{'better' if gap > 0 else 'worse'} when test signers also appear in training. Fold-to-fold sd is {summary.loc['grouped by signer', ('top1', 'std')]:.3f} for grouped "
+         f"folds, which hold different people, and {summary.loc['random', ('top1', 'std')]:.3f} for random folds.")
+
+%% md
+The repository behind this series found the same gap with a held-out test set instead of cross-validation. In its committed results (`results/tables/test_fp32_summary.csv`), its temporal CNN (on the v1 input with 7 pose points instead of 17) scored 80.7% top-1 on a stratified random split (one seed, 8,755 test sequences) and 62.5% (mean of three seeds, sd 0.2) on four held-out signers (16,242 test sequences). Those two test sets differ in size and content, which the cross-validation above avoids.
+
+## 5. Signer by signer
+
+Every sequence has one out-of-fold prediction per scheme, so each signer gets two accuracies: one from a fold where their other clips were in training, and one from a fold where none were.
+
+%% code
+from matplotlib.ticker import PercentFormatter
+
+correct = {scheme: predictions[scheme] == rows["label"].to_numpy() for scheme in folds}
+per_signer = pd.DataFrame({scheme: pd.Series(c).groupby(signers).mean() for scheme, c in correct.items()})
+per_signer["gain"] = 100 * (per_signer["random"] - per_signer["grouped by signer"])
+per_signer = per_signer.sort_values("grouped by signer")
+
+fig, ax = plt.subplots(figsize=(9, 5.6))
+yy = np.arange(len(per_signer))
+ax.hlines(yy, per_signer["grouped by signer"], per_signer["random"], color=GRID, linewidth=2, zorder=1)
+ax.scatter(per_signer["grouped by signer"], yy, color=ORANGE, s=40, zorder=3, label="grouped by signer (never seen)")
+ax.scatter(per_signer["random"], yy, color=BLUE, s=40, zorder=3, label="random (other clips seen)")
+ax.set_yticks(yy, per_signer.index.astype(str), fontsize=8)
+ax.set(title="Out-of-fold top-1 per signer under each scheme", xlabel="Top-1 on that signer's sequences", ylabel="Participant id")
+ax.xaxis.set_major_formatter(PercentFormatter(1.0))
+ax.legend(loc="lower right")
+plt.tight_layout()
+plt.show()
+higher = int((per_signer["gain"] > 0).sum())
+takeaway(f"{higher} of {len(per_signer)} signers score higher under random folds (random minus grouped runs from "
+         f"{per_signer['gain'].min():.1f} to {per_signer['gain'].max():.1f} points); as unseen signers they range from "
+         f"{per_signer['grouped by signer'].min():.1%} to {per_signer['grouped by signer'].max():.1%}, a spread a random split hides.")
+
+%% md
+## 6. Where the gap comes from
+
+Under random folds, a test clip usually has siblings in training: other clips of the same sign by the same signer. The next cell counts them for every test clip and groups accuracy by that count.
+
+%% code
+fold = folds["random"]
+pairs = pd.DataFrame({"signer": signers, "label": rows["label"].to_numpy(), "fold": fold})
+total = pairs.groupby(["signer", "label"])["fold"].transform("size")
+in_fold = pairs.groupby(["signer", "label", "fold"])["fold"].transform("size")
+siblings = (total - in_fold).to_numpy()  # Same signer, same sign, in the training folds.
+bins = [-1, 0, 2, 5, 9, np.inf]
+names = ["0", "1-2", "3-5", "6-9", "10+"]
+bucket = pd.cut(siblings, bins=bins, labels=names)
+by_bucket = pd.DataFrame({"correct": correct["random"], "bucket": bucket}).groupby("bucket", observed=False)["correct"].agg(["mean", "size"])
+display(by_bucket.rename(columns={"mean": "top-1 (random folds)", "size": "test clips"}).round(3))
+
+fig, ax = plt.subplots(figsize=(7.5, 4))
+bars = ax.bar(names, by_bucket["mean"], color=BLUE, width=0.7)
+ax.bar_label(bars, labels=[f"{m:.0%}\n(n={n:,})" if n else "no clips" for m, n in zip(by_bucket["mean"], by_bucket["size"])], padding=3, fontsize=8, color=INK_2)
+grouped_mean = correct["grouped by signer"].mean()
+ax.axhline(grouped_mean, color=ORANGE, linewidth=2)
+ax.annotate(f"grouped folds: {grouped_mean:.0%}", (len(names) - 0.6, grouped_mean), xytext=(0, 5), textcoords="offset points",
+            ha="right", color=INK_2)
+ax.set(title="Random folds: accuracy by same-signer copies in training", xlabel="Training clips of the same sign by the same signer",
+       ylabel="Top-1 on the test clip", ylim=(0, 1.1))
+plt.tight_layout()
+plt.show()
+share_with = (siblings > 0).mean()
+top_bucket = by_bucket[by_bucket["size"] > 0].index[-1]  # The bucket with the most siblings that has clips.
+takeaway(f"{share_with:.0%} of random-fold test clips have at least one same-signer, same-sign clip in training; clips with none "
+         f"score {by_bucket.loc['0', 'mean']:.1%} and clips with {top_bucket} such copies score {by_bucket.loc[top_bucket, 'mean']:.1%} "
+         f"(n = {by_bucket.loc[top_bucket, 'size']:,}), against {grouped_mean:.1%} for truly unseen signers.")
+
+%% md
+The cover image is the per-signer comparison from section 5.
+
+%% code
+fig, ax = plt.subplots(figsize=(12.8, 7.2))
+ax.hlines(yy, per_signer["grouped by signer"], per_signer["random"], color=GRID, linewidth=3, zorder=1)
+ax.scatter(per_signer["grouped by signer"], yy, color=ORANGE, s=90, zorder=3, label="signer never seen in training")
+ax.scatter(per_signer["random"], yy, color=BLUE, s=90, zorder=3, label="random split: other clips of the signer in training")
+ax.set_yticks(yy, per_signer.index.astype(str), fontsize=10)
+ax.set_xlabel("Top-1 on that signer's sequences", fontsize=12)
+ax.xaxis.set_major_formatter(PercentFormatter(1.0))
+ax.set_ylabel("Participant id", fontsize=12)
+ax.set_title(f"Same model, two kinds of 5-fold split: random {summary.loc['random', ('top1', 'mean')]:.1%} top-1, "
+             f"grouped by signer {summary.loc['grouped by signer', ('top1', 'mean')]:.1%}", fontsize=16, pad=14)
+ax.legend(loc="lower right", fontsize=11)
+plt.tight_layout()
+save_cover(fig)
+plt.close(fig)
+
+%% md
+## 7. What we found
+
+%% code
+display(Markdown(
+    f"With the same model, data, recipe and {EPOCHS} epochs, random 5-fold cross-validation reports "
+    f"{summary.loc['random', ('top1', 'mean')]:.1%} top-1 and signer-grouped cross-validation "
+    f"{summary.loc['grouped by signer', ('top1', 'mean')]:.1%}, a gap of {gap:.1f} points. "
+    f"{higher} of {len(per_signer)} signers look better under random folds, and as unseen signers their accuracy spans "
+    f"{per_signer['grouped by signer'].min():.1%} to {per_signer['grouped by signer'].max():.1%}. "
+    f"{share_with:.0%} of random-fold test clips have a same-signer copy of the same sign in training; clips with no such "
+    f"copy score {by_bucket.loc['0', 'mean']:.1%} and clips with {top_bucket} copies {by_bucket.loc[top_bucket, 'mean']:.1%}. "
+    "The grouped number is the one to report for a model meant to work for signers it has not seen."
+))
+
+%% md
+### Limitations
+
+- One architecture and a fixed 25-epoch schedule; a larger model might memorise signers more, or less.
+- Five grouped folds of four or five signers each give only five estimates, so the grouped mean has a wide uncertainty.
+- Random-fold clips with no same-signer sibling are rare and may be unusual clips, so that bucket is not a clean estimate of unseen-signer accuracy.
+
+### Ideas to try
+
+- Leave-one-signer-out cross-validation: 21 folds, one estimate per signer.
+- Plot grouped accuracy against the number of training signers to see how much a new signer would help.
+- Repeat with the CNN + Transformer hybrid from notebook 4 and check whether the gap grows with model size.
+
+### The series
+
+{{SERIES}}
+
+If this helped, an upvote helps other people find it, and feedback in the comments is welcome.

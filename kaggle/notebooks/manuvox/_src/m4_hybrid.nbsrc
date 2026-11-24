@@ -1,0 +1,300 @@
+%% md
+# A CNN + Transformer hybrid for isolated sign recognition in PyTorch
+
+{{HEADER}}
+
+This notebook builds and trains the model that ManuVox runs in the browser: a 3.4M-parameter network that alternates depthwise temporal convolutions with transformer blocks, on 588 features per frame computed inside the model. It trains on a Kaggle GPU with a signer-independent split, so the four test signers are never seen in training, then looks at which signs, which signers and which sign pairs it gets wrong. The repository trains the same model for 150 epochs and reports 68.5% top-1 (mean of three seeds, sd 0.2) on these four test signers (`results/model_selection.md`); this run uses 80 epochs to stay well inside Kaggle's limits.
+
+Data: the `asl-signs` competition files only (CC BY 4.0). Needs a GPU (T4), about 35 minutes on Kaggle. Part 4 of a 5-notebook series.
+
+Contents
+
+1. Setup and data
+2. A signer-independent split
+3. Features inside the model
+4. The hybrid architecture
+5. Augmentation and the training recipe
+6. Training
+7. Test results on unseen signers
+8. Per-sign accuracy
+9. The most common confusions
+10. What we found
+
+%% md
+## 1. Setup and data
+
+Preprocessing is shared with the rest of the series (notebook 1 explains the data): frames without a hand are dropped, left-dominant sequences are mirrored so the dominant hand is always in the right-hand block, coordinates are centred on the shoulders and divided by the shoulder width, and every sequence is resampled to 32 frames. One frame becomes 120 numbers: x and y for 59 landmarks (both hands and pose points 0-16) plus two hand-presence flags.
+
+%% include setup
+
+%% include data
+
+%% include preprocess
+
+%% code
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # A T4 on Kaggle; CPU works for FAST runs.
+EPOCHS = 3 if FAST else 80  # The repository's recipe runs 150 with early stopping.
+LR = 5e-4
+EMA_DECAY = 0.99 if FAST else 0.999  # FAST runs too few steps for 0.999.
+
+DATA_DIR = find_competition_dir()
+table, sign_map = load_table(DATA_DIR)
+labels = {index: sign for sign, index in sign_map.items()}
+X, rows, _ = build_features(table, DATA_DIR)
+
+%% md
+## 2. A signer-independent split
+
+Whole signers go to one split: 4 for test, 3 for validation and the other 14 for training. Notebook 3 shows why a random split would overstate accuracy. With seed 42 this is the repository's split, so the numbers here are comparable with its results.
+
+%% code
+split, test_signers, val_signers = signer_split(rows)
+print(f"test signers {test_signers}\nval signers  {val_signers}")
+display(pd.Series(split).value_counts().rename("sequences").to_frame())
+
+
+def tensors(name):
+    """Features and labels of one split, on the GPU."""
+    mask = split == name
+    return torch.from_numpy(X[mask]).to(DEVICE), torch.from_numpy(rows["label"].to_numpy()[mask]).long().to(DEVICE)
+
+
+(x_train, y_train), (x_val, y_val), (x_test, y_test) = (tensors(s) for s in ("train", "val", "test"))
+test_rows = rows[split == "test"].reset_index(drop=True)
+
+%% md
+## 3. Features inside the model
+
+The model computes its own features from the 120 raw numbers per frame, so the exported ONNX file (notebook 5) carries them and the browser only has to supply landmarks. Per frame:
+
+- the 118 coordinates, their velocity (118) and acceleration (118);
+- the 210 pairwise distances between the dominant hand's 21 points, which describe handshape regardless of where the hand is;
+- 24 distances from the dominant wrist and fingertips to the nose, the mouth centre and both shoulders, which place the hand on the body.
+
+That is 588 features. A missing point is stored as (0, 0), and any feature that involves a missing point is 0. Each feature is standardised with the mean and standard deviation of the training split.
+
+%% include features
+
+%% md
+## 4. The hybrid architecture
+
+The 588 features are projected to 256 channels. Three stages follow, each with two convolution blocks and one transformer block. A convolution block is a depthwise convolution over 17 frames with batch norm and SiLU, then a pointwise expansion to 512 channels and back, added to its input. Convolutions pick up local motion; the transformer block lets every frame attend to every other frame. Attention is written with plain `Linear` and `matmul`, which keeps the ONNX graph simple to quantise. The output is averaged over time and a linear head gives 250 logits. Head dropout of 0.4 switches on halfway through training.
+
+%% include hybrid
+
+%% code
+model = HybridClassifier()
+parts = {"projection": model.proj, "stages": model.stages, "head": model.head}
+display(pd.Series({name: sum(p.numel() for p in part.parameters()) for name, part in parts.items()}, name="parameters").to_frame())
+print(f"total {sum(p.numel() for p in model.parameters()):,} parameters; "
+      f"output {tuple(model.eval()(torch.zeros(2, NUM_FRAMES, FRAME_DIM)).shape)} for a batch of 2")
+
+%% md
+## 5. Augmentation and the training recipe
+
+The recipe is the repository's v2 recipe. Every batch is augmented on the GPU, each transform applied to a sample with its own probability: a random rotation (up to 15 degrees), scale (0.85 to 1.15) and shift of the whole skeleton (0.8); each hand rotated about its own wrist (0.5); a random 80-100% window stretched back to 32 frames (0.5); up to 20% of frames dropped and the rest resampled (0.5); small coordinate noise (0.5); one or two short windows blanked (0.5); and 1-4 landmarks hidden for the whole sequence (0.3). There is no horizontal flip, because preprocessing already put the dominant hand on one side.
+
+Training uses AdamW (learning rate 5e-4, weight decay 0.05) with a 5% warmup and cosine decay, label smoothing 0.1, gradient clipping at 1.0 and mixed precision. An exponential moving average of the weights (decay 0.999) is what gets validated and kept, and the epoch with the best validation top-1 is selected. The test signers play no part in any choice.
+
+%% include augment
+
+%% include train
+
+%% code
+seed_torch()
+gen = torch.Generator(device=DEVICE).manual_seed(SEED)
+example = x_train[:1].float().repeat(6, 1, 1)
+augmented = torch.cat([example[:1], augment_batch(example[1:], RECIPE_V2, gen)]).cpu().numpy()
+wrist = augmented[:, :, 2 * RIGHT.start : 2 * RIGHT.start + 2]  # Dominant wrist, (6, 32, 2).
+
+fig, ax = plt.subplots(figsize=(6.5, 5))
+for i, track in enumerate(wrist):
+    ok = np.abs(track).sum(axis=1) > 0
+    ax.plot(track[ok, 0], track[ok, 1], color=INK if i == 0 else BLUE, linewidth=2.4 if i == 0 else 1.2,
+            alpha=1 if i == 0 else 0.7, marker="o" if i == 0 else None, markersize=3,
+            label="original" if i == 0 else ("augmented copies" if i == 1 else None))
+ax.invert_yaxis()
+ax.set_aspect("equal")
+ax.set(title=f"Dominant-wrist path of one '{labels[int(y_train[0])]}' clip and 5 augmented copies",
+       xlabel="x (shoulder widths from the shoulder midpoint)", ylabel="y (shoulder widths, down is positive)")
+ax.legend(loc="best")
+plt.tight_layout()
+plt.show()
+takeaway("Each copy keeps the shape of the movement while its position, size, rotation and timing change, which is the "
+         "variation between signers and cameras the model has to ignore.")
+
+%% md
+## 6. Training
+
+%% code
+model, history = train_model(HybridClassifier(), x_train, y_train, x_val, y_val, epochs=EPOCHS, lr=LR,
+                             recipe=RECIPE_V2, ema_decay=EMA_DECAY)
+best_epoch = int(history["val_top1"].idxmax()) + 1
+print(f"best val top-1 {history['val_top1'].max():.3f} at epoch {best_epoch}; "
+      f"{history['seconds'].sum() / 60:.1f} min of training")
+
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.plot(history["epoch"], history["train_top1"], color=BLUE, linewidth=2, label="train (augmented batches)")
+ax.plot(history["epoch"], history["val_top1"], color=ORANGE, linewidth=2, label="validation (3 unseen signers, EMA weights)")
+ax.axvline(best_epoch, color=GRID, linewidth=1, zorder=0)
+ax.annotate(f"best epoch {best_epoch}", (best_epoch, 0.05), xytext=(4, 0), textcoords="offset points", color=MUTED, fontsize=8)
+ax.set(title="Top-1 accuracy by epoch", xlabel="Epoch", ylabel="Top-1", ylim=(0, 1))
+ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+ax.legend(loc="lower right")
+plt.tight_layout()
+plt.show()
+final = history.iloc[best_epoch - 1]
+takeaway(f"At the selected epoch the model gets {final['train_top1']:.1%} of augmented training batches right and "
+         f"{final['val_top1']:.1%} of the validation signers' clips, a {100 * (final['train_top1'] - final['val_top1']):.0f}-point gap; "
+         "training accuracy is measured on augmented batches and validation on unaugmented clips of new signers.")
+
+%% md
+## 7. Test results on unseen signers
+
+The test split is scored once, with the epoch chosen on validation.
+
+%% code
+test_logits = predict_logits(model, x_test)
+predicted = test_logits.argmax(1).cpu().numpy()
+truth = y_test.cpu().numpy()
+correct = predicted == truth
+low, high = bootstrap_ci(correct)
+
+
+def macro_f1(truth, predicted, n=250):
+    """Unweighted mean over classes of the F1 score."""
+    tp = np.bincount(truth[predicted == truth], minlength=n).astype(float)
+    precision = tp / np.maximum(np.bincount(predicted, minlength=n), 1)
+    recall = tp / np.maximum(np.bincount(truth, minlength=n), 1)
+    return float(np.mean(np.where(precision + recall > 0, 2 * precision * recall / np.maximum(precision + recall, 1e-12), 0)))
+
+
+test_top1 = correct.mean()
+print(f"test top-1 {test_top1:.3f} (95% CI {low:.3f}-{high:.3f} over clips), top-5 {top_k(test_logits, y_test, 5):.3f}, "
+      f"macro F1 {macro_f1(truth, predicted):.3f}, {len(truth):,} clips")
+by_signer = pd.Series(correct).groupby(test_rows["participant_id"].to_numpy()).agg(["mean", "size"])
+by_signer.columns = ["top-1", "clips"]
+by_signer.round(3)
+
+%% code
+fig, ax = plt.subplots(figsize=(6.5, 3.4))
+bars = ax.bar(by_signer.index.astype(str), by_signer["top-1"], color=BLUE, width=0.6)
+ax.bar_label(bars, labels=[f"{v:.1%}" for v in by_signer["top-1"]], padding=3, color=INK_2)
+ax.axhline(test_top1, color=INK, linewidth=1)
+ax.annotate(f"all test clips {test_top1:.1%}", (3.4, test_top1), xytext=(0, 4), textcoords="offset points", ha="right", color=INK_2)
+ax.set(title="Test top-1 per unseen signer", xlabel="Participant id", ylabel="Top-1", ylim=(0, 1))
+plt.tight_layout()
+plt.show()
+takeaway(f"Accuracy ranges from {by_signer['top-1'].min():.1%} to {by_signer['top-1'].max():.1%} across the four test signers, "
+         f"a {100 * (by_signer['top-1'].max() - by_signer['top-1'].min()):.0f}-point spread from who is signing.")
+
+%% md
+## 8. Per-sign accuracy
+
+%% code
+per_sign = pd.DataFrame({"sign": [labels[i] for i in truth], "correct": correct}).groupby("sign")["correct"].agg(["mean", "size"])
+per_sign.columns = ["top-1", "clips"]
+ends = pd.concat([per_sign.nsmallest(12, "top-1"), per_sign.nlargest(12, "top-1").iloc[::-1]])
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5.4), gridspec_kw={"width_ratios": [1, 1.2]})
+ax1.hist(per_sign["top-1"], bins=20, range=(0, 1), color=BLUE, rwidth=0.9)
+ax1.set(title="Distribution of per-sign top-1", xlabel="Top-1 of one sign on the test signers", ylabel="Signs")
+ax2.barh(range(len(ends)), ends["top-1"], color=[ORANGE] * 12 + [BLUE] * 12, height=0.75)
+ax2.set_yticks(range(len(ends)), ends.index, fontsize=8)
+ax2.set(title="12 hardest and 12 easiest signs", xlabel="Top-1", ylabel="Sign", xlim=(0, 1))
+ax2.legend(handles=[plt.Rectangle((0, 0), 1, 1, color=ORANGE), plt.Rectangle((0, 0), 1, 1, color=BLUE)],
+           labels=["hardest", "easiest"], loc="lower right")
+plt.tight_layout()
+plt.show()
+takeaway(f"Per-sign top-1 runs from {per_sign['top-1'].min():.0%} ('{per_sign['top-1'].idxmin()}') to "
+         f"{per_sign['top-1'].max():.0%} ('{per_sign['top-1'].idxmax()}'); {(per_sign['top-1'] < 0.4).sum()} signs fall below 40% "
+         f"and {(per_sign['top-1'] >= 0.9).sum()} reach 90% or more.")
+
+%% md
+## 9. The most common confusions
+
+A confusion pair counts test clips of sign A predicted as sign B. When reading the list, look for pairs that share a handshape or a location: the model sees only x and y of the hands and the pose, with no mouth shapes and no depth.
+
+%% code
+pairs = pd.DataFrame({"true": [labels[i] for i in truth], "predicted": [labels[i] for i in predicted]})
+pairs = pairs[pairs["true"] != pairs["predicted"]].value_counts().rename("clips").reset_index()
+pairs["share of the true sign"] = pairs["clips"] / pairs["true"].map(per_sign["clips"])
+top = pairs.head(15)
+display(top.round(3))
+
+fig, ax = plt.subplots(figsize=(8, 5.2))
+names = [f"{t} -> {p}" for t, p in zip(top["true"], top["predicted"])]
+ax.barh(range(len(top))[::-1], top["clips"], color=BLUE, height=0.75)
+ax.set_yticks(range(len(top))[::-1], names, fontsize=9)
+ax.set(title="15 most frequent confusions on the test signers", xlabel="Test clips (true sign -> predicted sign)", ylabel="Confusion")
+plt.tight_layout()
+plt.show()
+lead = top.iloc[0]
+takeaway(f"The most frequent error, '{lead['true']}' read as '{lead['predicted']}', takes {lead['share of the true sign']:.0%} of "
+         f"'{lead['true']}' clips; the top 15 pairs account for {top['clips'].sum() / (~correct).sum():.0%} of all "
+         f"{(~correct).sum():,} test errors.")
+
+%% code
+both_ways = pairs.assign(pair=[" / ".join(sorted(p)) for p in zip(pairs["true"], pairs["predicted"])]).groupby("pair")["clips"].sum()
+both_ways.sort_values(ascending=False).head(10).rename("clips, both directions").to_frame()
+
+%% md
+The trained weights and label map are saved to the notebook's output, so you can load them without retraining. Notebook 5 exports this architecture to ONNX.
+
+%% code
+torch.save({"state_dict": model.state_dict(), "labels": labels, "test_top1": float(test_top1)}, WORK_DIR / "hybrid_asl_signs.pt")
+print(f"saved hybrid_asl_signs.pt ({(WORK_DIR / 'hybrid_asl_signs.pt').stat().st_size / 1e6:.1f} MB)")
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12.8, 7.2), gridspec_kw={"width_ratios": [1, 1.1]})
+ax1.plot(history["epoch"], history["train_top1"], color=BLUE, linewidth=2.5, label="train")
+ax1.plot(history["epoch"], history["val_top1"], color=ORANGE, linewidth=2.5, label="validation (unseen signers)")
+ax1.set(xlabel="Epoch", ylabel="Top-1", ylim=(0, 1), title="Training")
+ax1.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+ax1.legend(loc="lower right")
+n_cover = min(10, len(top))
+ax2.barh(range(n_cover)[::-1], top["clips"].head(n_cover), color=BLUE, height=0.75)
+ax2.set_yticks(range(n_cover)[::-1], names[:n_cover], fontsize=11)
+ax2.set(xlabel="Test clips", title="Most frequent confusions")
+fig.suptitle(f"CNN + Transformer hybrid: {test_top1:.1%} top-1 on 4 unseen signers ({len(truth):,} clips, 250 signs)",
+             fontweight="bold", fontsize=16, x=0.02, ha="left")
+plt.tight_layout(rect=(0, 0, 1, 0.94))
+save_cover(fig)
+plt.close(fig)
+
+%% md
+## 10. What we found
+
+%% code
+display(Markdown(
+    f"Trained for {len(history)} epochs ({history['seconds'].sum() / 60:.0f} minutes on {DEVICE.type.upper()}), the hybrid scores "
+    f"{test_top1:.1%} top-1 (95% CI {low:.1%} to {high:.1%}) and {top_k(test_logits, y_test, 5):.1%} top-5 on {len(truth):,} clips "
+    f"from four signers it never saw, against 68.5% for the repository's 150-epoch runs on the same signers. "
+    f"The four test signers range from {by_signer['top-1'].min():.1%} to {by_signer['top-1'].max():.1%}, and per-sign top-1 from "
+    f"{per_sign['top-1'].min():.0%} to {per_sign['top-1'].max():.0%}. "
+    f"The 15 most frequent confusion pairs hold {top['clips'].sum() / (~correct).sum():.0%} of the errors, led by "
+    f"'{lead['true']}' read as '{lead['predicted']}'."
+))
+
+%% md
+### Limitations
+
+- One seed and one split. The repository's three seeds differ by 0.2 points; a different set of test signers would move the number more than that (see the per-signer spread above).
+- 80 epochs instead of the repository's 150 with early stopping, so the two scores do not come from the same recipe.
+- The bootstrap interval resamples clips and treats them as independent, which they are not within a signer.
+- Landmarks only: signs that differ by mouth shape or by depth are out of reach for this input.
+
+### Ideas to try
+
+- Average the logits of three seeds; the repository's seed ensemble gains about 2.5 points (`results/model_selection.md`).
+- Add the face landmarks around the mouth as extra input and check the confusion pairs above.
+- Swap the 17-frame depthwise kernel for 9 or 25 and see whether short signs or long signs benefit.
+
+### The series
+
+{{SERIES}}
+
+If this helped, an upvote helps other people find it, and feedback in the comments is welcome.

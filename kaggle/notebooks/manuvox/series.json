@@ -1,0 +1,61 @@
+{
+  "project": "ManuVox",
+  "app_url": "https://swapnil007-curious.github.io/manuvox/",
+  "repo_url": "https://github.com/Swapnil007-Curious/manuvox",
+  "username": "swapnilshukla007",
+  "competition_sources": [
+    "asl-signs"
+  ],
+  "notebooks": [
+    {
+      "key": "m1",
+      "number": 1,
+      "folder": "01-asl-signs-eda",
+      "source": "m1_eda.nbsrc",
+      "title": "ASL Signs EDA: animating 94k landmark sequences",
+      "kaggle_title": "ASL Signs EDA: animating 94k landmark sequences",
+      "gpu": false,
+      "internet": false
+    },
+    {
+      "key": "m2",
+      "number": 2,
+      "folder": "02-hand-swap-bug",
+      "source": "m2_skew.nbsrc",
+      "title": "The hand-swap bug: measuring train-serve skew in MediaPipe sign recognition",
+      "kaggle_title": "The hand-swap bug: train-serve skew in ASL models",
+      "gpu": true,
+      "internet": false
+    },
+    {
+      "key": "m3",
+      "number": 3,
+      "folder": "03-random-vs-grouped-splits",
+      "source": "m3_splits.nbsrc",
+      "title": "Why random splits overstate sign recognition accuracy",
+      "kaggle_title": "Why random splits overstate sign accuracy",
+      "gpu": true,
+      "internet": false
+    },
+    {
+      "key": "m4",
+      "number": 4,
+      "folder": "04-cnn-transformer-hybrid",
+      "source": "m4_hybrid.nbsrc",
+      "title": "A CNN + Transformer hybrid for isolated sign recognition in PyTorch",
+      "kaggle_title": "CNN + Transformer hybrid for isolated ASL signs",
+      "gpu": true,
+      "internet": false
+    },
+    {
+      "key": "m5",
+      "number": 5,
+      "folder": "05-onnx-quantization-calibration",
+      "source": "m5_export.nbsrc",
+      "title": "From PyTorch to the browser: ONNX export, FP16/INT8 quantization and temperature calibration",
+      "kaggle_title": "PyTorch to browser: ONNX, FP16, INT8, calibration",
+      "gpu": true,
+      "internet": true
+    }
+  ]
+}
