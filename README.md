@@ -730,7 +730,7 @@ Worker's URL comes from the repository variable `WORKER_URL` when it is set and 
 from `web/site.config.json` (an unset variable expands to an empty string, which never overrides
 the file); the build prints the URL it uses and, with `REQUIRE_WORKER_URL=true`, fails when both
 are empty, so deploy the Worker first. One-time setup: Settings -> Pages -> Source "GitHub
-Actions" (or `gh api -X POST repos/Swapnil007-Curious/manuvox/pages -f build_type=workflow`).
+Actions" (or `gh api -X POST repos/Swapnil007-Curious/ManuVox/pages -f build_type=workflow`).
 The `web` job in `.github/workflows/ci.yml` runs the type check, the contrast check, unit tests,
 build and browser tests; the `worker` job type-checks and tests `deploy/worker`. The service
 worker adds the COOP/COEP headers GitHub Pages cannot send (the coi-serviceworker approach), so
